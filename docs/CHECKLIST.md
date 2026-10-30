@@ -17,7 +17,7 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 | Multiplayer (§3.5–3.6) | ~40% |
 | Web pages + wallet (§3.7) | ~65% |
 | Server (§7) | ~75% |
-| CI | written, never run |
+| CI | green (4 jobs) |
 
 ---
 
@@ -117,7 +117,7 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 ## 6. Integration and operations
 - [x] Private GitHub repo: https://github.com/MedSlimane/realmforge
 - [x] CI workflow written (`.github/workflows/ci.yml`)
-- [ ] CI green on GitHub
+- [x] CI green on GitHub (all 4 jobs; server job builds game-core first)
 - [x] Shared `layoutHash` test vector `test-vectors/layout-hash.json` (web == server)
 - [x] Root `README.md` + root scripts: `dev:chain`, `deploy:local`, `dev:server`, `dev:web`, `test`, `build`, `e2e:chain`
 - [x] Scripted local end-to-end run (`npm run e2e:chain`): faucet → pin → clear-proof → publish → validate → settleRun + settleRunWithPermit → plays=2, creator +7, player +30, pool 2, treasury 1

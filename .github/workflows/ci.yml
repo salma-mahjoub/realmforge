@@ -84,7 +84,14 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: server/package-lock.json
+          cache-dependency-path: |
+            server/package-lock.json
+            game-core/package-lock.json
+      # server depends on file:../game-core, which resolves to game-core/dist
+      - name: Build game-core (server dependency)
+        if: hashFiles('server/package-lock.json') != ''
+        working-directory: game-core
+        run: npm ci && npm run build
       - run: npm ci
         if: hashFiles('server/package-lock.json') != ''
       - run: npm test

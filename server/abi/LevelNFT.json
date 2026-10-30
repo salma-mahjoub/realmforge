@@ -1,0 +1,15 @@
+{
+  "_comment": "Minimal event ABI matching contracts/src/LevelNFT.sol (reconciled 2026-10-30). Can be replaced by the full artifact ABI (plain array or Hardhat artifact {abi:[...]}). Param names matter: the indexer reads args by name.",
+  "abi": [
+    "event LevelPublished(uint256 indexed id, address indexed creator, bytes32 indexed layoutHash, uint256 parentId, uint96 playFee)",
+    "event PlayFeeUpdated(uint256 indexed id, uint96 fee)",
+    "event LevelToggled(uint256 indexed id, bool active)",
+    "event Liked(uint256 indexed id, address indexed user)",
+    "event Listed(uint256 indexed id, uint256 price)",
+    "event Unlisted(uint256 indexed id)",
+    "event Sold(uint256 indexed id, address indexed from, address indexed to, uint256 price)",
+    "event RunRecorded(uint256 indexed id, address indexed player, uint32 timeMs, bool cleared)",
+    "event NewRecord(uint256 indexed id, address indexed player, uint32 timeMs)",
+    "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)"
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "name": "@realmforge/web",
+  "private": true,
+  "version": "0.1.0",
+  "description": "RealmForge browser DApp: React shell + Phaser 3 (Matter.js) game + wagmi/RainbowKit wallet. Bootstrapped from phaserjs/template-react-ts (MIT).",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@rainbow-me/rainbowkit": "^2.2.11",
+    "@tanstack/react-query": "^5.105.0",
+    "colyseus.js": "^0.16.22",
+    "phaser": "^3.90.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.18.5",
+    "viem": "^2.57.13",
+    "wagmi": "^2.19.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^4.7.0",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.5"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

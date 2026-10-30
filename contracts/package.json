@@ -1,0 +1,41 @@
+{
+  "name": "@realmforge/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "build": "hardhat build",
+    "test": "hardhat test",
+    "test:sol": "hardhat test solidity",
+    "test:node": "hardhat test nodejs",
+    "deploy:local": "hardhat ignition deploy ignition/modules/RealmForge.ts",
+    "deploy:sepolia": "hardhat ignition deploy ignition/modules/RealmForge.ts --network sepolia --parameters ignition/parameters/sepolia.json --verify",
+    "export-abi": "node scripts/export-abi.ts",
+    "deploy:localhost": "hardhat ignition deploy ignition/modules/RealmForge.ts --network localhost",
+    "coverage": "hardhat test --coverage",
+    "gas": "hardhat test --gas-stats",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ignition": "^3.1.9",
+    "@nomicfoundation/hardhat-ignition-viem": "^3.1.6",
+    "@nomicfoundation/hardhat-keystore": "^3.1.2",
+    "@nomicfoundation/hardhat-network-helpers": "^3.0.12",
+    "@nomicfoundation/hardhat-node-test-runner": "^3.1.2",
+    "@nomicfoundation/hardhat-toolbox-viem": "^5.0.7",
+    "@nomicfoundation/hardhat-verify": "^3.1.4",
+    "@nomicfoundation/hardhat-viem": "^3.1.0",
+    "@nomicfoundation/hardhat-viem-assertions": "^3.1.5",
+    "@nomicfoundation/ignition-core": "^3.1.11",
+    "@openzeppelin/contracts": "^5.6.1",
+    "@types/node": "^22.20.5",
+    "forge-std": "https://github.com/foundry-rs/forge-std/tarball/v1.9.7",
+    "hardhat": "^3.21.2",
+    "typescript": "~5.8",
+    "viem": "^2.57.13"
+  },
+  "engines": {
+    "node": ">=22.10"
+  }
+}

@@ -1,0 +1,1507 @@
+{
+  "art": [
+    {
+      "id": "spikes",
+      "category": "hazards",
+      "source": "new-platformer-pack/Vector/Tiles/spikes.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "lava",
+      "category": "hazards",
+      "source": "new-platformer-pack/Vector/Tiles/lava_top.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "saw",
+      "category": "hazards",
+      "source": "new-platformer-pack/Vector/Tiles/saw.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "falling_block",
+      "category": "hazards",
+      "source": "new-platformer-pack/Vector/Enemies/block_idle.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "crate",
+      "category": "dynamic",
+      "source": "new-platformer-pack/Vector/Tiles/block_planks.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "spring",
+      "category": "dynamic",
+      "source": "new-platformer-pack/Vector/Tiles/spring.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "spring_extended",
+      "category": "dynamic",
+      "source": "new-platformer-pack/Vector/Tiles/spring_out.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "conveyor_belt",
+      "category": "dynamic",
+      "source": "new-platformer-pack/Vector/Tiles/conveyor.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "chain_link",
+      "category": "dynamic",
+      "source": "new-platformer-pack/Vector/Tiles/chain.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "pendulum_ball",
+      "category": "dynamic",
+      "source": "new-platformer-pack/Vector/Tiles/weight.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "coin",
+      "category": "items",
+      "source": "new-platformer-pack/Vector/Tiles/coin_gold.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "coin_side",
+      "category": "items",
+      "source": "new-platformer-pack/Vector/Tiles/coin_gold_side.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "key",
+      "category": "items",
+      "source": "new-platformer-pack/Vector/Tiles/key_yellow.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "start",
+      "category": "items",
+      "source": "new-platformer-pack/Vector/Tiles/sign_right.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "checkpoint",
+      "category": "items",
+      "source": "new-platformer-pack/Vector/Tiles/flag_blue_a.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "checkpoint_active",
+      "category": "items",
+      "source": "new-platformer-pack/Vector/Tiles/flag_blue_b.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "goal",
+      "category": "items",
+      "source": "new-platformer-pack/Vector/Tiles/flag_green_a.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "goal_wave",
+      "category": "items",
+      "source": "new-platformer-pack/Vector/Tiles/flag_green_b.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "switch",
+      "category": "items",
+      "source": "new-platformer-pack/Vector/Tiles/switch_blue.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "switch_on",
+      "category": "items",
+      "source": "new-platformer-pack/Vector/Tiles/switch_blue_pressed.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "switch_block",
+      "category": "items",
+      "source": "new-platformer-pack/Vector/Tiles/block_blue.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "ice",
+      "category": "tiles/shared",
+      "source": "custom/ice.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64,
+      "note": "Original RealmForge CC0 supplement."
+    },
+    {
+      "id": "slime",
+      "category": "tiles/shared",
+      "source": "custom/slime.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64,
+      "note": "Original RealmForge CC0 supplement."
+    },
+    {
+      "id": "seesaw",
+      "category": "dynamic",
+      "source": "custom/seesaw.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64,
+      "note": "Original RealmForge CC0 supplement."
+    },
+    {
+      "id": "chain_bridge",
+      "category": "dynamic",
+      "source": "custom/chain_bridge.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64,
+      "note": "Original RealmForge CC0 supplement."
+    },
+    {
+      "id": "moving_platform",
+      "category": "dynamic",
+      "source": "custom/moving_platform.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64,
+      "note": "Original RealmForge CC0 supplement."
+    },
+    {
+      "id": "elevator",
+      "category": "dynamic",
+      "source": "custom/elevator.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64,
+      "note": "Original RealmForge CC0 supplement."
+    },
+    {
+      "id": "rotating_platform",
+      "category": "dynamic",
+      "source": "custom/rotating_platform.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64,
+      "note": "Original RealmForge CC0 supplement."
+    },
+    {
+      "id": "cannon",
+      "category": "enemies",
+      "source": "custom/cannon.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64,
+      "note": "Original RealmForge CC0 supplement."
+    },
+    {
+      "id": "powerup_double_jump",
+      "category": "items",
+      "source": "custom/powerup_double_jump.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64,
+      "note": "Original RealmForge CC0 supplement."
+    },
+    {
+      "id": "powerup_dash",
+      "category": "items",
+      "source": "custom/powerup_dash.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64,
+      "note": "Original RealmForge CC0 supplement."
+    },
+    {
+      "id": "big_coin",
+      "category": "items",
+      "source": "new-platformer-pack/Vector/Tiles/coin_gold.svg",
+      "pack": "new-platformer-pack",
+      "width": 96,
+      "height": 96,
+      "note": "Native coin enlarged to 96 px; gameplay value comes from the entity."
+    },
+    {
+      "id": "door",
+      "category": "items",
+      "source": "custom/door.svg",
+      "pack": "new-platformer-pack (composition)",
+      "width": 64,
+      "height": 128,
+      "note": "Composition of Kenney New Platformer Pack CC0 sprites."
+    },
+    {
+      "id": "door_open",
+      "category": "items",
+      "source": "custom/door_open.svg",
+      "pack": "new-platformer-pack (composition)",
+      "width": 64,
+      "height": 128,
+      "note": "Composition of Kenney New Platformer Pack CC0 sprites."
+    },
+    {
+      "id": "locked_door",
+      "category": "items",
+      "source": "custom/locked_door.svg",
+      "pack": "new-platformer-pack (composition)",
+      "width": 64,
+      "height": 128,
+      "note": "Composition of Kenney New Platformer Pack CC0 sprites."
+    },
+    {
+      "id": "grass_ground",
+      "category": "tiles/grass",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_grass_block_top.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "grass_fill",
+      "category": "tiles/grass",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_grass_block_center.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "grass_left",
+      "category": "tiles/grass",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_grass_block_top_left.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "grass_right",
+      "category": "tiles/grass",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_grass_block_top_right.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "grass_bottom",
+      "category": "tiles/grass",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_grass_block_bottom.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "grass_brick",
+      "category": "tiles/grass",
+      "source": "new-platformer-pack/Vector/Tiles/bricks_brown.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "grass_question",
+      "category": "tiles/grass",
+      "source": "new-platformer-pack/Vector/Tiles/block_coin.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "grass_one_way",
+      "category": "tiles/grass",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_grass_horizontal_middle.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "grass_semi_solid",
+      "category": "tiles/grass",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_grass_cloud_middle.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "desert_ground",
+      "category": "tiles/desert",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_sand_block_top.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "desert_fill",
+      "category": "tiles/desert",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_sand_block_center.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "desert_left",
+      "category": "tiles/desert",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_sand_block_top_left.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "desert_right",
+      "category": "tiles/desert",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_sand_block_top_right.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "desert_bottom",
+      "category": "tiles/desert",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_sand_block_bottom.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "desert_brick",
+      "category": "tiles/desert",
+      "source": "new-platformer-pack/Vector/Tiles/bricks_brown.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "desert_question",
+      "category": "tiles/desert",
+      "source": "new-platformer-pack/Vector/Tiles/block_coin.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "desert_one_way",
+      "category": "tiles/desert",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_sand_horizontal_middle.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "desert_semi_solid",
+      "category": "tiles/desert",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_sand_cloud_middle.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "snow_ground",
+      "category": "tiles/snow",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_snow_block_top.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "snow_fill",
+      "category": "tiles/snow",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_snow_block_center.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "snow_left",
+      "category": "tiles/snow",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_snow_block_top_left.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "snow_right",
+      "category": "tiles/snow",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_snow_block_top_right.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "snow_bottom",
+      "category": "tiles/snow",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_snow_block_bottom.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "snow_brick",
+      "category": "tiles/snow",
+      "source": "new-platformer-pack/Vector/Tiles/bricks_grey.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "snow_question",
+      "category": "tiles/snow",
+      "source": "new-platformer-pack/Vector/Tiles/block_coin.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "snow_one_way",
+      "category": "tiles/snow",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_snow_horizontal_middle.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "snow_semi_solid",
+      "category": "tiles/snow",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_snow_cloud_middle.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "castle_ground",
+      "category": "tiles/castle",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_stone_block_top.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "castle_fill",
+      "category": "tiles/castle",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_stone_block_center.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "castle_left",
+      "category": "tiles/castle",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_stone_block_top_left.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "castle_right",
+      "category": "tiles/castle",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_stone_block_top_right.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "castle_bottom",
+      "category": "tiles/castle",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_stone_block_bottom.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "castle_brick",
+      "category": "tiles/castle",
+      "source": "new-platformer-pack/Vector/Tiles/bricks_grey.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "castle_question",
+      "category": "tiles/castle",
+      "source": "new-platformer-pack/Vector/Tiles/block_coin.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "castle_one_way",
+      "category": "tiles/castle",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_stone_horizontal_middle.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "castle_semi_solid",
+      "category": "tiles/castle",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_stone_cloud_middle.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "background_grass",
+      "category": "backgrounds",
+      "source": "new-platformer-pack/Vector/Backgrounds/background_color_hills.svg",
+      "pack": "new-platformer-pack",
+      "width": 256,
+      "height": 256
+    },
+    {
+      "id": "background_desert",
+      "category": "backgrounds",
+      "source": "new-platformer-pack/Vector/Backgrounds/background_color_desert.svg",
+      "pack": "new-platformer-pack",
+      "width": 256,
+      "height": 256
+    },
+    {
+      "id": "background_snow",
+      "category": "backgrounds",
+      "source": "custom/background_snow.svg",
+      "pack": "realmforge-supplements",
+      "width": 1024,
+      "height": 512,
+      "note": "Original CC0 theme silhouette; repeat horizontally."
+    },
+    {
+      "id": "background_castle",
+      "category": "backgrounds",
+      "source": "custom/background_castle.svg",
+      "pack": "realmforge-supplements",
+      "width": 1024,
+      "height": 512,
+      "note": "Original CC0 theme silhouette; repeat horizontally."
+    },
+    {
+      "id": "walker",
+      "category": "enemies",
+      "source": "new-platformer-pack/Vector/Enemies/slime_normal_walk_a.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "shell",
+      "category": "enemies",
+      "source": "new-platformer-pack/Vector/Enemies/snail_shell.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "flyer",
+      "category": "enemies",
+      "source": "new-platformer-pack/Vector/Enemies/fly_a.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "jumper",
+      "category": "enemies",
+      "source": "new-platformer-pack/Vector/Enemies/frog_idle.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "button_primary",
+      "category": "ui",
+      "source": "ui-pack/Vector/Green/button_rectangle_depth_flat.svg",
+      "pack": "ui-pack",
+      "width": 192,
+      "height": 64
+    },
+    {
+      "id": "button_pressed",
+      "category": "ui",
+      "source": "ui-pack/Vector/Green/button_rectangle_flat.svg",
+      "pack": "ui-pack",
+      "width": 192,
+      "height": 64
+    },
+    {
+      "id": "button_square",
+      "category": "ui",
+      "source": "ui-pack/Vector/Green/button_square_depth_flat.svg",
+      "pack": "ui-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "checkmark",
+      "category": "ui",
+      "source": "ui-pack/Vector/Green/icon_checkmark.svg",
+      "pack": "ui-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "close",
+      "category": "ui",
+      "source": "ui-pack/Vector/Green/icon_cross.svg",
+      "pack": "ui-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "arrow_left",
+      "category": "ui",
+      "source": "ui-pack/Vector/Green/arrow_basic_w.svg",
+      "pack": "ui-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "arrow_right",
+      "category": "ui",
+      "source": "ui-pack/Vector/Green/arrow_basic_e.svg",
+      "pack": "ui-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "star",
+      "category": "ui",
+      "source": "ui-pack/Vector/Green/star.svg",
+      "pack": "ui-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "checkbox",
+      "category": "ui",
+      "source": "ui-pack/Vector/Green/check_square_color_checkmark.svg",
+      "pack": "ui-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "hud_heart",
+      "category": "ui",
+      "source": "new-platformer-pack/Vector/Tiles/hud_heart.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "hud_heart_empty",
+      "category": "ui",
+      "source": "new-platformer-pack/Vector/Tiles/hud_heart_empty.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "hud_coin",
+      "category": "ui",
+      "source": "new-platformer-pack/Vector/Tiles/hud_coin.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "hud_key_yellow",
+      "category": "ui",
+      "source": "new-platformer-pack/Vector/Tiles/hud_key_yellow.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "tool_copy",
+      "category": "icons/editor",
+      "source": "custom/tool_copy.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "tool_delete",
+      "category": "icons/editor",
+      "source": "custom/tool_delete.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "tool_erase",
+      "category": "icons/editor",
+      "source": "custom/tool_erase.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "tool_grid",
+      "category": "icons/editor",
+      "source": "custom/tool_grid.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "tool_link",
+      "category": "icons/editor",
+      "source": "custom/tool_link.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "tool_paste",
+      "category": "icons/editor",
+      "source": "custom/tool_paste.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "tool_place",
+      "category": "icons/editor",
+      "source": "custom/tool_place.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "tool_play",
+      "category": "icons/editor",
+      "source": "custom/tool_play.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "tool_properties",
+      "category": "icons/editor",
+      "source": "custom/tool_properties.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "tool_redo",
+      "category": "icons/editor",
+      "source": "custom/tool_redo.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "tool_rotate",
+      "category": "icons/editor",
+      "source": "custom/tool_rotate.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "tool_save",
+      "category": "icons/editor",
+      "source": "custom/tool_save.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "tool_select",
+      "category": "icons/editor",
+      "source": "custom/tool_select.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "tool_undo",
+      "category": "icons/editor",
+      "source": "custom/tool_undo.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "palette_ground",
+      "category": "icons/editor",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_grass_block_top.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "palette_brick",
+      "category": "icons/editor",
+      "source": "new-platformer-pack/Vector/Tiles/bricks_brown.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "palette_question_block",
+      "category": "icons/editor",
+      "source": "new-platformer-pack/Vector/Tiles/block_coin.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "palette_ice",
+      "category": "icons/editor",
+      "source": "custom/ice.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64,
+      "note": "Original RealmForge CC0 supplement."
+    },
+    {
+      "id": "palette_slime",
+      "category": "icons/editor",
+      "source": "custom/slime.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64,
+      "note": "Original RealmForge CC0 supplement."
+    },
+    {
+      "id": "palette_one_way",
+      "category": "icons/editor",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_grass_horizontal_middle.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "palette_semi_solid",
+      "category": "icons/editor",
+      "source": "new-platformer-pack/Vector/Tiles/terrain_grass_cloud_middle.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "palette_spikes",
+      "category": "icons/editor",
+      "source": "new-platformer-pack/Vector/Tiles/spikes.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "palette_lava",
+      "category": "icons/editor",
+      "source": "new-platformer-pack/Vector/Tiles/lava_top.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "palette_saw",
+      "category": "icons/editor",
+      "source": "new-platformer-pack/Vector/Tiles/saw.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "palette_falling_block",
+      "category": "icons/editor",
+      "source": "new-platformer-pack/Vector/Enemies/block_idle.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "palette_crate",
+      "category": "icons/editor",
+      "source": "new-platformer-pack/Vector/Tiles/block_planks.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "palette_seesaw",
+      "category": "icons/editor",
+      "source": "custom/seesaw.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64,
+      "note": "Original RealmForge CC0 supplement."
+    },
+    {
+      "id": "palette_pendulum_ball",
+      "category": "icons/editor",
+      "source": "new-platformer-pack/Vector/Tiles/weight.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "palette_chain_bridge",
+      "category": "icons/editor",
+      "source": "custom/chain_bridge.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64,
+      "note": "Original RealmForge CC0 supplement."
+    },
+    {
+      "id": "palette_spring",
+      "category": "icons/editor",
+      "source": "new-platformer-pack/Vector/Tiles/spring.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "palette_conveyor_belt",
+      "category": "icons/editor",
+      "source": "new-platformer-pack/Vector/Tiles/conveyor.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "palette_moving_platform",
+      "category": "icons/editor",
+      "source": "custom/moving_platform.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64,
+      "note": "Original RealmForge CC0 supplement."
+    },
+    {
+      "id": "palette_elevator",
+      "category": "icons/editor",
+      "source": "custom/elevator.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64,
+      "note": "Original RealmForge CC0 supplement."
+    },
+    {
+      "id": "palette_rotating_platform",
+      "category": "icons/editor",
+      "source": "custom/rotating_platform.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64,
+      "note": "Original RealmForge CC0 supplement."
+    },
+    {
+      "id": "palette_walker",
+      "category": "icons/editor",
+      "source": "new-platformer-pack/Vector/Enemies/slime_normal_walk_a.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "palette_shell",
+      "category": "icons/editor",
+      "source": "new-platformer-pack/Vector/Enemies/snail_shell.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "palette_flyer",
+      "category": "icons/editor",
+      "source": "new-platformer-pack/Vector/Enemies/fly_a.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "palette_jumper",
+      "category": "icons/editor",
+      "source": "new-platformer-pack/Vector/Enemies/frog_idle.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "palette_cannon",
+      "category": "icons/editor",
+      "source": "custom/cannon.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64,
+      "note": "Original RealmForge CC0 supplement."
+    },
+    {
+      "id": "palette_coin",
+      "category": "icons/editor",
+      "source": "new-platformer-pack/Vector/Tiles/coin_gold.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "palette_big_coin",
+      "category": "icons/editor",
+      "source": "new-platformer-pack/Vector/Tiles/coin_gold.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64,
+      "note": "Native coin enlarged to 96 px; gameplay value comes from the entity."
+    },
+    {
+      "id": "palette_key",
+      "category": "icons/editor",
+      "source": "new-platformer-pack/Vector/Tiles/key_yellow.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "palette_powerup_double_jump",
+      "category": "icons/editor",
+      "source": "custom/powerup_double_jump.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64,
+      "note": "Original RealmForge CC0 supplement."
+    },
+    {
+      "id": "palette_powerup_dash",
+      "category": "icons/editor",
+      "source": "custom/powerup_dash.svg",
+      "pack": "realmforge-supplements",
+      "width": 64,
+      "height": 64,
+      "note": "Original RealmForge CC0 supplement."
+    },
+    {
+      "id": "palette_start",
+      "category": "icons/editor",
+      "source": "new-platformer-pack/Vector/Tiles/sign_right.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "palette_checkpoint",
+      "category": "icons/editor",
+      "source": "new-platformer-pack/Vector/Tiles/flag_blue_a.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "palette_goal",
+      "category": "icons/editor",
+      "source": "new-platformer-pack/Vector/Tiles/flag_green_a.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "palette_door",
+      "category": "icons/editor",
+      "source": "custom/door.svg",
+      "pack": "new-platformer-pack (composition)",
+      "width": 64,
+      "height": 64,
+      "note": "Composition of Kenney New Platformer Pack CC0 sprites."
+    },
+    {
+      "id": "palette_locked_door",
+      "category": "icons/editor",
+      "source": "custom/locked_door.svg",
+      "pack": "new-platformer-pack (composition)",
+      "width": 64,
+      "height": 64,
+      "note": "Composition of Kenney New Platformer Pack CC0 sprites."
+    },
+    {
+      "id": "palette_switch",
+      "category": "icons/editor",
+      "source": "new-platformer-pack/Vector/Tiles/switch_blue.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "palette_switch_block",
+      "category": "icons/editor",
+      "source": "new-platformer-pack/Vector/Tiles/block_blue.svg",
+      "pack": "new-platformer-pack",
+      "width": 64,
+      "height": 64
+    }
+  ],
+  "characters": {
+    "green": {
+      "idle": {
+        "sources": [
+          "new-platformer-pack/Vector/Characters/character_green_idle.svg"
+        ],
+        "frameRate": 1
+      },
+      "walk": {
+        "sources": [
+          "new-platformer-pack/Vector/Characters/character_green_walk_a.svg",
+          "new-platformer-pack/Vector/Characters/character_green_walk_b.svg"
+        ],
+        "frameRate": 8
+      },
+      "run": {
+        "sources": [
+          "new-platformer-pack/Vector/Characters/character_green_walk_a.svg",
+          "new-platformer-pack/Vector/Characters/character_green_walk_b.svg"
+        ],
+        "frameRate": 14,
+        "note": "Native walk cycle reused at higher playback speed."
+      },
+      "jump": {
+        "sources": [
+          "new-platformer-pack/Vector/Characters/character_green_jump.svg"
+        ],
+        "frameRate": 1
+      },
+      "fall": {
+        "sources": [
+          "custom/green_fall.svg"
+        ],
+        "frameRate": 1,
+        "note": "Derived native jump pose with downward offset and slight tilt; CC0."
+      },
+      "skid": {
+        "sources": [
+          "custom/green_skid.svg"
+        ],
+        "frameRate": 1,
+        "note": "Derived native crouch pose with braking tilt and original dust strokes; CC0."
+      },
+      "crouch": {
+        "sources": [
+          "new-platformer-pack/Vector/Characters/character_green_duck.svg"
+        ],
+        "frameRate": 1
+      }
+    },
+    "pink": {
+      "idle": {
+        "sources": [
+          "new-platformer-pack/Vector/Characters/character_pink_idle.svg"
+        ],
+        "frameRate": 1
+      },
+      "walk": {
+        "sources": [
+          "new-platformer-pack/Vector/Characters/character_pink_walk_a.svg",
+          "new-platformer-pack/Vector/Characters/character_pink_walk_b.svg"
+        ],
+        "frameRate": 8
+      },
+      "run": {
+        "sources": [
+          "new-platformer-pack/Vector/Characters/character_pink_walk_a.svg",
+          "new-platformer-pack/Vector/Characters/character_pink_walk_b.svg"
+        ],
+        "frameRate": 14,
+        "note": "Native walk cycle reused at higher playback speed."
+      },
+      "jump": {
+        "sources": [
+          "new-platformer-pack/Vector/Characters/character_pink_jump.svg"
+        ],
+        "frameRate": 1
+      },
+      "fall": {
+        "sources": [
+          "custom/pink_fall.svg"
+        ],
+        "frameRate": 1,
+        "note": "Derived native jump pose with downward offset and slight tilt; CC0."
+      },
+      "skid": {
+        "sources": [
+          "custom/pink_skid.svg"
+        ],
+        "frameRate": 1,
+        "note": "Derived native crouch pose with braking tilt and original dust strokes; CC0."
+      },
+      "crouch": {
+        "sources": [
+          "new-platformer-pack/Vector/Characters/character_pink_duck.svg"
+        ],
+        "frameRate": 1
+      }
+    },
+    "purple": {
+      "idle": {
+        "sources": [
+          "new-platformer-pack/Vector/Characters/character_purple_idle.svg"
+        ],
+        "frameRate": 1
+      },
+      "walk": {
+        "sources": [
+          "new-platformer-pack/Vector/Characters/character_purple_walk_a.svg",
+          "new-platformer-pack/Vector/Characters/character_purple_walk_b.svg"
+        ],
+        "frameRate": 8
+      },
+      "run": {
+        "sources": [
+          "new-platformer-pack/Vector/Characters/character_purple_walk_a.svg",
+          "new-platformer-pack/Vector/Characters/character_purple_walk_b.svg"
+        ],
+        "frameRate": 14,
+        "note": "Native walk cycle reused at higher playback speed."
+      },
+      "jump": {
+        "sources": [
+          "new-platformer-pack/Vector/Characters/character_purple_jump.svg"
+        ],
+        "frameRate": 1
+      },
+      "fall": {
+        "sources": [
+          "custom/purple_fall.svg"
+        ],
+        "frameRate": 1,
+        "note": "Derived native jump pose with downward offset and slight tilt; CC0."
+      },
+      "skid": {
+        "sources": [
+          "custom/purple_skid.svg"
+        ],
+        "frameRate": 1,
+        "note": "Derived native crouch pose with braking tilt and original dust strokes; CC0."
+      },
+      "crouch": {
+        "sources": [
+          "new-platformer-pack/Vector/Characters/character_purple_duck.svg"
+        ],
+        "frameRate": 1
+      }
+    },
+    "beige": {
+      "idle": {
+        "sources": [
+          "new-platformer-pack/Vector/Characters/character_beige_idle.svg"
+        ],
+        "frameRate": 1
+      },
+      "walk": {
+        "sources": [
+          "new-platformer-pack/Vector/Characters/character_beige_walk_a.svg",
+          "new-platformer-pack/Vector/Characters/character_beige_walk_b.svg"
+        ],
+        "frameRate": 8
+      },
+      "run": {
+        "sources": [
+          "new-platformer-pack/Vector/Characters/character_beige_walk_a.svg",
+          "new-platformer-pack/Vector/Characters/character_beige_walk_b.svg"
+        ],
+        "frameRate": 14,
+        "note": "Native walk cycle reused at higher playback speed."
+      },
+      "jump": {
+        "sources": [
+          "new-platformer-pack/Vector/Characters/character_beige_jump.svg"
+        ],
+        "frameRate": 1
+      },
+      "fall": {
+        "sources": [
+          "custom/beige_fall.svg"
+        ],
+        "frameRate": 1,
+        "note": "Derived native jump pose with downward offset and slight tilt; CC0."
+      },
+      "skid": {
+        "sources": [
+          "custom/beige_skid.svg"
+        ],
+        "frameRate": 1,
+        "note": "Derived native crouch pose with braking tilt and original dust strokes; CC0."
+      },
+      "crouch": {
+        "sources": [
+          "new-platformer-pack/Vector/Characters/character_beige_duck.svg"
+        ],
+        "frameRate": 1
+      }
+    }
+  },
+  "enemies": {
+    "walker": [
+      "new-platformer-pack/Vector/Enemies/slime_normal_walk_a.svg",
+      "new-platformer-pack/Vector/Enemies/slime_normal_walk_b.svg",
+      "new-platformer-pack/Vector/Enemies/slime_normal_flat.svg"
+    ],
+    "shell": [
+      "new-platformer-pack/Vector/Enemies/snail_shell.svg",
+      "new-platformer-pack/Vector/Enemies/snail_walk_a.svg",
+      "new-platformer-pack/Vector/Enemies/snail_walk_b.svg"
+    ],
+    "flyer": [
+      "new-platformer-pack/Vector/Enemies/fly_a.svg",
+      "new-platformer-pack/Vector/Enemies/fly_b.svg"
+    ],
+    "jumper": [
+      "new-platformer-pack/Vector/Enemies/frog_idle.svg",
+      "new-platformer-pack/Vector/Enemies/frog_jump.svg"
+    ],
+    "cannon": [
+      "custom/cannon.svg"
+    ]
+  },
+  "audio": {
+    "jump": {
+      "source": "new-platformer-pack/Sounds/sfx_jump.ogg",
+      "category": "sfx",
+      "pack": "new-platformer-pack"
+    },
+    "coin": {
+      "source": "new-platformer-pack/Sounds/sfx_coin.ogg",
+      "category": "sfx",
+      "pack": "new-platformer-pack"
+    },
+    "stomp": {
+      "source": "new-platformer-pack/Sounds/sfx_bump.ogg",
+      "category": "sfx",
+      "pack": "new-platformer-pack"
+    },
+    "spring": {
+      "source": "new-platformer-pack/Sounds/sfx_jump-high.ogg",
+      "category": "sfx",
+      "pack": "new-platformer-pack"
+    },
+    "death": {
+      "source": "new-platformer-pack/Sounds/sfx_hurt.ogg",
+      "category": "sfx",
+      "pack": "new-platformer-pack"
+    },
+    "goal": {
+      "source": "music-jingles/Audio/Pizzicato jingles/jingles_PIZZI01.ogg",
+      "category": "sfx",
+      "pack": "music-jingles"
+    },
+    "ui_click": {
+      "source": "interface-sounds/Audio/click_001.ogg",
+      "category": "sfx",
+      "pack": "interface-sounds"
+    },
+    "grass_01": {
+      "source": "music/music-overworld.ogg",
+      "category": "music",
+      "pack": "music-overworld",
+      "loop": true
+    },
+    "snow_01": {
+      "source": "music/music-bass.ogg",
+      "category": "music",
+      "pack": "music-bass",
+      "loop": true
+    },
+    "castle_01": {
+      "source": "music/music-sprinter.ogg",
+      "category": "music",
+      "pack": "music-sprinter",
+      "loop": true
+    }
+  },
+  "themes": {
+    "grass": [
+      "grass_ground",
+      "grass_fill",
+      "grass_left",
+      "grass_right",
+      "grass_bottom",
+      "grass_brick",
+      "grass_question",
+      "grass_one_way",
+      "grass_semi_solid",
+      "ice",
+      "slime"
+    ],
+    "desert": [
+      "desert_ground",
+      "desert_fill",
+      "desert_left",
+      "desert_right",
+      "desert_bottom",
+      "desert_brick",
+      "desert_question",
+      "desert_one_way",
+      "desert_semi_solid",
+      "ice",
+      "slime"
+    ],
+    "snow": [
+      "snow_ground",
+      "snow_fill",
+      "snow_left",
+      "snow_right",
+      "snow_bottom",
+      "snow_brick",
+      "snow_question",
+      "snow_one_way",
+      "snow_semi_solid",
+      "ice",
+      "slime"
+    ],
+    "castle": [
+      "castle_ground",
+      "castle_fill",
+      "castle_left",
+      "castle_right",
+      "castle_bottom",
+      "castle_brick",
+      "castle_question",
+      "castle_one_way",
+      "castle_semi_solid",
+      "ice",
+      "slime"
+    ]
+  }
+}

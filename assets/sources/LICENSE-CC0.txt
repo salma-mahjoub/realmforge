@@ -1,0 +1,4 @@
+RealmForge original supplemental SVG artwork in sources/custom/ is dedicated to the public domain under CC0 1.0 Universal.
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Kenney and OpenGameArt works retain their own CC0 notices, preserved in assets/licenses/ and described in assets/CREDITS.md. Attribution is appreciated but not required by CC0.

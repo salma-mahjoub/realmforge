@@ -1,0 +1,107 @@
+[
+  {
+    "package": "node_modules/@esbuild/darwin-arm64",
+    "version": "0.28.2",
+    "license": "MIT"
+  },
+  {
+    "package": "node_modules/@napi-rs/canvas",
+    "version": "0.1.100",
+    "license": "MIT"
+  },
+  {
+    "package": "node_modules/@napi-rs/canvas-android-arm64",
+    "version": "0.1.100",
+    "license": "MIT"
+  },
+  {
+    "package": "node_modules/@napi-rs/canvas-darwin-arm64",
+    "version": "0.1.100",
+    "license": "MIT"
+  },
+  {
+    "package": "node_modules/@napi-rs/canvas-darwin-x64",
+    "version": "0.1.100",
+    "license": "MIT"
+  },
+  {
+    "package": "node_modules/@napi-rs/canvas-linux-arm-gnueabihf",
+    "version": "0.1.100",
+    "license": "MIT"
+  },
+  {
+    "package": "node_modules/@napi-rs/canvas-linux-arm64-gnu",
+    "version": "0.1.100",
+    "license": "MIT"
+  },
+  {
+    "package": "node_modules/@napi-rs/canvas-linux-arm64-musl",
+    "version": "0.1.100",
+    "license": "MIT"
+  },
+  {
+    "package": "node_modules/@napi-rs/canvas-linux-riscv64-gnu",
+    "version": "0.1.100",
+    "license": "MIT"
+  },
+  {
+    "package": "node_modules/@napi-rs/canvas-linux-x64-gnu",
+    "version": "0.1.100",
+    "license": "MIT"
+  },
+  {
+    "package": "node_modules/@napi-rs/canvas-linux-x64-musl",
+    "version": "0.1.100",
+    "license": "MIT"
+  },
+  {
+    "package": "node_modules/@napi-rs/canvas-win32-arm64-msvc",
+    "version": "0.1.100",
+    "license": "MIT"
+  },
+  {
+    "package": "node_modules/@napi-rs/canvas-win32-x64-msvc",
+    "version": "0.1.100",
+    "license": "MIT"
+  },
+  {
+    "package": "node_modules/@types/node",
+    "version": "22.20.5",
+    "license": "MIT"
+  },
+  {
+    "package": "node_modules/@types/pngjs",
+    "version": "6.0.5",
+    "license": "MIT"
+  },
+  {
+    "package": "node_modules/esbuild",
+    "version": "0.28.2",
+    "license": "MIT"
+  },
+  {
+    "package": "node_modules/fsevents",
+    "version": "2.3.3",
+    "license": "MIT"
+  },
+  {
+    "package": "node_modules/pngjs",
+    "version": "7.0.0",
+    "license": "MIT"
+  },
+  {
+    "package": "node_modules/tsx",
+    "version": "4.23.15",
+    "license": "MIT"
+  },
+  {
+    "package": "node_modules/typescript",
+    "version": "5.9.3",
+    "license": "Apache-2.0"
+  },
+  {
+    "package": "node_modules/undici-types",
+    "version": "6.21.0",
+    "license": "MIT"
+  }
+]

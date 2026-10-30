@@ -1,0 +1,116 @@
+name: CI
+
+# Each package is standalone (own package.json + lockfile). A package's steps run only
+# once its lockfile exists, so CI stays green while packages are being bootstrapped.
+# NOTE: hashFiles() is not available in job-level `if:` (no workspace yet), so the
+# guard is applied to every step after checkout.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  contracts:
+    name: contracts (hardhat test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+      - name: Skip notice
+        if: hashFiles('contracts/package-lock.json') == ''
+        working-directory: .
+        run: echo "::notice::contracts/package-lock.json not found — skipping contracts job"
+      - uses: actions/setup-node@v4
+        if: hashFiles('contracts/package-lock.json') != ''
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: contracts/package-lock.json
+      - run: npm ci
+        if: hashFiles('contracts/package-lock.json') != ''
+      - run: npx hardhat test
+        if: hashFiles('contracts/package-lock.json') != ''
+
+  web:
+    name: web (build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - name: Skip notice
+        if: hashFiles('web/package-lock.json') == ''
+        working-directory: .
+        run: echo "::notice::web/package-lock.json not found — skipping web job"
+      - uses: actions/setup-node@v4
+        if: hashFiles('web/package-lock.json') != ''
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+        if: hashFiles('web/package-lock.json') != ''
+      - run: npm run build
+        if: hashFiles('web/package-lock.json') != ''
+
+  server:
+    name: server (test + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - name: Skip notice
+        if: hashFiles('server/package-lock.json') == ''
+        working-directory: .
+        run: echo "::notice::server/package-lock.json not found — skipping server job"
+      - uses: actions/setup-node@v4
+        if: hashFiles('server/package-lock.json') != ''
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+        if: hashFiles('server/package-lock.json') != ''
+      - run: npm test
+        if: hashFiles('server/package-lock.json') != ''
+      - run: npm run build
+        if: hashFiles('server/package-lock.json') != ''
+
+  game-core:
+    name: game-core (test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: game-core
+    steps:
+      - uses: actions/checkout@v4
+      - name: Skip notice
+        if: hashFiles('game-core/package-lock.json') == ''
+        working-directory: .
+        run: echo "::notice::game-core/package-lock.json not found — skipping game-core job"
+      - uses: actions/setup-node@v4
+        if: hashFiles('game-core/package-lock.json') != ''
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: game-core/package-lock.json
+      - run: npm ci
+        if: hashFiles('game-core/package-lock.json') != ''
+      - run: npm test
+        if: hashFiles('game-core/package-lock.json') != ''

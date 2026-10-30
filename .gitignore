@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+.env
+.env.*
+!.env.example
+cache/
+artifacts/
+typechain-types/
+coverage/
+ignition/deployments/chain-31337/
+assets/_downloads/
+.DS_Store
+*.log

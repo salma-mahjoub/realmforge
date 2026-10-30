@@ -1,0 +1,35 @@
+{
+  "name": "@realmforge/server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "RealmForge game server (Colyseus) + API (Fastify): IPFS pinning, run validation, EIP-712 signer, event indexer",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node --disable-warning=ExperimentalWarning dist/index.js",
+    "test": "NODE_OPTIONS=--disable-warning=ExperimentalWarning vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@colyseus/core": "~0.16.26",
+    "@colyseus/schema": "^3.0.76",
+    "@colyseus/ws-transport": "~0.16.5",
+    "fastify": "^5.6.0",
+    "viem": "^2.38.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "colyseus.js": "~0.16.22",
+    "tsx": "^4.20.0",
+    "typescript": "5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

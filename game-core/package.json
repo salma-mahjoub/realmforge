@@ -1,0 +1,34 @@
+{
+  "name": "@realmforge/game-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./dist/index.js",
+    "./phaserMatter": "./dist/adapters/phaserMatter.js"
+  },
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "lab": "vite --config lab/vite.config.ts",
+    "lab:build": "vite build --config lab/vite.config.ts",
+    "typecheck:lab": "tsc -p lab/tsconfig.json",
+    "lab:elements": "vite --config lab/elements/vite.config.ts",
+    "lab:elements:build": "vite build --config lab/elements/vite.config.ts"
+  },
+  "peerDependencies": {
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "phaser": "^3.90.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.1.0",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=22",
+    "npm": ">=10"
+  }
+}

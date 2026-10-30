@@ -1,0 +1,24 @@
+{
+  "name": "@realmforge/assets",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:assets": "tsx scripts/build.ts",
+    "check": "tsc --noEmit",
+    "verify": "tsx scripts/verify.ts",
+    "preview": "tsx scripts/preview.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "pngjs": "^7.0.0",
+    "@types/pngjs": "^6.0.0",
+    "@napi-rs/canvas": "^0.1.80"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT"
+}

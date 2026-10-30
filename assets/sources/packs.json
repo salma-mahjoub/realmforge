@@ -1,0 +1,66 @@
+[
+  {
+    "id": "new-platformer-pack",
+    "author": "Kenney",
+    "url": "https://kenney.nl/assets/new-platformer-pack",
+    "license": "CC0-1.0",
+    "bytes": 3276507,
+    "sha256": "553b907f3f0e505ab65f56f245ccaff3123c8fe3f3a0dfce9373b996bfc18cc2"
+  },
+  {
+    "id": "ui-pack",
+    "author": "Kenney",
+    "url": "https://kenney.nl/assets/ui-pack",
+    "license": "CC0-1.0",
+    "bytes": 1229750,
+    "sha256": "a8a14a234911eb648c062622915c93e79e94e97cb7f9f375a70f6617f1174318"
+  },
+  {
+    "id": "interface-sounds",
+    "author": "Kenney",
+    "url": "https://kenney.nl/assets/interface-sounds",
+    "license": "CC0-1.0",
+    "bytes": 834536,
+    "sha256": "f2193d072726d6758a5f7871b2dcc54dcce0d5c35c6f0a62f92549b327c81232"
+  },
+  {
+    "id": "music-jingles",
+    "author": "Kenney",
+    "url": "https://kenney.nl/assets/music-jingles",
+    "license": "CC0-1.0",
+    "bytes": 1239525,
+    "sha256": "b729ba57959bd58793d2c5cafa348aaf2655d354f3da35ec4729e03ec77197b8"
+  },
+  {
+    "id": "game-icons",
+    "author": "Kenney",
+    "url": "https://kenney.nl/assets/game-icons",
+    "license": "CC0-1.0",
+    "bytes": 1045980,
+    "sha256": "7a86d8d58e0b851e22004b3c70bf90b003632bbf9ac633424daa3bb17d9e7e4e"
+  },
+  {
+    "id": "pixel-platformer",
+    "author": "Kenney",
+    "url": "https://kenney.nl/assets/pixel-platformer",
+    "license": "CC0-1.0",
+    "bytes": 260312,
+    "sha256": "d01a196dbe3cc964e00d83ba3b987df62f332dc9260c9f941b4fbcc9047130f4"
+  },
+  {
+    "id": "pixel-platformer-blocks",
+    "author": "Kenney",
+    "url": "https://kenney.nl/assets/pixel-platformer-blocks",
+    "license": "CC0-1.0",
+    "bytes": 155366,
+    "sha256": "e54f21518555c4603a16b8346dcd082d21bea110fca7496da1350c7ef86d0e66"
+  },
+  {
+    "id": "platformer-art-requests",
+    "author": "Kenney",
+    "url": "https://kenney.nl/assets/platformer-art-requests",
+    "license": "CC0-1.0",
+    "bytes": 495957,
+    "sha256": "651357e497a35fd0ff6de5f53935854d5453f543351935036b5a53f444b0dbc4"
+  }
+]

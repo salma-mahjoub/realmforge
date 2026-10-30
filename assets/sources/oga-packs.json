@@ -1,0 +1,63 @@
+[
+  {
+    "id": "platformer-complete",
+    "error": "The read operation timed out",
+    "url": "https://opengameart.org/content/platformer-art-complete-pack-often-updated"
+  },
+  {
+    "id": "music-overworld",
+    "url": "https://opengameart.org/content/overworld-theme-0",
+    "download": "https://opengameart.org/sites/default/files/platformer.ogg",
+    "license": "CC0-1.0",
+    "sha256": "109b50cf3757e59ee8746e180fdb0e57ffc851620d806f813007daae8da4f9a1",
+    "bytes": 670636,
+    "author": "Louswan"
+  },
+  {
+    "id": "music-sprinter",
+    "url": "https://opengameart.org/content/pixel-sprinter",
+    "download": "https://opengameart.org/sites/default/files/pixel_sprinter_loop.ogg",
+    "license": "CC0-1.0",
+    "sha256": "abf963d5121e033b5e26348b172a55a696e834404bf9fe3d019c3d964ab4c784",
+    "bytes": 704319,
+    "author": "Zane Little Music"
+  },
+  {
+    "id": "music-bass",
+    "url": "https://opengameart.org/content/subtle-bass",
+    "download": "https://opengameart.org/sites/default/files/bassy_tune.ogg",
+    "license": "CC0-1.0",
+    "sha256": "2739e35bbf2dd29e8b1cfba7d322698f6682795f5377a2cfcf1df3fbf62832ce",
+    "bytes": 443714,
+    "author": "TinyWorlds"
+  },
+  {
+    "id": "ui-oga",
+    "error": "The read operation timed out",
+    "url": "https://opengameart.org/content/ui-pack"
+  },
+  {
+    "id": "icons-oga",
+    "url": "https://opengameart.org/content/game-icons",
+    "download": "https://opengameart.org/sites/default/files/Kenney_gameIcons.zip",
+    "license": "CC0-1.0",
+    "sha256": "7a86d8d58e0b851e22004b3c70bf90b003632bbf9ac633424daa3bb17d9e7e4e",
+    "bytes": 1045980
+  },
+  {
+    "id": "interface-oga",
+    "url": "https://opengameart.org/content/interface-sounds",
+    "download": "https://opengameart.org/sites/default/files/kenney_interfaceSounds.zip",
+    "license": "CC0-1.0",
+    "sha256": "f2193d072726d6758a5f7871b2dcc54dcce0d5c35c6f0a62f92549b327c81232",
+    "bytes": 834536
+  },
+  {
+    "id": "jingles-oga",
+    "url": "https://opengameart.org/content/85-short-music-jingles",
+    "download": "https://opengameart.org/sites/default/files/jingleSounds_Kenney.zip",
+    "license": "CC0-1.0",
+    "sha256": "be324b6cf26e35c95c2a344569a2470512819d0246cc81328bef3499de3682e5",
+    "bytes": 1089319
+  }
+]

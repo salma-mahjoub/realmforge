@@ -1,0 +1,77 @@
+{
+  "license": "CC0-1.0",
+  "art": [
+    {
+      "id": "new-platformer-pack",
+      "url": "https://kenney.nl/assets/new-platformer-pack",
+      "license": "CC0-1.0",
+      "author": "Kenney"
+    },
+    {
+      "id": "ui-pack",
+      "url": "https://kenney.nl/assets/ui-pack",
+      "license": "CC0-1.0",
+      "author": "Kenney"
+    },
+    {
+      "id": "interface-sounds",
+      "url": "https://kenney.nl/assets/interface-sounds",
+      "license": "CC0-1.0",
+      "author": "Kenney"
+    },
+    {
+      "id": "music-jingles",
+      "url": "https://kenney.nl/assets/music-jingles",
+      "license": "CC0-1.0",
+      "author": "Kenney"
+    },
+    {
+      "id": "game-icons",
+      "url": "https://kenney.nl/assets/game-icons",
+      "license": "CC0-1.0",
+      "author": "Kenney"
+    },
+    {
+      "id": "pixel-platformer",
+      "url": "https://kenney.nl/assets/pixel-platformer",
+      "license": "CC0-1.0",
+      "author": "Kenney"
+    },
+    {
+      "id": "pixel-platformer-blocks",
+      "url": "https://kenney.nl/assets/pixel-platformer-blocks",
+      "license": "CC0-1.0",
+      "author": "Kenney"
+    },
+    {
+      "id": "platformer-art-requests",
+      "url": "https://kenney.nl/assets/platformer-art-requests",
+      "license": "CC0-1.0",
+      "author": "Kenney"
+    }
+  ],
+  "music": [
+    {
+      "id": "music-overworld",
+      "url": "https://opengameart.org/content/overworld-theme-0",
+      "license": "CC0-1.0",
+      "author": "Louswan"
+    },
+    {
+      "id": "music-sprinter",
+      "url": "https://opengameart.org/content/pixel-sprinter",
+      "license": "CC0-1.0",
+      "author": "Zane Little Music"
+    },
+    {
+      "id": "music-bass",
+      "url": "https://opengameart.org/content/subtle-bass",
+      "license": "CC0-1.0",
+      "author": "TinyWorlds"
+    }
+  ],
+  "supplements": {
+    "author": "RealmForge contributors",
+    "license": "CC0-1.0"
+  }
+}

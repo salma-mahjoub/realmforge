@@ -1,0 +1,13 @@
+{
+  "_comment": "Minimal event ABI matching contracts/src/interfaces/IForgeCoin.sol (reconciled 2026-10-30). Can be replaced by the full artifact ABI. Param names matter: the indexer reads args by name.",
+  "abi": [
+    "event FaucetClaimed(address indexed user)",
+    "event RunSettled(address indexed player, uint256 indexed levelId, uint32 timeMs, bool cleared, uint256 reward, uint256 feePaid)",
+    "event FeeSplit(uint256 indexed levelId, address indexed owner, uint256 ownerAmt, uint256 poolAmt, uint256 treasuryAmt)",
+    "event RaceCreated(bytes32 indexed roomId, uint256 indexed levelId, address indexed creator, uint256 stake)",
+    "event RaceJoined(bytes32 indexed roomId, address indexed player)",
+    "event SeasonClosed(uint256 indexed season, uint256 pool)",
+    "event RaceSettled(bytes32 indexed roomId, address first, address second, uint256 pot)",
+    "event RaceRefunded(bytes32 indexed roomId, uint256 playerCount, uint256 stake)"
+  ]
+}

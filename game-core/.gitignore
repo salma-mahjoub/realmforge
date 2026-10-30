@@ -1,0 +1,6 @@
+node_modules/
+dist/
+lab/dist/
+.playwright/
+.playwright-cli/
+output/playwright/

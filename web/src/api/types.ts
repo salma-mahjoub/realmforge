@@ -1,7 +1,8 @@
 import type { Address, Hex } from 'viem';
 import type { LevelFileV1, LevelNftMetadata, Theme } from '../game/level/types';
+import type { RunSubmission } from '../game/run';
 
-/** API response shapes (server/ Fastify + indexer, SPEC §7). Provisional until server/ freezes its routes. */
+/** API shapes. Read models are what pages render; `LevelRow` etc. are the raw server/ responses. */
 
 export type LevelSort = 'new' | 'popular' | 'hardest';
 
@@ -77,43 +78,79 @@ export interface RoomPlayer {
     finishedMs?: number;
 }
 
-// ── request/response for write endpoints ──────────────────────────────────────────────────────
+// ── request/response for write endpoints (server/src/api/routes, server/src/api/schemas.ts) ──
 
+/** POST /levels/pin */
 export interface PinRequest {
     level: LevelFileV1;
     /** data:image/png;base64,… from game.renderer.snapshot */
-    thumbnail: string;
-    name: string;
-    description: string;
+    thumbnail?: string;
+    description?: string;
 }
 export interface PinResponse {
-    levelCid: string;
-    imageCid: string;
-    metadataUri: string; // ipfs://…
     layoutHash: Hex;
+    levelCid: string;
+    thumbnailCid: string | null;
+    metadataCid: string;
+    /** ipfs://<metadataCid> — pass to LevelNFT.publish */
+    tokenURI: string;
+    minTimeMs: number;
+    provider: string;
+    alreadyPublished: boolean;
 }
 
+/** POST /levels/clear-proof (level must be pinned first). */
 export interface ClearProofRequest {
     creator: Address;
-    level: LevelFileV1;
-    timeMs: number;
-    inputs: Array<[number, number]>;
+    layoutHash: Hex;
+    run: RunSubmission;
 }
 export interface ClearProofResponse {
-    layoutHash: Hex;
-    deadline: string; // uint256 as decimal string
+    proof: { creator: Address; layoutHash: Hex; deadline: string };
     signature: Hex;
+    signer: Address;
+    tokenURI: string | null;
 }
 
+/** POST /runs/validate */
 export interface SubmitRunRequest {
     player: Address;
     levelId: number;
-    timeMs: number;
-    coins: number;
-    cleared: boolean;
-    inputs: Array<[number, number]>;
+    run: RunSubmission;
 }
 export interface SubmitRunResponse {
     result: { player: Address; levelId: string; timeMs: number; cleared: boolean; coins: number; nonce: string; deadline: string };
     signature: Hex;
+    signer: Address;
+}
+
+/** 422 body of clear-proof / runs/validate. */
+export interface RunRejected {
+    error: string;
+    issues?: { code: string; message: string; frame?: number }[];
+}
+
+/** Row of GET /levels and GET /levels/:id (SQLite indexer, snake_case). */
+export interface LevelRow {
+    id: number;
+    creator: string;
+    owner: string;
+    layout_hash: string;
+    parent_id: number;
+    play_fee: string;
+    active: number;
+    plays: number;
+    clears: number;
+    likes: number;
+    best_time_ms: number | null;
+    best_player: string | null;
+    listing_price: string | null;
+    created_at: number;
+    tx_hash: string;
+    level_cid: string | null;
+    metadata_cid: string | null;
+    thumbnail_cid: string | null;
+    min_time_ms: number | null;
+    name: string | null;
+    theme: string | null;
 }

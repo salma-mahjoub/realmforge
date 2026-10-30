@@ -1,6 +1,6 @@
 # RealmForge — Implementation Checklist
 
-Status snapshot: **30/10/2026**. Bootstrap commit `1e57ca7`; the integration pass is still in progress (uncommitted).
+Status snapshot: **30/10/2026**, after the integration pass. Tests: game-core 33 · contracts 42 (+9 todo) · server 31 · web 10, all passing. The local end-to-end chain flow passes.
 Reference: [SPEC.md](SPEC.md) (section numbers below refer to it) · Agent rules: [../AGENTS.md](../AGENTS.md)
 
 Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in progress · `[ ]` not started
@@ -11,12 +11,12 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 | Mario-like controller (§3.1) | ~90% |
 | Level elements (§3.2) | ~80% |
 | Assets | ~95% |
-| Editor (§3.3) | ~60% |
-| Publish flow | ~40% |
-| Solo play + settlement | ~50% |
-| Multiplayer (§3.5–3.6) | ~35% |
-| Web pages + wallet (§3.7) | ~60% |
-| Server (§7) | ~70% |
+| Editor (§3.3) | ~65% |
+| Publish flow | ~70% (scripted end to end OK, UI path not clicked with a wallet) |
+| Solo play + settlement | ~75% |
+| Multiplayer (§3.5–3.6) | ~40% |
+| Web pages + wallet (§3.7) | ~65% |
+| Server (§7) | ~75% |
 | CI | written, never run |
 
 ---
@@ -29,6 +29,7 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] `MockLevelNFT` so Student B can test without Student A's contract
 - [x] Ignition deploy module (§6 order: ForgeCoin → LevelNFT → link → grant GAME_ROLE), local deploy verified
 - [x] `scripts/export-abi.ts`
+- [x] ABIs exported to web + server; `ignition/parameters/localhost.json` (account #1 signer)
 - [x] 42 tests passing (38 Solidity, 4 Node), 0 compiler warnings
 - [ ] 9 `it.todo` integration tests from §11
 - [ ] Slither static analysis report and discussion (`docs/security/`)
@@ -61,8 +62,10 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] Fixed-point maths, 60 Hz, replay bitmask encoder with a determinism test
 - [x] `createMatterPlayer` Phaser/Matter adapter + `npm run lab`
 - [x] Movement research with cited sources: `game-core/docs/MOVEMENT_RESEARCH.md`
+- [x] 33 tests; optional atlas `frame` on element textures
 - [x] `ELEMENTS` registry: all §3.2 elements, with prop descriptors for the editor, `npm run lab:elements`
-- [ ] **Multi-player support** in the elements runtime (currently one attached player per Matter world)
+- [ ] **Multi-player support** in the elements runtime (one physics player per Matter world; remote players are interpolated sprites only)
+- [ ] Dash power-up (6 px/frame) exceeds the server speed bound (2.5 × 1.75), so dash runs get rejected. Align the bound with game-core.
 - [ ] Headless re-simulation on the server, so a replay can be checked against trusted collisions
 
 ## 3. Assets — `assets/`, `web/public/assets/`
@@ -76,20 +79,24 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] React ⇄ Phaser EventBus, scenes Boot / Preloader / Editor / Play / Race
 - [x] Manifest-driven preloader with placeholder fallback
 - [x] Level types, RLE, canonical JSON + `layoutHash`, sample level
-- [~] Real ABIs from export-abi replacing the hand-written interim ones (integration in progress)
-- [~] Hooks for `claimFaucet`, `publish`, `settleRun(WithPermit)`, `buy`/`list` (`useMarket` added)
-- [~] Player switched to the game-core controller; scenes switched to the game-core `ELEMENTS`
-- [~] API and Colyseus client aligned with the server's real routes and rooms
-- [ ] Pages read real indexer/contract data instead of `data/mock.ts`
+- [x] Real ABIs from export-abi (interim ABI deleted)
+- [x] Hooks for `claimFaucet`, `publish`, `settleRun` + `settleRunWithPermit` (approve fallback), `useMarket` list/unlist/buy; Buy buttons wired
+- [x] PlayScene uses the game-core player + element runtime + fixed 60 Hz clock; replay bitmask + trace + checkpoints recorded (verified in browser)
+- [x] API and Colyseus client aligned with the server's real routes and rooms
+- [x] vitest added (10 tests)
+- [ ] Pages read real indexer/contract data instead of `data/mock.ts` (profile, market listings, activity and earnings still mock: these need server endpoints)
+- [ ] Free Reown/WalletConnect project ID in `web/.env.local` (currently a 403 warning)
+- [ ] RaceScene waits for the server countdown/start; ghost replays rendered
 - [ ] Wallet connect + transactions tested in a browser with MetaMask
 - [ ] Read the minted token ID from the publish receipt
 
 ### Editor (§3.3)
 - [x] Grid, palette (7 categories, 36 elements), place/erase, 100-step undo/redo, T toggles test-play, autosave, JSON import/export
-- [~] Property panel driven by the `ELEMENTS` prop descriptors
+- [x] Palette + property panel driven by the game-core `ELEMENTS` prop descriptors (verified in browser)
+- [x] Test Play uses the game-core PlayScene
 - [ ] Copy/paste, rotate, link mode (door↔door, switch→blocks)
 - [ ] Theme and music picker
-- [ ] Publish flow end to end: clear check → thumbnail → IPFS pin → `publish()`
+- [~] Publish flow (pin → clear-proof → mint) wired; scripted end to end OK, UI path with a wallet not yet clicked
 
 ## 5. Server — `server/` (Fastify, Colyseus 0.16, viem, node:sqlite)
 - [x] Zod config, `.env.example`
@@ -99,19 +106,21 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] Event indexer (catch-up, then watch, idempotent writes)
 - [x] RaceRoom + CoopRoom at 20 Hz, signed RaceResult/RunResult; test with two clients
 - [x] 29 tests passing
-- [~] Movement constants imported from game-core instead of copies (integration)
+- [x] Movement constants imported from game-core (`file:../game-core`)
+- [x] `GET /levels/:id/file`; schema accepts the web level format; 31 tests
 - [ ] Join signatures / SIWE mandatory
 - [ ] Rate limiting on `/runs/validate`
 - [ ] Fetch level JSON from IPFS for levels not pinned through this server
+- [ ] Profile / market / activity / earnings endpoints
 - [ ] Season-signing admin endpoint, persisting race results, reconnect handling
 
 ## 6. Integration and operations
 - [x] Private GitHub repo: https://github.com/MedSlimane/realmforge
 - [x] CI workflow written (`.github/workflows/ci.yml`)
 - [ ] CI green on GitHub
-- [~] Shared `layoutHash` test vector (web == server)
-- [~] Root `README.md` + root scripts: `dev:chain`, `deploy:local`, `dev:server`, `dev:web`, `test`, `build`
-- [~] Scripted local end-to-end run: faucet → pin → clear-proof → publish → validate → settleRun → read state
+- [x] Shared `layoutHash` test vector `test-vectors/layout-hash.json` (web == server)
+- [x] Root `README.md` + root scripts: `dev:chain`, `deploy:local`, `dev:server`, `dev:web`, `test`, `build`, `e2e:chain`
+- [x] Scripted local end-to-end run (`npm run e2e:chain`): faucet → pin → clear-proof → publish → validate → settleRun + settleRunWithPermit → plays=2, creator +7, player +30, pool 2, treasury 1
 - [ ] Browser end-to-end run: build a level → publish → second wallet plays and pays → creator earns → sell the NFT
 - [ ] Race 1v1 end to end with stake escrow
 

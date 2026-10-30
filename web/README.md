@@ -40,7 +40,7 @@ Read endpoints fall back to bundled mock data (`src/data/mock.ts`) when the API 
 src/
   api/            client.ts (Fastify API, VITE_API_URL), colyseus.ts (VITE_GAME_SERVER_URL), types.ts
   components/     Layout (nav, FORGE pill, wallet chip), ui (cards, thumbs, formatters), useAsync
-  contracts/      addresses.ts (env), abi.interim.ts, generated/ (ABIs from contracts/), hooks/
+  contracts/      addresses.ts (env / generated addresses.json), generated/ (ABIs exported by contracts/), hooks/
   data/mock.ts    placeholder data shaped like docs/mockups
   game/
     EventBus.ts   typed React ⇄ Phaser bridge (event map = the contract between both sides)
@@ -50,32 +50,40 @@ src/
     scenes/       Boot, Preloader, EditorScene, PlayScene, RaceScene
     level/        types.ts (level.v1 format), rle.ts, serialize.ts (canonical JSON + layoutHash), catalog.ts (palette), samples/
     editor/       commands.ts (command pattern, 100-step undo/redo)
-    player/       PlayerAdapter.ts (seam for game-core; temporary Matter player)
     assets/       registry.ts (manifest.json → texture keys), placeholders.ts
-    elements/     ← owned by elements-runtime (Matter level elements), not by this package's author
+    elements/     bridge.ts — level.v1 entities/terrain → game-core ElementDefs (centres, prop sanitising, textures)
+    run.ts        run recording: game-core replay masks → input log, trace + checkpoints for the server
   pages/          Home, Browse, LevelDetail, Play, Room, Profile, Market, editor/{EditorPage,Panels,PublishModal}
   web3/           config.ts (wagmi + RainbowKit; chains hardhat 31337 + sepolia), Providers.tsx
 ```
 
 ## Game notes
 
-- **Physics**: Matter, gravity y=2, `runner: { fps: 60 }`. Phaser 3.90 bundles Matter 0.20 whose
-  runner is always a fixed-delta accumulator (the `isFixed` flag from SPEC §3.1 no longer exists).
-  The controller is stepped from Matter's `beforeupdate`, i.e. once per 60 Hz physics step, and the
-  input log (`[frame, buttons]`, SPEC §3.6) is recorded at that rate.
-- **Assets**: `Preloader` reads `/assets/manifest.json` (schema 1 from asset-pipeline: `elements`,
-  `characters`, `enemies`, `themes`, `sfx`). Missing manifest/files → generated placeholder
-  textures, and a 15 s timeout never blocks the game on slow art.
+- **game-core** (`@realmforge/game-core` → `../game-core/src` via Vite alias + tsconfig paths) provides
+  the player (`createMatterPlayer`/`stepController`), all 38 SPEC elements (`createElementRuntime`,
+  `ELEMENTS[type].create`) and the fixed clock (`installFixedMatterClock`). Element names, editor
+  palette and property panel come from `ELEMENT_TYPES` / `ELEMENT_PROPS`.
+- **Physics**: Matter, gravity y=2. The world is stepped by game-core's fixed 60 Hz accumulator
+  (`world.autoUpdate = false`, exactly 1000/60 ms per step). PlayScene samples input once per step in
+  `beforeupdate` (registered before the element runtime and player), records it with game-core's
+  `recordInput` (6-bit masks), and records a tile-space trace every 4 frames + checkpoint hits in
+  `afterupdate`. `play:finished` carries `run` = the server's `RunSubmission`.
+- **Level file**: entities keep integer bottom-left tile anchors (what the editor shows);
+  `elements/bridge.ts` converts to game-core tile centres and sanitises props (legacy names such as
+  `pendulum`/`conveyor`/`lock_door` and `direction: 'left'` are mapped). Ground runs are merged
+  static bodies; other terrain tiles are game-core elements.
+- **Assets**: `Preloader` reads `/assets/manifest.json` (schema 1). Missing manifest/files → generated
+  placeholder textures, and a 15 s timeout never blocks the game on slow art.
 - **Editor**: tools Place/Erase/Select/Link (keys 1–4), ⌘Z / ⇧⌘Z, `G` grid, arrows/right-drag pan,
-  `T` toggles test-play from the cursor tile (Esc/T returns, undo stack survives). Autosave to
-  `localStorage` every 2 s; JSON import/export in the header.
-- **`@realmforge/game-core`** is aliased to `../game-core/src` (Vite + tsconfig paths) but not
-  imported yet — swap `TemporaryMatterPlayer` in `src/game/player/PlayerAdapter.ts`.
+  `T` toggles test-play from the cursor tile (toolbar button = from the level spawn; only spawn
+  clears count for the publish ClearProof). Autosave to `localStorage` every 2 s.
+- **Tests**: `npm test` (vitest) — shared layoutHash vectors (`../test-vectors/layout-hash.json`, same
+  file as server/), bridge conversion of every sample entity through game-core `normalizeProps`,
+  input-log round trip.
 
-## TODO / integration points
+## TODO / known gaps
 
-- Replace `PlayerAdapter` internals with `createMatterPlayer`/`stepController` from game-core.
-- Replace `PlayScene.spawnEntity` stand-ins with the factory from `src/game/elements/`.
-- Point `src/contracts/generated/index.ts` at generated ABIs; delete `abi.interim.ts`.
-- Align `src/api/client.ts` routes and `src/api/colyseus.ts` room/message names with `server/`.
-- Wire `LevelNFT.buy` / `list`, parse `LevelPublished` id after mint, `settleRunWithPermit`.
+- Race/co-op: the element runtime supports one attached physics player per Matter world; remote
+  racers are interpolated sprites only. Countdown/start from the room is not yet gating RaceScene.
+- Server has no profile / market listing / activity / earnings endpoints yet → those pages use mocks.
+- Ghost replays (`/levels/:id/replays`) are not rendered yet.

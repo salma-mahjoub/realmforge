@@ -38,7 +38,7 @@ describe("EIP-712 types match contracts/", () => {
     expect(sol).toContain('"RealmForge ForgeCoin"');
   });
 
-  it.skipIf(!hasContracts)("placeholder event ABIs match event declarations in the Solidity sources", () => {
+  it.skipIf(!hasContracts)("exported event ABIs match event declarations in the Solidity sources", () => {
     const srcs = ["LevelNFT.sol", "ForgeCoin.sol", "interfaces/IForgeCoin.sol"]
       .map((f) => resolve(CONTRACTS, f))
       .filter(existsSync)
@@ -49,7 +49,8 @@ describe("EIP-712 types match contracts/", () => {
       .replace(/\s+\)/g, ")");
     for (const name of ["LevelNFT", "ForgeCoin"]) {
       for (const ev of loadAbi(name).filter((x): x is AbiEvent => x.type === "event")) {
-        if (ev.name === "Transfer") continue; // inherited from OpenZeppelin
+        // Events not declared in RealmForge sources (Transfer, Approval, RoleGranted, …) are inherited from OpenZeppelin.
+        if (!srcs.includes(`event ${ev.name}(`)) continue;
         const params = ev.inputs.map((i) => `${i.type}${i.indexed ? " indexed" : ""} ${i.name}`).join(", ");
         expect(srcs, `${name}.${ev.name}`).toContain(`event ${ev.name}(${params})`);
         expect(toEventSelector(ev)).toMatch(/^0x[0-9a-f]{64}$/);

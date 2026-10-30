@@ -1,12 +1,28 @@
 import Phaser from 'phaser';
+import {
+    COLLISION_CATEGORIES,
+    EMPTY_INPUT,
+    MOVEMENT,
+    MovementState,
+    createControllerState,
+    createElementRuntime,
+    createMatterPlayer,
+    createReplay,
+    installFixedMatterClock,
+    inventoryFor,
+    recordInput,
+    type ElementInstance,
+    type InputState,
+    type Replay,
+} from '@realmforge/game-core';
 import { EventBus } from '../EventBus';
 import { REG, SCENES, SIM_HZ, STEP_MS, THEME_SKY, TILE } from '../constants';
-import { ELEMENT_BY_TYPE, TERRAIN_FRICTION } from '../level/catalog';
 import { decodeLevel } from '../level/serialize';
 import { SAMPLE_LEVEL } from '../level';
-import { TERRAIN_BY_ID, type LevelDoc, type LevelEntity, type LevelFileV1, type Waypoint } from '../level/types';
+import { TERRAIN_BY_ID, type LevelDoc, type LevelFileV1, type Waypoint } from '../level/types';
 import { elementTexture, hasSfx, themeBackground } from '../assets/registry';
-import { CATEGORY, EMPTY_INPUT, createPlayer, encodeButtons, type InputState, type PlayerHandle } from '../player/PlayerAdapter';
+import { coreTextures, terrainDef, toCoreDef } from '../elements/bridge';
+import { TRACE_STRIDE, changePairs, encodeInputLog, type RunSubmission, type TraceSample } from '../run';
 
 export interface PlaySceneData {
     level?: LevelFileV1;
@@ -17,32 +33,55 @@ export interface PlaySceneData {
     spawn?: Waypoint;
 }
 
+type MatterPlayer = ReturnType<typeof createMatterPlayer>;
+type ElementRuntime = ReturnType<typeof createElementRuntime>;
+
+/** Rendered character height (the controller hull is 12×15 reference px = 48×60 px at TILE 64). */
+const PLAYER_DISPLAY_H = TILE * 1.25;
+
+const ANIM_FOR: Record<MovementState, string> = {
+    idle: 'idle',
+    walk: 'walk',
+    run: 'run',
+    skid: 'skid',
+    jump: 'jump',
+    fall: 'fall',
+    crouch: 'crouch',
+    wallSlide: 'fall',
+    dead: 'fall',
+};
+
 /**
- * Solo play (SPEC §3.5). Builds a Matter world from a level file, runs the player at a fixed
- * 60 Hz step, records the input log (`frame, buttons`) and reports HUD + finish to React.
- *
- * TODO(elements): entity behaviour is a minimal stand-in. Replace `spawnEntity` with the
- * element factory from src/game/elements/ (owned by elements-runtime) once it lands.
+ * Solo play (SPEC §3.5). Builds the level with game-core: terrain bodies + `createElementRuntime`
+ * (all SPEC elements via `ELEMENTS[type].create`) + `createMatterPlayer` (Mario-like controller),
+ * stepped by game-core's fixed 60 Hz Matter clock. Every physics step records one input mask
+ * (game-core replay encoder), a position trace and checkpoint hits for server validation.
  */
 export class PlayScene extends Phaser.Scene {
     protected file!: LevelFileV1;
     protected doc!: LevelDoc;
     protected levelId: string | null = null;
     protected from: PlaySceneData['from'] = 'play';
-    protected player!: PlayerHandle;
+    protected player!: MatterPlayer;
+    protected playerSprite!: Phaser.GameObjects.Sprite;
+    protected runtime!: ElementRuntime;
     protected frame = 0;
     protected finished = false;
     protected paused = false;
-    protected coins = 0;
-    protected checkpoint: Waypoint | null = null;
     protected checkpointName: string | null = null;
-    protected inputLog: Array<[number, number]> = [];
-    private lastButtons = -1;
+    protected replay: Replay = createReplay();
+    protected trace: TraceSample[] = [];
+    protected checkpointHits: { id: number; f: number }[] = [];
+    protected currentInput: InputState = EMPTY_INPUT;
+    private respawnTile!: Waypoint;
     private spawnTile!: Waypoint;
+    private goalReached = false;
+    private anim = '';
+    private playerTex = '';
     private keys!: Record<'left' | 'right' | 'up' | 'down' | 'a' | 'd' | 'w' | 's' | 'space' | 'z' | 'x' | 'shift', Phaser.Input.Keyboard.Key>;
-    private sensorHandlers = new Map<number, { entity: LevelEntity; obj?: Phaser.GameObjects.GameObject }>();
     protected unsubs: Array<() => void> = [];
     private bg?: Phaser.GameObjects.TileSprite;
+    private readonly scaleRef = TILE / MOVEMENT.referenceTile;
 
     constructor(key: string = SCENES.Play) {
         super({
@@ -51,9 +90,8 @@ export class PlayScene extends Phaser.Scene {
                 default: 'matter',
                 matter: {
                     gravity: { x: 0, y: 2 },
-                    // SPEC §3.1 fixed 60 Hz step. Phaser 3.90 bundles Matter 0.20, whose Runner is
-                    // always a fixed-delta accumulator (the old `isFixed` flag no longer exists):
-                    // `fps: 60` => every Engine.update advances exactly 1000/60 ms.
+                    // Stepped by game-core's installFixedMatterClock (exactly 1000/60 ms per step,
+                    // accumulator-driven, render-rate independent); runner fps kept at 60 for consistency.
                     runner: { fps: SIM_HZ },
                     positionIterations: 8,
                     velocityIterations: 6,
@@ -70,15 +108,17 @@ export class PlayScene extends Phaser.Scene {
         this.levelId = data?.levelId ?? null;
         this.from = data?.from ?? 'play';
         this.spawnTile = data?.spawn ?? this.doc.spawn;
+        this.respawnTile = this.spawnTile;
         this.frame = 0;
         this.finished = false;
         this.paused = false;
-        this.coins = 0;
-        this.checkpoint = null;
+        this.goalReached = false;
         this.checkpointName = null;
-        this.inputLog = [];
-        this.lastButtons = -1;
-        this.sensorHandlers.clear();
+        this.replay = createReplay();
+        this.trace = [];
+        this.checkpointHits = [];
+        this.currentInput = EMPTY_INPUT;
+        this.anim = '';
     }
 
     create() {
@@ -87,53 +127,116 @@ export class PlayScene extends Phaser.Scene {
         const H = h * TILE;
         this.cameras.main.setBackgroundColor(THEME_SKY[this.doc.meta.theme]);
         this.cameras.main.setBounds(0, 0, W, H);
-        // open bottom so falling out of the level is a death
-        this.matter.world.setBounds(0, -TILE * 4, W, H + TILE * 8, 64, true, true, false, false);
+        // Side walls + ceiling, open bottom (falling out is a death). Walls must be "solid" for the player mask.
+        this.matter.world.setBounds(0, -TILE * 4, W, H + TILE * 8, 64, true, true, true, false);
+        for (const wall of Object.values(this.matter.world.walls)) {
+            if (wall) wall.collisionFilter = { category: COLLISION_CATEGORIES.solid, mask: 0xffff, group: 0 };
+        }
 
         const bg = themeBackground(this.doc.meta.theme);
         if (bg) this.bg = this.add.tileSprite(0, 0, 1, 1, bg).setOrigin(0.5).setScrollFactor(0).setDepth(-10);
         this.scale.on(Phaser.Scale.Events.RESIZE, this.onResize, this);
 
-        this.buildTerrain();
-        this.doc.entities.forEach((e) => this.spawnEntity(e));
-
-        const sp = this.tileCenter(this.spawnTile);
-        this.player = createPlayer(this, sp.x, sp.y - 8);
-        this.cameras.main.startFollow(this.player.sprite, true, 0.15, 0.15, 0, TILE);
-        this.fitZoom();
-
-        this.matter.world.on('collisionstart', this.onCollision, this);
-        // Drive the controller from the physics step (not the render frame) so one game frame
-        // == one 60 Hz Matter step regardless of monitor refresh rate.
+        // 1. Input sampling first: one mask per physics step, read by runtime + player.
         this.matter.world.on(Phaser.Physics.Matter.Events.BEFORE_UPDATE, this.fixedStep, this);
+        // 2. Element runtime BEFORE the player (platform motion / one-way filtering precede contact queries).
+        this.runtime = createElementRuntime(this, {
+            tile: TILE,
+            textures: coreTextures(this.doc.meta.theme),
+            input: () => this.currentInput,
+            onEvent: (type, el) => this.onElementEvent(type, el),
+        });
+        this.buildTerrain();
+        for (const e of this.doc.entities) {
+            if (e.type === 'start') continue;
+            const def = toCoreDef(e);
+            if (!def) {
+                console.warn(`[PlayScene] unknown element type "${e.type}" (#${e.id}) skipped`);
+                continue;
+            }
+            try {
+                this.runtime.add(def);
+            } catch (err) {
+                console.warn(`[PlayScene] element #${e.id} (${e.type}) rejected:`, err);
+            }
+        }
+
+        // 3. game-core Mario-like controller on a Matter compound body.
+        const sp = this.tileCenter(this.spawnTile);
+        this.player = createMatterPlayer(this, sp.x, sp.y, {
+            tile: TILE,
+            input: () => this.currentInput,
+            surface: this.runtime.surface,
+            carry: this.runtime.carry,
+        });
+        this.runtime.attachPlayer(this.player);
+        this.matter.world.on(Phaser.Physics.Matter.Events.AFTER_UPDATE, this.afterFixedStep, this);
+
+        const tex = elementTexture('player');
+        this.playerTex = tex.key;
+        this.playerSprite = this.add.sprite(sp.x, sp.y, tex.key, tex.frame).setOrigin(0.5, 1).setDepth(50);
+        this.playerSprite.setScale(PLAYER_DISPLAY_H / Math.max(1, this.playerSprite.height));
+        this.syncSprite();
+
+        // 4. Fixed 60 Hz clock shared by runtime + player (game-core accumulator).
+        installFixedMatterClock(this);
+
+        this.cameras.main.startFollow(this.playerSprite, true, 0.15, 0.15, 0, TILE);
+        this.fitZoom();
         this.bindKeys();
         this.bindBus();
+        this.trace.push(this.sample());
 
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.teardown());
         this.events.once(Phaser.Scenes.Events.DESTROY, () => this.teardown());
         this.emitHud();
+        if (import.meta.env.DEV) (window as unknown as { __play?: PlayScene }).__play = this;
         EventBus.emit('current-scene-ready', this);
     }
 
+    /** BEFORE_UPDATE — once per 16.67 ms physics step. */
     protected fixedStep() {
         if (this.paused || this.finished) return;
-        const input = this.readInput();
-        const buttons = encodeButtons(input);
-        if (buttons !== this.lastButtons) {
-            this.inputLog.push([this.frame, buttons]);
-            this.lastButtons = buttons;
-        }
-        this.player.step(input);
-        this.frame++;
+        this.currentInput = this.readInput();
+        recordInput(this.replay, this.currentInput);
+    }
 
-        if (this.player.sprite.y > this.doc.size.h * TILE + TILE * 2) this.die();
+    /** AFTER_UPDATE — collision-resolved state of this step. */
+    protected afterFixedStep() {
+        if (this.paused || this.finished || !this.player) return;
+        this.frame++;
+        const y = this.player.body.position.y;
+        if (this.player.state.mode === MovementState.dead || y > this.doc.size.h * TILE + TILE * 2) this.die();
+        if (this.frame % TRACE_STRIDE === 0) this.trace.push(this.sample());
+        if (this.goalReached) this.finish();
         if (this.frame % 6 === 0) this.emitHud();
         this.afterStep();
     }
 
     update() {
-        // render-rate only: parallax background (simulation runs in fixedStep)
+        // render-rate only: sprite + parallax (simulation runs in the fixed step)
+        if (this.player) this.syncSprite();
         if (this.bg) this.bg.tilePositionX = (this.cameras.main.scrollX * 0.3) / this.bg.tileScaleX;
+    }
+
+    private syncSprite() {
+        const b = this.player.body;
+        this.playerSprite.setPosition(b.position.x, b.bounds.max.y + 2);
+        const s = this.player.state;
+        this.playerSprite.setFlipX(s.facing < 0);
+        const name = ANIM_FOR[s.mode] ?? 'idle';
+        if (name !== this.anim) {
+            this.anim = name;
+            const key = `${this.playerTex}:${name}`;
+            if (this.anims.exists(key)) this.playerSprite.play(key, true);
+        }
+    }
+
+    /** Position in tile cell coordinates (same convention as level spawn/goal). */
+    protected sample(): TraceSample {
+        const p = this.player.body.position;
+        const r = (v: number) => Math.round(v * 1000) / 1000;
+        return { f: this.frame, x: r(p.x / TILE - 0.5), y: r(p.y / TILE - 0.5) };
     }
 
     private onResize() {
@@ -146,7 +249,6 @@ export class PlayScene extends Phaser.Scene {
         const z = Phaser.Math.Clamp((height || 540) / (11 * TILE), 0.4, 1.25);
         this.cameras.main.setZoom(z);
         if (this.bg) {
-            // scrollFactor-0 objects still scale with zoom around the viewport centre
             this.bg.setPosition(width / 2, height / 2).setSize(width / z, height / z);
             this.bg.setTileScale(height / z / this.bg.texture.getSourceImage().height);
         }
@@ -163,134 +265,83 @@ export class PlayScene extends Phaser.Scene {
         return Math.round(this.frame * STEP_MS);
     }
 
+    get coins() {
+        return this.player ? inventoryFor(this.player).coins : 0;
+    }
+
     // ── world building ─────────────────────────────────────────────────────────────────────────
+    /**
+     * Ground runs become one merged static "solid" body per horizontal run (no seams, few bodies);
+     * every other terrain tile (brick, question, ice, slime, one-way, semi-solid) is a game-core
+     * element so it gets its behaviour (break, reward, surface, drop-through).
+     */
     private buildTerrain() {
         const { w, h } = this.doc.size;
         const t = this.doc.terrain;
+        const theme = this.doc.meta.theme;
         for (let y = 0; y < h; y++) {
             let x = 0;
             while (x < w) {
                 const v = t[y * w + x];
-                if (!v) {
+                const type = TERRAIN_BY_ID[v];
+                if (!type) {
+                    x++;
+                    continue;
+                }
+                if (type !== 'ground') {
+                    try {
+                        this.runtime.add(terrainDef(type, x, y));
+                    } catch (err) {
+                        console.warn(`[PlayScene] terrain ${type} at ${x},${y} rejected`, err);
+                    }
                     x++;
                     continue;
                 }
                 let n = 1;
                 while (x + n < w && t[y * w + x + n] === v) n++;
-                const type = TERRAIN_BY_ID[v];
                 for (let i = 0; i < n; i++) {
-                    const tex = elementTexture(type, this.doc.meta.theme);
+                    const tex = elementTexture('ground', theme);
                     this.add.image((x + i) * TILE, y * TILE, tex.key, tex.frame).setOrigin(0).setDisplaySize(TILE, TILE);
                 }
-                const oneway = type === 'oneway' || type === 'semisolid';
-                // merged static body per horizontal run (fewer bodies, no seams)
-                this.matter.add.rectangle((x + n / 2) * TILE, y * TILE + (oneway ? TILE * 0.15 : TILE / 2), n * TILE, oneway ? TILE * 0.3 : TILE, {
+                this.matter.add.rectangle((x + n / 2) * TILE, y * TILE + TILE / 2, n * TILE, TILE, {
                     isStatic: true,
-                    friction: TERRAIN_FRICTION[type] ?? 0.1,
-                    label: `terrain:${type}`,
-                    collisionFilter: { category: oneway ? CATEGORY.oneway : CATEGORY.solid, mask: 0xffff, group: 0 },
+                    friction: 0.1,
+                    label: 'ground',
+                    collisionFilter: { category: COLLISION_CATEGORIES.solid, mask: 0xffff, group: 0 },
                 });
                 x += n;
             }
         }
     }
 
-    protected spawnEntity(e: LevelEntity) {
-        const def = ELEMENT_BY_TYPE[e.type];
-        if (!def || e.type === 'start') return;
-        const wTiles = (e.type === 'seesaw' || e.type === 'chain_bridge') && typeof e.props?.length === 'number' ? e.props.length : def.w ?? 1;
-        const hTiles = def.h ?? 1;
-        const cx = (e.x + wTiles / 2) * TILE;
-        const cy = (e.y + 1 - hTiles / 2) * TILE;
-        const tex = elementTexture(e.type, this.doc.meta.theme);
-
-        const sensor = (category: number) => {
-            const img = this.add.image(cx, cy, tex.key, tex.frame).setDisplaySize(wTiles * TILE, hTiles * TILE);
-            const body = this.matter.add.rectangle(cx, cy, wTiles * TILE * 0.8, hTiles * TILE * 0.8, {
-                isStatic: true,
-                isSensor: true,
-                label: `entity:${e.type}`,
-                collisionFilter: { category, mask: CATEGORY.player, group: 0 },
-            });
-            this.sensorHandlers.set(body.id, { entity: e, obj: img });
-        };
-
-        switch (def.category) {
-            case 'items':
-                sensor(CATEGORY.pickup);
-                return;
-            case 'hazards':
-                if (e.type === 'falling_block') break;
-                sensor(CATEGORY.hazard);
-                return;
-            case 'flow':
-                if (e.type === 'goal' || e.type === 'checkpoint') {
-                    sensor(CATEGORY.sensor);
-                    return;
-                }
-                break;
-            case 'dynamic':
-                if (e.type === 'spring') {
-                    sensor(CATEGORY.sensor);
-                    return;
-                }
-                if (e.type === 'crate') {
-                    const img = this.matter.add.image(cx, cy, tex.key, tex.frame, { label: 'entity:crate', friction: 0.4, frictionAir: 0.02 });
-                    img.setDisplaySize(TILE * 0.95, TILE * 0.95).setFixedRotation();
-                    return;
-                }
-                break;
-            default:
-                break;
-        }
-        // Everything else: render + static solid stand-in until src/game/elements provides behaviour.
-        this.add.image(cx, cy, tex.key, tex.frame).setDisplaySize(wTiles * TILE, hTiles * TILE);
-        if (def.category !== 'enemies' && e.type !== 'door' && e.type !== 'pipe') {
-            this.matter.add.rectangle(cx, cy, wTiles * TILE, hTiles * TILE * (e.type === 'seesaw' || e.type === 'chain_bridge' ? 0.25 : 1), {
-                isStatic: true,
-                label: `entity:${e.type}`,
-            });
-        }
-    }
-
-    private onCollision(ev: Phaser.Physics.Matter.Events.CollisionStartEvent) {
-        for (const pair of ev.pairs) {
-            const a = pair.bodyA as MatterJS.BodyType;
-            const b = pair.bodyB as MatterJS.BodyType;
-            const other = this.player.owns(a) ? b : this.player.owns(b) ? a : null;
-            if (!other) continue;
-            const hit = this.sensorHandlers.get(other.id);
-            if (!hit) continue;
-            this.onTouch(hit.entity, other, hit.obj);
-        }
-    }
-
-    protected onTouch(e: LevelEntity, body: MatterJS.BodyType, obj?: Phaser.GameObjects.GameObject) {
-        switch (e.type) {
+    /** Interactions reported by the game-core element runtime (afterupdate). */
+    protected onElementEvent(type: string, el: ElementInstance) {
+        switch (type) {
             case 'coin':
             case 'big_coin':
-                this.coins += e.type === 'big_coin' ? Number(e.props?.value ?? 10) : 1;
                 this.sfx('coin');
-                obj?.destroy();
-                this.matter.world.remove(body);
-                this.sensorHandlers.delete(body.id);
-                break;
-            case 'checkpoint':
-                this.checkpoint = { x: e.x, y: e.y };
-                this.checkpointName = `Checkpoint ${e.id}`;
-                (obj as Phaser.GameObjects.Image | undefined)?.setTint(0xffc83d);
                 break;
             case 'spring':
-                this.player.launch(Number(e.props?.power ?? 1));
                 this.sfx('spring');
                 break;
-            case 'goal':
-                this.finish();
+            case 'walker':
+            case 'shell':
+            case 'flyer':
+            case 'jumper':
+                if (this.player.state.mode !== MovementState.dead) this.sfx('stomp');
                 break;
-            case 'spikes':
-            case 'lava':
-            case 'saw':
-                this.die();
+            case 'checkpoint': {
+                const id = Number(el.def.id);
+                const entity = this.doc.entities.find((e) => e.id === id);
+                if (entity && !this.checkpointHits.some((c) => c.id === id)) {
+                    this.checkpointHits.push({ id, f: this.frame });
+                    this.respawnTile = { x: entity.x, y: entity.y };
+                    this.checkpointName = `Checkpoint ${id}`;
+                }
+                break;
+            }
+            case 'goal':
+                this.goalReached = true;
                 break;
             default:
                 break;
@@ -299,8 +350,8 @@ export class PlayScene extends Phaser.Scene {
     }
 
     protected die() {
-        const cp = this.tileCenter(this.checkpoint ?? this.spawnTile);
-        this.player.teleport(cp.x, cp.y - 8);
+        const cp = this.tileCenter(this.respawnTile);
+        this.player.setState(createControllerState(cp.x / this.scaleRef, cp.y / this.scaleRef));
         this.cameras.main.flash(150, 255, 80, 80);
         this.sfx('death');
         EventBus.emit('play:died');
@@ -309,12 +360,28 @@ export class PlayScene extends Phaser.Scene {
     protected finish() {
         if (this.finished) return;
         this.finished = true;
-        this.player.sprite.setVelocity(0, 0);
+        this.trace.push(this.sample());
         this.matter.world.pause();
         this.sfx('goal');
         this.emitHud();
         this.cameras.main.flash(250, 255, 200, 61);
-        EventBus.emit('play:finished', { levelId: this.levelId, timeMs: this.timeMs, coins: this.coins, cleared: true, inputs: this.inputLog });
+        const run: RunSubmission = {
+            timeMs: this.timeMs,
+            cleared: true,
+            coins: this.coins,
+            trace: dedupeTrace(this.trace),
+            checkpoints: [...this.checkpointHits],
+            inputLog: encodeInputLog(this.replay),
+        };
+        EventBus.emit('play:finished', {
+            levelId: this.levelId,
+            timeMs: this.timeMs,
+            coins: this.coins,
+            cleared: true,
+            inputs: changePairs(this.replay),
+            fromSpawn: this.spawnTile.x === this.doc.spawn.x && this.spawnTile.y === this.doc.spawn.y,
+            run,
+        });
     }
 
     // ── input / bus ────────────────────────────────────────────────────────────────────────────
@@ -335,6 +402,7 @@ export class PlayScene extends Phaser.Scene {
         });
     }
 
+    /** Up/W is "up" (doors, pipes, switches) — jump is Space/Z, as in game-core's lab. */
     protected readInput(): InputState {
         const k = this.keys;
         if (!k) return EMPTY_INPUT;
@@ -343,7 +411,7 @@ export class PlayScene extends Phaser.Scene {
             right: k.right.isDown || k.d.isDown,
             up: k.up.isDown || k.w.isDown,
             down: k.down.isDown || k.s.isDown,
-            jump: k.space.isDown || k.z.isDown || k.up.isDown || k.w.isDown,
+            jump: k.space.isDown || k.z.isDown,
             run: k.shift.isDown || k.x.isDown,
         };
     }
@@ -380,12 +448,11 @@ export class PlayScene extends Phaser.Scene {
         this.unsubs.forEach((u) => u());
         this.unsubs = [];
         this.scale.off(Phaser.Scale.Events.RESIZE, this.onResize, this);
-        // Matter's own SHUTDOWN handler may already have destroyed the world (listeners go with it);
-        // input/keyboard plugins drop their listeners on shutdown by themselves.
+        // Matter's SHUTDOWN handler may already have destroyed the world; game-core's player,
+        // element runtime and fixed clock remove their own listeners on scene shutdown.
         const world = this.matter?.world;
-        world?.off('collisionstart', this.onCollision, this);
         world?.off(Phaser.Physics.Matter.Events.BEFORE_UPDATE, this.fixedStep, this);
-        if (world) this.player?.destroy();
+        world?.off(Phaser.Physics.Matter.Events.AFTER_UPDATE, this.afterFixedStep, this);
     }
 
     protected emitHud() {
@@ -395,6 +462,13 @@ export class PlayScene extends Phaser.Scene {
     protected tileCenter(p: Waypoint) {
         return { x: p.x * TILE + TILE / 2, y: p.y * TILE + TILE / 2 };
     }
+}
+
+/** Trace frames must be strictly increasing. */
+function dedupeTrace(trace: TraceSample[]): TraceSample[] {
+    const out: TraceSample[] = [];
+    for (const s of trace) if (!out.length || s.f > out[out.length - 1].f) out.push(s);
+    return out;
 }
 
 export function formatTime(ms: number): string {

@@ -1,0 +1,27 @@
+{
+  "name": "realmforge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "RealmForge \u2014 convenience scripts over the four standalone packages (no workspaces). Run `npm run setup` once.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "setup": "cd game-core && npm ci && cd ../contracts && npm ci && cd ../server && npm ci && cd ../web && npm ci",
+    "dev:chain": "cd contracts && npx hardhat node",
+    "deploy:local": "node scripts/deploy-local.mjs",
+    "dev:server": "npm run build:game-core && cd server && npm run dev",
+    "dev:web": "cd web && npm run dev",
+    "build:game-core": "cd game-core && npm run build",
+    "build": "npm run build:game-core && cd contracts && npx hardhat build && cd ../server && npm run build && cd ../web && npm run build",
+    "typecheck": "npm run build:game-core && cd server && npm run typecheck && cd ../web && npm run typecheck",
+    "test": "npm run test:game-core && npm run test:contracts && npm run test:server && npm run test:web",
+    "test:game-core": "cd game-core && npm test",
+    "test:contracts": "cd contracts && npx hardhat test",
+    "test:server": "npm run build:game-core && cd server && npm test",
+    "test:web": "cd web && npm test",
+    "e2e:chain": "cd server && npx tsx scripts/e2e-chain-flow.ts"
+  },
+  "engines": {
+    "node": ">=22.13"
+  }
+}

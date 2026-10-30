@@ -3,12 +3,15 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { LevelThumb, compact, shortAddr } from '../components/ui';
 import { useAsync } from '../components/useAsync';
+import { parseEther } from 'viem';
+import { useMarket } from '../contracts/hooks';
 
 type Sort = 'recent' | 'price-asc' | 'price-desc' | 'plays';
 
 export default function Market() {
     const { data, loading } = useAsync(() => api.listListings(), []);
     const [sort, setSort] = useState<Sort>('recent');
+    const market = useMarket();
 
     const rows = [...(data ?? [])].sort((a, b) => {
         if (sort === 'price-asc') return Number(a.priceEth) - Number(b.priceEth);
@@ -65,7 +68,11 @@ export default function Market() {
                             </div>
                             <div className="row between">
                                 <b style={{ fontSize: 18 }}>{r.priceEth} ETH</b>
-                                <button className="btn primary sm" title="TODO: LevelNFT.buy(id)">
+                                <button
+                                    className="btn primary sm"
+                                    title="LevelNFT.buy(id)"
+                                    onClick={() => void market.buy(BigInt(r.level.id), parseEther(r.priceEth)).catch((e) => console.warn('[buy]', e))}
+                                >
                                     Buy
                                 </button>
                             </div>

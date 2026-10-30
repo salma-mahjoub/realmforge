@@ -29,11 +29,15 @@ export const levelSchema = z
       theme: z.enum(THEMES),
       timeLimit: z.number().int().min(10).max(3600),
       music: z.string().max(64),
+      description: z.string().max(1000).optional(),
+      /** Remix source token id (mirrors on-chain parentId). */
+      parentId: z.number().int().nonnegative().optional(),
     }),
     size: z.strictObject({
       w: z.number().int().min(1).max(MAX_W),
       h: z.number().int().min(1).max(MAX_H),
-      tile: z.union([z.literal(18), z.literal(21)]),
+      /** Source tile size in px (web renders 64 px Kenney tiles; 16/18/21 for pixel packs). */
+      tile: z.number().int().min(8).max(128),
     }),
     layers: z
       .record(z.string().regex(/^[a-z][a-zA-Z0-9_]*$/), z.string().max(1_000_000))

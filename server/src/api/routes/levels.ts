@@ -18,6 +18,9 @@ function decodeImage(input: string): { bytes: Uint8Array; type: string; ext: str
   return { bytes, type, ext: type.split("/")[1] };
 }
 
+/** Level name/theme from the pinned JSON (null when the level was not pinned through this server). */
+const META_COLS = "json_extract(p.json, '$.meta.name') AS name, json_extract(p.json, '$.meta.theme') AS theme";
+
 export function levelRoutes(app: FastifyInstance, svc: Services) {
   /**
    * Validate a level (SPEC §3.4), compute layoutHash = keccak256(canonical JSON) and
@@ -136,7 +139,7 @@ export function levelRoutes(app: FastifyInstance, svc: Services) {
     }[sort];
     const rows = svc.db
       .prepare(
-        `SELECT l.*, p.level_cid, p.metadata_cid, p.thumbnail_cid, p.min_time_ms
+        `SELECT l.*, p.level_cid, p.metadata_cid, p.thumbnail_cid, p.min_time_ms, ${META_COLS}
          FROM levels l LEFT JOIN pinned_levels p ON p.layout_hash = l.layout_hash
          WHERE ${where.join(" AND ")} ORDER BY ${order} LIMIT ? OFFSET ?`,
       )
@@ -149,12 +152,23 @@ export function levelRoutes(app: FastifyInstance, svc: Services) {
     if (!p.success) return badRequest(reply, "invalid id");
     const row = svc.db
       .prepare(
-        `SELECT l.*, p.level_cid, p.metadata_cid, p.thumbnail_cid, p.min_time_ms
+        `SELECT l.*, p.level_cid, p.metadata_cid, p.thumbnail_cid, p.min_time_ms, ${META_COLS}
          FROM levels l LEFT JOIN pinned_levels p ON p.layout_hash = l.layout_hash WHERE l.id = ?`,
       )
       .get(p.data.id);
     if (!row) return reply.code(404).send({ error: "level not indexed" });
     return row;
+  });
+
+  /** Pinned level.v1 JSON (canonical bytes, keccak256 == layoutHash) of an on-chain level. */
+  app.get("/levels/:id/file", async (req, reply) => {
+    const p = idParamSchema.safeParse(req.params);
+    if (!p.success) return badRequest(reply, "invalid id");
+    const hash = svc.levels.hashForLevelId(p.data.id);
+    if (!hash) return reply.code(404).send({ error: "level not indexed" });
+    const row = svc.db.prepare("SELECT json FROM pinned_levels WHERE layout_hash = ?").get(hash.toLowerCase()) as { json: string } | undefined;
+    if (!row) return reply.code(404).send({ error: "level JSON not pinned through this server" });
+    return reply.type("application/json").send(row.json);
   });
 
   /** Best on-chain (settled) time per player. */

@@ -4,7 +4,7 @@ import { formatEther } from 'viem';
 import { api } from '../api/client';
 import { LevelThumb, formatMs, shortAddr } from '../components/ui';
 import { useAsync } from '../components/useAsync';
-import { useLevel } from '../contracts/hooks';
+import { useLevel, useMarket } from '../contracts/hooks';
 import { formatForge } from '../contracts/hooks/useForgeBalance';
 import { explorerTxUrl } from '../web3/config';
 
@@ -55,6 +55,7 @@ export default function LevelDetail() {
     const { data: txs } = useAsync(() => api.getLevelActivity(id), [id]);
     const { data: earnings } = useAsync(() => api.getCreatorEarnings(id), [id]);
     const chain = useLevel(Number.isFinite(id) ? id : undefined);
+    const market = useMarket();
 
     if (!Number.isFinite(id)) return <div className="empty">Invalid level id.</div>;
     if (error) return <div className="empty error">Could not load level #{id}: {error.message}</div>;
@@ -126,7 +127,12 @@ export default function LevelDetail() {
                                 </dl>
                             </div>
                             <div className="stack" style={{ alignItems: 'center', gap: 6 }}>
-                                <button className="btn primary" disabled={!listed} title="TODO: LevelNFT.buy(id) with value = listing price">
+                                <button
+                                    className="btn primary"
+                                    disabled={!listed || !chain.listingPriceWei || market.phase === 'signing'}
+                                    onClick={() => chain.listingPriceWei && void market.buy(BigInt(id), chain.listingPriceWei).catch((e) => console.warn('[buy]', e))}
+                                    title="LevelNFT.buy(id) with value = listing price"
+                                >
                                     {listed ? `Listed ${listed} ETH — Buy` : 'Not listed'}
                                 </button>
                                 <span className="muted" style={{ fontSize: 12 }}>

@@ -49,18 +49,11 @@ interface ManifestV1 {
     sfx?: Record<string, { path?: string }>;
 }
 
-/** Our element ids → names used by the asset pack (first match wins). */
+/** game-core element types → extra names used by the asset pack (first match wins; theme variants are `${theme}_${name}`). */
 const ALIASES: Partial<Record<ElementType | 'player', string[]>> = {
-    oneway: ['one_way', 'one-way', 'oneWay'],
-    semisolid: ['semi_solid', 'semi-solid'],
-    question: ['question', 'question_block'],
-    pendulum: ['pendulum', 'wrecking_ball', 'pendulum_ball'],
-    lock_door: ['locked_door', 'key-lock-door', 'lockedDoor'],
-    big_coin: ['big_coin', 'bigCoin'],
-    powerup_double_jump: ['powerup_double_jump', 'double-jump'],
-    powerup_dash: ['powerup_dash', 'dash'],
-    chain_bridge: ['chain_bridge', 'chain'],
-    conveyor: ['conveyor', 'conveyor_belt'],
+    question_block: ['question'],
+    chain_bridge: ['chain_link'],
+    switch_block: ['switch-block'],
 };
 
 /** Preferred playable character for the local player (violet, like the mockups). */

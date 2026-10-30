@@ -1,0 +1,71 @@
+{
+  "_comment": "Shared layoutHash test vectors (SPEC §3.4): keccak256(UTF-8 canonical JSON). Checked by server/test/canonical.test.ts and web/src/game/level/serialize.test.ts — both implementations must produce these exact values.",
+  "vectors": [
+    {
+      "name": "sample level (web/src/game/level/samples/seesaw-hell.level.v1.json)",
+      "file": "web/src/game/level/samples/seesaw-hell.level.v1.json",
+      "canonicalBytes": 1727,
+      "layoutHash": "0x4309fa7d260d7c0f1f40113c2d2843dfea75f393face42032567119566317b6b"
+    },
+    {
+      "name": "inline level with unicode, unsorted nested keys, null and boolean props",
+      "level": {
+        "schema": 1,
+        "meta": {
+          "name": "Vecteur — é ✓ \"q\"",
+          "theme": "grass",
+          "timeLimit": 60,
+          "music": "grass_01"
+        },
+        "size": {
+          "w": 8,
+          "h": 4,
+          "tile": 64
+        },
+        "layers": {
+          "terrain": "0*24,1*8"
+        },
+        "entities": [
+          {
+            "id": 2,
+            "type": "moving_platform",
+            "x": 3,
+            "y": 1,
+            "props": {
+              "width": 3,
+              "speed": 1.5,
+              "path": [
+                {
+                  "y": 1,
+                  "x": 3
+                },
+                {
+                  "x": 5,
+                  "y": 1
+                }
+              ],
+              "zeta": true,
+              "Alpha": null
+            }
+          },
+          {
+            "id": 1,
+            "type": "coin",
+            "x": 1,
+            "y": 2
+          }
+        ],
+        "spawn": {
+          "x": 0,
+          "y": 2
+        },
+        "goal": {
+          "x": 7,
+          "y": 2
+        }
+      },
+      "canonical": "{\"entities\":[{\"id\":2,\"props\":{\"Alpha\":null,\"path\":[{\"x\":3,\"y\":1},{\"x\":5,\"y\":1}],\"speed\":1.5,\"width\":3,\"zeta\":true},\"type\":\"moving_platform\",\"x\":3,\"y\":1},{\"id\":1,\"type\":\"coin\",\"x\":1,\"y\":2}],\"goal\":{\"x\":7,\"y\":2},\"layers\":{\"terrain\":\"0*24,1*8\"},\"meta\":{\"music\":\"grass_01\",\"name\":\"Vecteur — é ✓ \\\"q\\\"\",\"theme\":\"grass\",\"timeLimit\":60},\"schema\":1,\"size\":{\"h\":4,\"tile\":64,\"w\":8},\"spawn\":{\"x\":0,\"y\":2}}",
+      "layoutHash": "0x18bf04e4c583c4bc84f7c8f2f786db037f8d1c022ba048dce543dd6bfbcaf358"
+    }
+  ]
+}

@@ -1,11 +1,11 @@
 import type Phaser from 'phaser';
-import { COLLISION_CATEGORIES as C, worldToFixed, fixedToWorld, toFixed } from '../constants.js';
+import { COLLISION_CATEGORIES as C, worldToFixed } from '../constants.js';
 import { MovementState, springLaunch, stompBounce, type Surface, type ControllerState } from '../controller.js';
 import { EMPTY_INPUT, type InputState } from '../input.js';
 import { ELEMENT_TYPES, ELEMENT_PROPS, normalizeProps, type ElementType, type ElementDef, type EntityId, type Point } from './schema.js';
 export * from './schema.js';
 export interface ElementPlayer { body:MatterJS.BodyType; readonly state:Readonly<ControllerState>; setState(state:ControllerState):void }
-export interface ElementContext { tile:number; textures?:Record<string,{texture:string}>; linkResolver:(id:EntityId)=>ElementInstance|ElementDef|undefined; groupResolver?:(group:string)=>ElementInstance[] }
+export interface ElementContext { tile:number; textures?:Record<string,{texture:string;frame?:string|number}>; linkResolver:(id:EntityId)=>ElementInstance|ElementDef|undefined; groupResolver?:(group:string)=>ElementInstance[] }
 export interface ElementInstance {
   readonly def:ElementDef; bodies:MatterJS.BodyType[]; constraints:MatterJS.ConstraintType[];
   enabled:boolean; phase:string; carry:Point; surface:Surface;
@@ -37,8 +37,8 @@ function create(scene:Phaser.Scene,inputDef:ElementDef,ctx:ElementContext):Eleme
     const config={isStatic,isSensor,friction:type==='ice'?0.01:type==='slime'?0.9:0.1,frictionAir:0,label:type,collisionFilter:{category,mask:0xffff,group:0}};
     const b=['saw','pendulum_ball'].includes(type)?scene.matter.add.circle(bx,by,Math.min(bw,bh)/2,config):scene.matter.add.rectangle(bx,by,bw,bh,config);
     bodies.push(b);
-    const key=ctx.textures?.[type]?.texture;
-    if(key && scene.textures.exists(key))visuals.push(scene.add.image(bx,by,key).setDisplaySize(bw,bh));
+    const key=ctx.textures?.[type]?.texture,frame=ctx.textures?.[type]?.frame;
+    if(key && scene.textures.exists(key))visuals.push(scene.add.image(bx,by,key,frame).setDisplaySize(bw,bh));
     else {const key=`elements-fallback-${type}`;if(!scene.textures.exists(key)){const g=scene.add.graphics();g.fillStyle(category===C.hazard?0xe85165:category===C.enemy?0xbc77ed:category===C.pickup?0xffd66b:0x66bda8);g.fillRect(0,0,32,32);g.lineStyle(2,0x182b42);g.strokeRect(0,0,32,32);g.generateTexture(key,32,32);g.destroy();}visuals.push(scene.add.image(bx,by,key).setDisplaySize(bw,bh));}
     return b;
   };

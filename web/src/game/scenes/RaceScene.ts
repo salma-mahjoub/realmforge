@@ -1,8 +1,10 @@
 import Phaser from 'phaser';
+import { fixedToWorld, MOVEMENT } from '@realmforge/game-core';
 import { EventBus, type RemotePlayerState } from '../EventBus';
-import { SCENES } from '../constants';
+import { SCENES, TILE } from '../constants';
 import { PlayScene, type PlaySceneData } from './PlayScene';
 import { elementTexture } from '../assets/registry';
+import type { ElementInstance } from '@realmforge/game-core';
 
 export interface RaceSceneData extends PlaySceneData {
     roomCode?: string;
@@ -10,8 +12,9 @@ export interface RaceSceneData extends PlaySceneData {
 
 /**
  * Versus race (SPEC §3.5/§3.6): the local player is simulated client-side exactly like solo play
- * (client prediction); remote players are interpolated from Colyseus patches (20 Hz) relayed by
- * React via `race:remote-states`. Local state is emitted at 20 Hz on `race:local-state`.
+ * (client prediction, game-core controller); remote players are interpolated from Colyseus patches
+ * (20 Hz) relayed by React via `race:remote-states`. Local state is emitted at 20 Hz on
+ * `race:local-state` in tiles (the server checks per-tick speed in tiles, like run traces).
  * Finish order / timing authority is the server — `play:finished` here is only a local claim.
  */
 export class RaceScene extends PlayScene {
@@ -33,18 +36,27 @@ export class RaceScene extends PlayScene {
         this.unsubs.push(EventBus.subscribe('race:remote-states', (players) => this.applyRemote(players)));
     }
 
+    protected onElementEvent(type: string, el: ElementInstance) {
+        super.onElementEvent(type, el);
+        if (type === 'checkpoint') EventBus.emit('race:checkpoint', { id: Number(el.def.id) });
+        if (type === 'coin' || type === 'big_coin') EventBus.emit('race:coins', this.coins);
+    }
+
     protected afterStep() {
         // 60 Hz sim, 20 Hz network
         if (this.frame % 3 === 0) {
-            const s = this.player.sprite;
-            const v = (s.body as MatterJS.BodyType).velocity;
-            EventBus.emit('race:local-state', { x: s.x, y: s.y, vx: v.x, vy: v.y });
+            const s = this.sample();
+            const st = this.player.state;
+            const scale = TILE / MOVEMENT.referenceTile;
+            EventBus.emit('race:local-state', { f: s.f, x: s.x, y: s.y, vx: fixedToWorld(st.vx, scale) / TILE, vy: fixedToWorld(st.vy, scale) / TILE });
         }
-        // interpolate remotes toward last snapshot
+        // interpolate remotes toward last snapshot (tiles → px)
         for (const r of this.remotes.values()) {
-            r.sprite.x = Phaser.Math.Linear(r.sprite.x, r.target.x, 0.35);
-            r.sprite.y = Phaser.Math.Linear(r.sprite.y, r.target.y, 0.35);
-            r.label.setPosition(r.sprite.x, r.sprite.y - 44);
+            const tx = r.target.x * TILE + TILE / 2;
+            const ty = r.target.y * TILE + TILE / 2;
+            r.sprite.x = Phaser.Math.Linear(r.sprite.x, tx, 0.35);
+            r.sprite.y = Phaser.Math.Linear(r.sprite.y, ty, 0.35);
+            r.label.setPosition(r.sprite.x, r.sprite.y - 52);
         }
     }
 
@@ -55,9 +67,12 @@ export class RaceScene extends PlayScene {
             let r = this.remotes.get(p.sessionId);
             if (!r) {
                 const tex = elementTexture('player');
-                const sprite = this.add.image(p.x, p.y, tex.key, tex.frame).setTint(p.color).setAlpha(0.85).setDepth(40);
+                const x = p.x * TILE + TILE / 2;
+                const y = p.y * TILE + TILE / 2;
+                const sprite = this.add.image(x, y, tex.key, tex.frame).setTint(p.color).setAlpha(0.85).setDepth(40);
+                sprite.setScale((TILE * 1.25) / Math.max(1, sprite.height));
                 const label = this.add
-                    .text(p.x, p.y - 44, shortAddress(p.address), { fontFamily: 'system-ui, sans-serif', fontSize: '12px', color: '#ffffff', backgroundColor: '#0f1424aa', padding: { x: 4, y: 2 } })
+                    .text(x, y - 52, shortAddress(p.address), { fontFamily: 'system-ui, sans-serif', fontSize: '12px', color: '#ffffff', backgroundColor: '#0f1424aa', padding: { x: 4, y: 2 } })
                     .setOrigin(0.5)
                     .setDepth(41);
                 r = { sprite, label, target: p };

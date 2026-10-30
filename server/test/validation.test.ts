@@ -12,7 +12,7 @@ const run = (o?: Parameters<typeof makeRun>[0]) => runSubmissionSchema.parse(mak
 describe("run plausibility (SPEC §3.6)", () => {
   it("computes a positive min time and max coins at publish", () => {
     expect(analysis.minTimeMs).toBeGreaterThan(1000);
-    expect(analysis.maxCoins).toBe(6);
+    expect(analysis.maxCoins).toBe(11); // coin 1 + big_coin 10 (game-core values)
     expect(analysis.checkpoints.map((c) => c.id)).toEqual([10]);
   });
 

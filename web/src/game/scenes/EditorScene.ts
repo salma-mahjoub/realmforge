@@ -17,6 +17,7 @@ import {
     type TileChange,
 } from '../editor/commands';
 import { elementTexture } from '../assets/registry';
+import { canonicalType, footprint } from '../elements/bridge';
 
 export interface EditorSceneData {
     level?: LevelFileV1;
@@ -181,18 +182,17 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
         this.tiles.set(idx, this.add.image(x, y, tex.key, tex.frame).setOrigin(0).setDisplaySize(TILE, TILE).setDepth(1));
     }
 
+    /** Preview with the same footprint + texture game-core's factory uses in test-play. */
     private renderEntity(e: LevelEntity) {
         this.entitySprites.get(e.id)?.destroy();
-        const def = ELEMENT_BY_TYPE[e.type];
-        const w = ((e.props?.length as number | undefined) && (e.type === 'seesaw' || e.type === 'chain_bridge') ? (e.props!.length as number) : def?.w ?? 1) * TILE;
-        const h = (def?.h ?? 1) * TILE;
-        const tex = elementTexture(e.type, this.doc.meta.theme);
+        const type = canonicalType(e.type);
+        const size = type ? footprint(type, e.props) : { w: 1, h: 1 };
+        const tex = elementTexture(type ?? (e.type as ElementType), this.doc.meta.theme);
         const img = this.add
             .image(e.x * TILE, (e.y + 1) * TILE, tex.key, tex.frame)
             .setOrigin(0, 1)
-            .setDisplaySize(w, h)
-            .setDepth(10)
-            .setAngle(Number(e.props?.rotation ?? 0));
+            .setDisplaySize(size.w * TILE, size.h * TILE)
+            .setDepth(10);
         if (e.id === this.selectedId) img.setTint(0xd9ccff);
         this.entitySprites.set(e.id, img);
         this.drawOverlay();
@@ -277,6 +277,8 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
             this.endStroke();
         });
         this.input.on(Phaser.Input.Events.GAME_OUT, () => {
+            // leaving the canvas (e.g. toolbar "Test" button) → test-play starts from the level spawn
+            this.cursor = null;
             this.cursorBox.setVisible(false);
             this.endStroke();
         });
@@ -419,7 +421,7 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
             return;
         }
         if (this.linkFrom === null) {
-            const linkable = ELEMENT_BY_TYPE[hit.type]?.props?.some((p) => p.kind === 'link');
+            const linkable = ELEMENT_BY_TYPE[canonicalType(hit.type) ?? hit.type]?.props.some((p) => p.kind === 'link');
             if (linkable) this.linkFrom = hit.id;
             this.select(hit.id);
             return;
@@ -429,7 +431,7 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
         if (!src || src.id === hit.id) return;
         const cmds = [new UpdatePropsCommand(src.id, src.props, { ...src.props, link: hit.id })];
         // pairs are bidirectional (door↔door, pipe↔pipe)
-        if ((src.type === 'door' || src.type === 'pipe') && hit.type === src.type) {
+        if ((src.type === 'door' || src.type === 'pipe' || src.type === 'locked_door') && (hit.type === 'door' || hit.type === 'pipe' || hit.type === 'locked_door')) {
             cmds.push(new UpdatePropsCommand(hit.id, hit.props, { ...hit.props, link: src.id }));
         }
         this.stack.execute(new CompositeCommand('Link', cmds), this);
@@ -550,13 +552,12 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
     }
 
     private entityAt(cell: { x: number; y: number }): LevelEntity | undefined {
-        // topmost first
+        // topmost first; footprint grows right/up from the bottom-left anchor tile
         for (let i = this.doc.entities.length - 1; i >= 0; i--) {
             const e = this.doc.entities[i];
-            const def = ELEMENT_BY_TYPE[e.type];
-            const w = def?.w ?? 1;
-            const h = def?.h ?? 1;
-            if (cell.x >= e.x && cell.x < e.x + w && cell.y <= e.y && cell.y > e.y - h) return e;
+            const type = canonicalType(e.type);
+            const { w, h } = type ? footprint(type, e.props) : { w: 1, h: 1 };
+            if (cell.x >= e.x && cell.x < e.x + Math.max(1, Math.ceil(w)) && cell.y <= e.y && cell.y > e.y - Math.max(1, Math.ceil(h))) return e;
         }
         return undefined;
     }

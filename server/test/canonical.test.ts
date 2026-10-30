@@ -3,6 +3,13 @@ import { keccak256, toHex } from "viem";
 import { canonicalize, layoutHash } from "../src/level/canonical.js";
 import { levelSchema } from "../src/level/schema.js";
 import { makeLevel } from "./helpers.js";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const VECTORS = resolve(ROOT, "test-vectors/layout-hash.json");
+type Vector = { name: string; file?: string; level?: unknown; canonical?: string; canonicalBytes?: number; layoutHash: string };
 
 function shuffleKeys(v: unknown): unknown {
   if (Array.isArray(v)) return v.map(shuffleKeys);
@@ -42,5 +49,21 @@ describe("layoutHash / canonical JSON", () => {
     expect(levelSchema.safeParse(makeLevel()).success).toBe(true);
     const bad = { ...makeLevel(), goal: { x: 999, y: 1 } };
     expect(levelSchema.safeParse(bad).success).toBe(false);
+  });
+
+  describe.skipIf(!existsSync(VECTORS))("shared web/server test vectors (test-vectors/layout-hash.json)", () => {
+    const { vectors } = existsSync(VECTORS) ? (JSON.parse(readFileSync(VECTORS, "utf8")) as { vectors: Vector[] }) : { vectors: [] };
+    for (const v of vectors) {
+      it(v.name, () => {
+        const level = v.file ? JSON.parse(readFileSync(resolve(ROOT, v.file), "utf8")) : v.level;
+        const canonical = canonicalize(level);
+        if (v.canonical) expect(canonical).toBe(v.canonical);
+        if (v.canonicalBytes) expect(new TextEncoder().encode(canonical).length).toBe(v.canonicalBytes);
+        expect(layoutHash(level)).toBe(v.layoutHash);
+        expect(keccak256(toHex(canonical))).toBe(v.layoutHash);
+        // the server accepts the web's level format as-is (tile 64, meta.description, game-core element names)
+        expect(levelSchema.safeParse(level).success).toBe(true);
+      });
+    }
   });
 });

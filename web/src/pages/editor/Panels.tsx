@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { CATEGORIES, ELEMENTS, ELEMENT_BY_TYPE, elementsIn, type ElementDef, type PropSpec } from '../../game/level/catalog';
 import type { ElementCategory, ElementType, EntityProps, LevelEntity, Waypoint } from '../../game/level/types';
 import { EventBus } from '../../game/EventBus';
+import { canonicalType } from '../../game/elements/bridge';
 import { hex } from '../../components/ui';
 
 const QUICK: ElementType[] = ['ground', 'spring', 'coin'];
@@ -52,44 +53,46 @@ export function Palette({ selected }: { selected: ElementType }) {
                 </div>
             </div>
             <span className="muted" style={{ fontSize: 11 }}>
-                {ELEMENTS.length} elements · SPEC §3.2
+                {ELEMENTS.length} game-core elements · SPEC §3.2
             </span>
         </aside>
     );
 }
 
+/** One property row, driven by a game-core PropDescriptor (via catalog.propSpec). */
 function PropInput({ spec, value, onChange }: { spec: PropSpec; value: unknown; onChange: (v: unknown) => void }) {
+    const current = value ?? spec.default;
     switch (spec.kind) {
         case 'number':
+            if (spec.key === 'direction') {
+                return (
+                    <select className="input" value={String(Number(current) < 0 ? -1 : 1)} onChange={(e) => onChange(Number(e.target.value))}>
+                        <option value="-1">-1 (left / up)</option>
+                        <option value="1">+1 (right / down)</option>
+                    </select>
+                );
+            }
             return (
                 <div className="row">
                     {spec.max !== undefined && spec.max <= 400 && (
-                        <input type="range" className="grow" min={spec.min} max={spec.max} step={spec.step} value={Number(value ?? spec.default ?? 0)} onChange={(e) => onChange(Number(e.target.value))} />
+                        <input type="range" className="grow" min={spec.min} max={spec.max} step={spec.step} value={Number(current ?? 0)} onChange={(e) => onChange(Number(e.target.value))} />
                     )}
-                    <input className="input" style={{ width: 90 }} type="number" min={spec.min} max={spec.max} step={spec.step} value={Number(value ?? spec.default ?? 0)} onChange={(e) => onChange(Number(e.target.value))} />
+                    <input className="input" style={{ width: 90 }} type="number" min={spec.min} max={spec.max} step={spec.step} value={Number(current ?? 0)} onChange={(e) => onChange(Number(e.target.value))} />
                     {spec.unit && <span className="muted">{spec.unit}</span>}
                 </div>
             );
-        case 'select':
-            return (
-                <select className="input" value={String(value ?? spec.options?.[0] ?? '')} onChange={(e) => onChange(spec.key === 'rotation' ? Number(e.target.value) : e.target.value)}>
-                    {spec.options?.map((o) => (
-                        <option key={o} value={o}>
-                            {o}
-                        </option>
-                    ))}
-                </select>
-            );
+        case 'string':
+            return <input className="input" value={String(current ?? '')} onChange={(e) => onChange(e.target.value)} />;
         case 'boolean':
             return (
                 <label className="row" style={{ cursor: 'pointer' }}>
-                    <input type="checkbox" checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} /> {value ? 'On' : 'Off'}
+                    <input type="checkbox" checked={Boolean(current)} onChange={(e) => onChange(e.target.checked)} /> {current ? 'On' : 'Off'}
                 </label>
             );
         case 'link':
             return (
                 <div className="row">
-                    <input className="input" type="number" min={0} placeholder="entity id" value={value === undefined ? '' : Number(value)} onChange={(e) => onChange(e.target.value === '' ? undefined : Number(e.target.value))} />
+                    <input className="input" placeholder="entity id or group" value={value === undefined ? '' : String(value)} onChange={(e) => onChange(e.target.value === '' ? undefined : /^\d+$/.test(e.target.value) ? Number(e.target.value) : e.target.value)} />
                     <button className="btn sm" onClick={() => EventBus.emit('editor:set-tool', 'link')} title="Use the Link tool: click source, then target">
                         Pick
                     </button>
@@ -145,7 +148,7 @@ export function PropertiesPanel({ entity }: { entity: LevelEntity | null }) {
         );
     }
 
-    const def = ELEMENT_BY_TYPE[entity.type];
+    const def = ELEMENT_BY_TYPE[canonicalType(entity.type) ?? entity.type];
     const commit = (next: EntityProps) => {
         setDraft(next);
         EventBus.emit('editor:update-props', { id: entity.id, props: next });

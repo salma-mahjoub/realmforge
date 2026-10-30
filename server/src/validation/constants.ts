@@ -1,23 +1,20 @@
 /**
  * Physics bounds used for plausibility checks (SPEC §3.6).
  *
- * Values mirror game-core/src/constants.ts MOVEMENT (reference px per 60 Hz frame,
- * 16 px reference tile) converted to *tiles per tick* so they are independent of the
- * 18/21 px render tile. They are copied, not imported, until @realmforge/game-core
- * is published as a dependency.
- * TODO(game-core): import MOVEMENT/FIXED_HZ from @realmforge/game-core instead.
+ * Derived from @realmforge/game-core (`MOVEMENT`, `FIXED_HZ` — reference px per 60 Hz frame,
+ * 16 px reference tile) converted to *tiles per tick* so they are independent of the render tile.
+ * game-core is a local `file:../game-core` dependency (build it first: `npm run build` in game-core/).
  */
-const REFERENCE_TILE = 16;
-const RUN_MAX = 2.5; // ref px / frame
-const SPRING_VELOCITY = 7; // ref px / frame (strongest vertical launch)
-const MAX_FALL = 4; // ref px / frame
+import { FIXED_HZ, MOVEMENT } from "@realmforge/game-core";
+
+const REFERENCE_TILE = MOVEMENT.referenceTile;
 
 export const PHYSICS = {
-  tickHz: 60,
+  tickHz: FIXED_HZ,
   /** Fastest horizontal speed, tiles per tick. */
-  maxRunTilesPerTick: RUN_MAX / REFERENCE_TILE,
+  maxRunTilesPerTick: MOVEMENT.runMax / REFERENCE_TILE,
   /** Fastest vertical speed (spring launch / falling), tiles per tick. */
-  maxVerticalTilesPerTick: Math.max(SPRING_VELOCITY, MAX_FALL) / REFERENCE_TILE,
+  maxVerticalTilesPerTick: Math.max(MOVEMENT.springVelocity, MOVEMENT.maxFallSpeed, -MOVEMENT.springVelocity) / REFERENCE_TILE,
   /** Head-room for dash power-ups, conveyors, moving platforms, float error. */
   speedTolerance: 1.75,
   /** Divide theoretical min time by this (dash, springs) to get a safe lower bound. */

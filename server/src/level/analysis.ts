@@ -16,7 +16,21 @@ export interface LevelAnalysis {
   timeLimitMs: number;
 }
 
-const COIN_VALUES: Record<string, number> = { coin: 1, big_coin: 5, bigcoin: 5 };
+/** Coin values granted by game-core's element runtime (coin 1, big_coin 10, question block reward). */
+const COIN_VALUES: Record<string, number> = { coin: 1, big_coin: 10 };
+const QUESTION_REWARD: Record<string, number> = { coin: 1, big_coin: 10 };
+/** Terrain byte of `question_block` in layers.terrain (web/src/game/level/types.ts TERRAIN_IDS). */
+const TERRAIN_QUESTION_BLOCK = 3;
+
+/** Count cells with value `v` in the RLE terrain layer (`value*count` runs, comma-separated). */
+function countTerrain(rle: string, v: number): number {
+  let n = 0;
+  for (const run of rle ? rle.split(",") : []) {
+    const [vs, ns] = run.split("*");
+    if (Number(vs) === v) n += ns === undefined ? 1 : Number(ns) || 0;
+  }
+  return n;
+}
 
 /**
  * Static analysis of a level used by plausibility checks.
@@ -25,7 +39,7 @@ const COIN_VALUES: Record<string, number> = { coin: 1, big_coin: 5, bigcoin: 5 }
  * horizontal speed (dash power-ups and springs could beat this, so a safety factor
  * is applied). Teleports (doors/pipes) can shortcut distance, so levels with
  * teleports use a lower bound of 0 horizontal distance through them.
- * TODO(game-core): replace with a value derived from the real controller constants.
+ * Speeds come from game-core MOVEMENT (see validation/constants.ts).
  */
 export function analyzeLevel(level: Level): LevelAnalysis {
   const tile = level.size.tile;
@@ -34,8 +48,15 @@ export function analyzeLevel(level: Level): LevelAnalysis {
     .map((e) => ({ e, order: typeof e.props?.order === "number" ? (e.props.order as number) : e.x }))
     .sort((a, b) => a.order - b.order || a.e.x - b.e.x || a.e.id - b.e.id)
     .map(({ e }) => ({ id: e.id, x: e.x, y: e.y }));
-  const teleports = level.entities.filter((e: LevelEntity) => e.type === "door" || e.type === "pipe").map((e) => ({ x: e.x, y: e.y }));
-  const maxCoins = level.entities.reduce((acc, e) => acc + (COIN_VALUES[e.type] ?? 0), 0);
+  const teleports = level.entities.filter((e: LevelEntity) => e.type === "door" || e.type === "pipe" || e.type === "locked_door").map((e) => ({ x: e.x, y: e.y }));
+  const maxCoins =
+    level.entities.reduce(
+      (acc, e) =>
+        acc +
+        (COIN_VALUES[e.type] ?? 0) +
+        (e.type === "question_block" ? (QUESTION_REWARD[String(e.props?.reward ?? "coin")] ?? 0) : 0),
+      0,
+    ) + countTerrain(level.layers.terrain ?? "", TERRAIN_QUESTION_BLOCK);
   const dxTiles = teleports.length > 0 ? 0 : Math.abs(level.goal.x - level.spawn.x);
   const maxTilesPerMs = (PHYSICS.maxRunTilesPerTick * PHYSICS.tickHz) / 1000;
   const minTimeMs = Math.floor(dxTiles / maxTilesPerMs / PHYSICS.minTimeSafetyFactor);

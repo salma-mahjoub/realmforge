@@ -57,10 +57,10 @@ export function generatePlaceholderTextures(scene: Scene): number {
                     if (el.layer === 'terrain') {
                         g.fillStyle(c, 1).fillRect(0, 0, w, h);
                         g.lineStyle(2, 0x000000, 0.25).strokeRect(1, 1, w - 2, h - 2);
-                        if (el.type === 'question') {
+                        if (el.type === 'question_block') {
                             g.fillStyle(0x7a4b00, 1).fillRect(w * 0.42, h * 0.2, w * 0.16, h * 0.4).fillRect(w * 0.42, h * 0.68, w * 0.16, h * 0.12);
                         }
-                        if (el.type === 'oneway' || el.type === 'semisolid') {
+                        if (el.type === 'one_way' || el.type === 'semi_solid') {
                             g.clear();
                             g.fillStyle(c, 1).fillRect(0, 0, w, h * 0.3);
                         }

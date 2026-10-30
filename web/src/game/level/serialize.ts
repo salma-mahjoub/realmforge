@@ -50,19 +50,37 @@ export function createEmptyLevel(w = 120, h = 30, theme: LevelDoc['meta']['theme
     };
 }
 
-/** Deterministic JSON: object keys sorted recursively, no whitespace. */
+/**
+ * Canonical JSON for `layoutHash` — byte-for-byte identical to server/src/level/canonical.ts:
+ *  - object keys sorted by UTF-16 code unit order (JS default sort), recursively
+ *  - no insignificant whitespace; strings/numbers/booleans/null exactly as JSON.stringify
+ *  - `undefined` object members omitted, `undefined` array items → null; non-finite numbers rejected
+ *  - UTF-8 encoding of the resulting string
+ * Shared test vectors: ../../../../test-vectors/layout-hash.json (checked by web and server tests).
+ */
 export function canonicalize(value: unknown): string {
-    if (value === null || typeof value !== 'object') return JSON.stringify(value);
-    if (Array.isArray(value)) return `[${value.map(canonicalize).join(',')}]`;
-    const obj = value as Record<string, unknown>;
-    return `{${Object.keys(obj)
-        .filter((k) => obj[k] !== undefined)
-        .sort()
-        .map((k) => `${JSON.stringify(k)}:${canonicalize(obj[k])}`)
-        .join(',')}}`;
+    if (value === null) return 'null';
+    switch (typeof value) {
+        case 'number':
+            if (!Number.isFinite(value)) throw new TypeError('non-finite number in canonical JSON');
+            return JSON.stringify(value);
+        case 'string':
+        case 'boolean':
+            return JSON.stringify(value);
+        case 'object': {
+            if (Array.isArray(value)) return `[${value.map((v) => canonicalize(v === undefined ? null : v)).join(',')}]`;
+            const obj = value as Record<string, unknown>;
+            const keys = Object.keys(obj)
+                .filter((k) => obj[k] !== undefined)
+                .sort();
+            return `{${keys.map((k) => `${JSON.stringify(k)}:${canonicalize(obj[k])}`).join(',')}}`;
+        }
+        default:
+            throw new TypeError(`unsupported type in canonical JSON: ${typeof value}`);
+    }
 }
 
 /** `layoutHash = keccak256(canonicalJSONBytes)` (SPEC §3.4). Must match server/ implementation. */
-export function layoutHash(file: LevelFileV1): `0x${string}` {
+export function layoutHash(file: LevelFileV1 | unknown): `0x${string}` {
     return keccak256(toBytes(canonicalize(file)));
 }

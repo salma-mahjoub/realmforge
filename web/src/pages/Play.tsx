@@ -38,18 +38,23 @@ export default function Play() {
         setPaused(!paused);
     };
 
-    /** Solo run settlement: server validates the input log and signs RunResult (§3.6), then settleRun (§5.3). */
+    /** Solo run settlement: server validates the run and signs RunResult (§3.6), then approve + settleRun (§5.3). */
     const submit = async () => {
         if (!result || !address) return;
         try {
             setSubmitState('Validating run on server…');
-            const signed = await api.submitRun({ player: address, levelId: id, timeMs: result.timeMs, coins: result.coins, cleared: result.cleared, inputs: result.inputs });
-            setSubmitState('Confirm settleRun in your wallet…');
+            const signed = await api.submitRun({ player: address, levelId: id, run: result.run });
             const r = signed.result;
-            await settle.settle(
-                { player: r.player, levelId: BigInt(r.levelId), timeMs: r.timeMs, cleared: r.cleared, coins: r.coins, nonce: BigInt(r.nonce), deadline: BigInt(r.deadline) },
-                signed.signature as Hex,
-            );
+            const runResult = { player: r.player, levelId: BigInt(r.levelId), timeMs: r.timeMs, cleared: r.cleared, coins: r.coins, nonce: BigInt(r.nonce), deadline: BigInt(r.deadline) };
+            setSubmitState('Sign the FORGE permit for the play fee, then confirm settleRunWithPermit…');
+            try {
+                await settle.settleWithPermit(runResult, signed.signature as Hex);
+            } catch (permitErr) {
+                console.warn('[settle] permit path failed, falling back to approve + settleRun', permitErr);
+                setSubmitState('Approve the play fee, then confirm settleRun…');
+                await settle.approveFee(runResult.levelId);
+                await settle.settle(runResult, signed.signature as Hex);
+            }
             setSubmitState('Run settled — transaction sent.');
         } catch (e) {
             setSubmitState(`Failed: ${e instanceof Error ? e.message : String(e)}`);

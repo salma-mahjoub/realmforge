@@ -7,16 +7,19 @@ import { layoutHash } from '../../game/level/serialize';
 import type { LevelFileV1 } from '../../game/level/types';
 import { usePublishLevel } from '../../contracts/hooks';
 import { contractsConfigured } from '../../contracts/addresses';
+import type { RunSubmission } from '../../game/run';
 
 export interface CreatorClear {
     hash: Hex;
     timeMs: number;
     inputs: Array<[number, number]>;
+    /** Trace + checkpoints + input log the server validates for the ClearProof. */
+    run: RunSubmission;
 }
 
 type StepState = 'todo' | 'active' | 'done' | 'error';
-const STEPS = ['Clear check', 'Thumbnail', 'Upload to IPFS', 'Mint LevelNFT'] as const;
-const SUB = ['Server-signed proof', 'game.renderer.snapshot', 'Level JSON + thumbnail + metadata', 'LevelNFT.publish(...)'];
+const STEPS = ['Thumbnail', 'Upload to IPFS', 'Clear check', 'Mint LevelNFT'] as const;
+const SUB = ['game.renderer.snapshot', 'Level JSON + thumbnail + metadata', 'Server-signed ClearProof', 'LevelNFT.publish(...)'];
 
 /**
  * Publish flow (SPEC §3.3): 1. clear proof from server, 2. thumbnail, 3. IPFS pin, 4. mint.
@@ -57,11 +60,6 @@ export function PublishModal({ level, clear, onClose }: { level: LevelFileV1; cl
             const file: LevelFileV1 = { ...level, meta: { ...level.meta, name, parentId: Number(remixOf.replace('#', '')) || undefined } };
 
             mark(0, 'active');
-            const proof = await api.requestClearProof({ creator: address, level: file, timeMs: clear.timeMs, inputs: clear.inputs });
-            mark(0, 'done');
-
-            i = 1;
-            mark(1, 'active');
             const image = thumb ?? (await new Promise<string>((res) => {
                 const off = EventBus.subscribe('editor:snapshot', (d) => {
                     off();
@@ -70,22 +68,28 @@ export function PublishModal({ level, clear, onClose }: { level: LevelFileV1; cl
                 EventBus.emit('editor:request-snapshot');
             }));
             setThumb(image);
-            mark(1, 'done');
+            mark(0, 'done');
+
+            i = 1;
+            mark(1, 'active');
+            const pin = await api.pinLevel({ level: file, thumbnail: image, description: file.meta.description ?? `${name} — a RealmForge level` });
+            if (pin.alreadyPublished) throw new Error('This exact layout is already published.');
+            mark(1, 'done', `CID ${pin.levelCid.slice(0, 10)}…`);
 
             i = 2;
             mark(2, 'active');
-            const pin = await api.pinLevel({ level: file, thumbnail: image, name, description: file.meta.description ?? `${name} — a RealmForge level` });
-            mark(2, 'done', `CID ${pin.levelCid.slice(0, 10)}…`);
+            const proof = await api.requestClearProof({ creator: address, layoutHash: pin.layoutHash, run: clear.run });
+            mark(2, 'done');
 
             i = 3;
             mark(3, 'active', 'Confirm in your wallet');
             if (!contractsConfigured) throw new Error('VITE_LEVEL_NFT_ADDRESS is not configured.');
             await pub.publish({
-                layoutHash: proof.layoutHash,
-                uri: pin.metadataUri,
+                layoutHash: proof.proof.layoutHash,
+                uri: proof.tokenURI ?? pin.tokenURI,
                 playFee: parseUnits(fee || '0', 18),
                 parentId: BigInt(Number(remixOf.replace('#', '')) || 0),
-                deadline: BigInt(proof.deadline),
+                deadline: BigInt(proof.proof.deadline),
                 clearSig: proof.signature,
             });
             mark(3, 'done', 'Transaction sent');

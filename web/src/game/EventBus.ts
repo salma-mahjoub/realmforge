@@ -1,5 +1,6 @@
 import { Events } from 'phaser';
 import type { ElementType, EntityProps, LevelEntity, LevelFileV1 } from './level/types';
+import type { RunSubmission } from './run';
 
 /**
  * React ⇄ Phaser bridge (SPEC §2). Based on the EventBus of phaserjs/template-react-ts (MIT),
@@ -32,10 +33,24 @@ export interface RunFinished {
     timeMs: number;
     coins: number;
     cleared: boolean;
-    /** Compact input log, `frame,buttons` pairs (SPEC §3.6). */
+    /** Compact input log, `frame,buttons` change pairs (game-core 6-bit masks, SPEC §3.6). */
     inputs: Array<[frame: number, buttons: number]>;
+    /** False when test-play started from the editor cursor (server requires the trace to start at spawn). */
+    fromSpawn: boolean;
+    /** Payload for POST /levels/clear-proof and POST /runs/validate (`run`). */
+    run: RunSubmission;
 }
 
+/** Local racer state sent to the Colyseus room (`pos` message): tiles + tiles/frame, like run traces. */
+export interface LocalRacerState {
+    f: number;
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+}
+
+/** Remote racer from the Colyseus room state; x/y are tiles (cell coordinates). */
 export interface RemotePlayerState {
     sessionId: string;
     address: string;
@@ -81,7 +96,9 @@ export interface BusEvents {
     'play:restart': [];
     'play:pause': [paused: boolean];
     'race:remote-states': [players: RemotePlayerState[]];
-    'race:local-state': [state: Omit<RemotePlayerState, 'sessionId' | 'address' | 'color'>];
+    'race:local-state': [state: LocalRacerState];
+    'race:checkpoint': [hit: { id: number }];
+    'race:coins': [count: number];
 }
 
 type Handler<K extends keyof BusEvents> = (...args: BusEvents[K]) => void;

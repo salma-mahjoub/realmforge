@@ -1,8 +1,10 @@
 import { getAddress, isAddress, zeroAddress, type Address } from 'viem';
+import { deployedAddresses } from './generated';
 
 /**
- * Contract addresses, env-driven (see .env.example). Per-chain overrides can be added to
- * `byChain` once contracts/ exports a deployments file.
+ * Contract addresses: env vars (VITE_LEVEL_NFT_ADDRESS / VITE_FORGE_COIN_ADDRESS, written to
+ * .env.local by `npm run deploy:local`) win; otherwise the per-chain map exported by
+ * contracts/scripts/export-abi.ts (generated/addresses.json) is used.
  */
 function envAddress(value: string | undefined, name: string): Address {
     if (value && isAddress(value)) return getAddress(value);
@@ -18,11 +20,16 @@ export interface ContractAddresses {
     forgeCoin: Address;
 }
 
-/** Per-chain overrides (chainId -> addresses). Empty until deployments exist. */
-const byChain: Partial<Record<number, ContractAddresses>> = {};
+const byChain: Partial<Record<number, ContractAddresses>> = Object.fromEntries(
+    Object.entries(deployedAddresses)
+        .filter(([, a]) => a.LevelNFT && a.ForgeCoin && isAddress(a.LevelNFT) && isAddress(a.ForgeCoin))
+        .map(([chain, a]) => [Number(chain), { levelNFT: getAddress(a.LevelNFT!), forgeCoin: getAddress(a.ForgeCoin!) }]),
+);
 
 export function getAddresses(chainId?: number): ContractAddresses {
+    if (LEVEL_NFT_ADDRESS !== zeroAddress && FORGE_COIN_ADDRESS !== zeroAddress) return { levelNFT: LEVEL_NFT_ADDRESS, forgeCoin: FORGE_COIN_ADDRESS };
     return (chainId !== undefined && byChain[chainId]) || { levelNFT: LEVEL_NFT_ADDRESS, forgeCoin: FORGE_COIN_ADDRESS };
 }
 
-export const contractsConfigured = LEVEL_NFT_ADDRESS !== zeroAddress && FORGE_COIN_ADDRESS !== zeroAddress;
+export const contractsConfigured =
+    (LEVEL_NFT_ADDRESS !== zeroAddress && FORGE_COIN_ADDRESS !== zeroAddress) || Object.keys(byChain).length > 0;

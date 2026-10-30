@@ -40,8 +40,10 @@ export default function EditorPage() {
             }),
             EventBus.subscribe('current-scene-ready', (s) => setMode(s.scene.key === SCENES.Editor ? 'edit' : 'test')),
             EventBus.subscribe('play:finished', (r) => {
+                // Only a clear from the level spawn counts for the server-signed ClearProof.
+                if (!r.fromSpawn) return;
                 const l = levelRef.current;
-                setClear({ hash: layoutHash(l), timeMs: r.timeMs, inputs: r.inputs });
+                setClear({ hash: layoutHash(l), timeMs: r.timeMs, inputs: r.inputs, run: r.run });
             }),
         ];
         return () => offs.forEach((o) => o());

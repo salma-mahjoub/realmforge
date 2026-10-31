@@ -2,6 +2,8 @@
 export const SUBPIXEL = 256;
 export const FIXED_HZ = 60;
 export const FIXED_MS = 1000 / FIXED_HZ;
+/** Reference-pixel hulls; big crouch uses the small hull. Timers count physics steps. */
+export const PLAYER = Object.freeze({width:12, smallHeight:15, bigHeight:30, invulnerableFrames:90});
 export const MOVEMENT = Object.freeze({
   tile: 64, referenceTile: 16, scale: 4,
   walkMax: 1.5, runMax: 2.5,

@@ -62,15 +62,29 @@ export default function Play() {
     };
 
     return (
-        <div className="stack" style={{ gap: 14 }}>
+        <div className="stack play-page" style={{ gap: 18 }}>
+            <style>{`
+                .play-page h1 { font-size: clamp(26px, 3vw, 38px); letter-spacing: -.8px; line-height: 1.15; margin-bottom: 4px; }
+                .play-page .play-stage { height: min(68vh, 640px); border-radius: 18px; overflow: hidden; border: 1px solid #344363; }
+                .play-page .hud { top: 18px; left: 18px; border-radius: 16px; background: #0f1424d9; box-shadow: 0 4px 20px #0f142420; }
+                .play-page .hud > div { padding: 13px 18px; gap: 10px; font-size: clamp(14px, 1.4vw, 20px); }
+                .play-page .hud > div + div { border-left-color: #9ca5d52b; }
+                .play-page .hud-symbol { font: 30px system-ui; line-height: 1; }
+                .play-page .checkpoint-flag { color: #a47cff; font-size: 30px; line-height: 1; }
+                .play-page .hud .coin, .play-page .economy-panel .coin { width: 25px; height: 25px; }
+                .play-page .play-actions .btn { min-height: 46px; padding: 10px 18px; font-size: 16px; border-radius: 13px; }
+                .play-page .economy-panel { padding: 15px 20px; border-radius: 17px; gap: 12px; background: linear-gradient(135deg, #20273f, #141a2c); }
+                .play-page .controls-panel { padding: 12px 16px; font-size: 13px; border-radius: 17px; }
+                @media (max-width: 640px) { .play-page .hud { top: 8px; left: 8px; } .play-page .hud > div { padding: 8px; } .play-page .economy-panel { flex-wrap: wrap; padding: 12px; } }
+            `}</style>
             <div className="row between">
                 <div>
-                    <h1 style={{ fontSize: 28 }}>{meta?.name ?? `Level #${id}`}</h1>
+                    <h1>{meta?.name ?? `Level #${id}`}</h1>
                     <span className="muted">
                         by <Link to={`/profile/${meta?.creator ?? ''}`} className="mono">{shortAddr(meta?.creator)}</Link>
                     </span>
                 </div>
-                <div className="row">
+                <div className="row play-actions">
                     <button className="btn" onClick={restart}>
                         ↻ Restart
                     </button>
@@ -82,11 +96,11 @@ export default function Play() {
 
             <div className="play-stage">
                 <div className="hud">
-                    <div className="mono">⏱ {formatMs(hud.timeMs)}</div>
+                    <div><span className="hud-symbol" aria-hidden="true">⏱</span><span className="mono">{formatMs(hud.timeMs)}</span></div>
                     <div>
                         <span className="coin" /> {hud.coins}
                     </div>
-                    <div>⚑ {hud.checkpoint ? 'Checkpoint' : 'Start'}</div>
+                    <div><span className="checkpoint-flag" aria-hidden="true">⚑</span>{hud.checkpoint ? 'Checkpoint' : 'Start'}</div>
                 </div>
                 {error && <div className="empty error">Could not load level file: {error.message}</div>}
                 {file ? <PhaserGame scene={SCENES.Play} data={{ level: file, levelId: String(id), from: 'play' }} /> : <div className="game-container" />}
@@ -116,11 +130,11 @@ export default function Play() {
             </div>
 
             <div className="row between wrap">
-                <div className="panel row" style={{ padding: '10px 16px' }}>
+                <div className="panel row economy-panel">
                     <span className="coin" /> Level fee <b className="gold">{meta?.playFee ?? '—'} FORGE</b>
                     <span className="muted">·</span> Reward on clear <b className="gold">+12 FORGE</b>
                 </div>
-                <div className="panel row" style={{ padding: '10px 16px', fontSize: 13 }}>
+                <div className="panel row controls-panel">
                     <span className="kbd">A</span>
                     <span className="kbd">D</span> Move
                     <span className="kbd">Space</span> Jump

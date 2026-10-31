@@ -39,6 +39,7 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
     private dirty = false;
 
     private tiles = new Map<number, Phaser.GameObjects.Image>();
+    private entityPivots = new Map<number, Phaser.GameObjects.Image>();
     private entitySprites = new Map<number, Phaser.GameObjects.Image>();
     private grid!: Phaser.GameObjects.TileSprite;
     private overlay!: Phaser.GameObjects.Graphics;
@@ -66,6 +67,8 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
         this.registry.set(REG.editorStack, this.stack);
         this.tiles.clear();
         this.entitySprites.clear();
+        this.entityPivots.forEach((s) => s.destroy());
+        this.entityPivots.clear();
         this.selectedId = null;
         this.linkFrom = null;
     }
@@ -73,6 +76,7 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
     create() {
         const { w, h } = this.doc.size;
         const cam = this.cameras.main;
+        cam.roundPixels = true;
         cam.setBackgroundColor(THEME_SKY[this.doc.meta.theme]);
         cam.setBounds(-TILE * 2, -TILE * 2, (w + 4) * TILE, (h + 4) * TILE);
         this.fitCamera();
@@ -105,7 +109,7 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
         const occupied = this.doc.terrain.findIndex((v) => v !== 0);
         const top = occupied < 0 ? Math.max(0, h - 14) : Math.min(Math.floor(occupied / w), ...this.doc.entities.map((e) => e.y));
         const visibleHeight = Math.min(h, Math.max(12, h - top + 2));
-        cam.setZoom(Phaser.Math.Clamp(vh / (visibleHeight * TILE), 0.35, 1));
+        cam.setZoom(Math.round(Phaser.Math.Clamp(vh / (visibleHeight * TILE), 0.35, 1) * TILE) / TILE);
         const viewW = this.scale.width / cam.zoom;
         cam.centerOn(Math.min(this.doc.spawn.x * TILE + viewW / 2 - TILE * 2, w * TILE - viewW / 2 + TILE), (h - visibleHeight / 2) * TILE);
         this.emitStatus();
@@ -123,7 +127,7 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
         this.doc.terrain[idx] = value;
         this.renderTile(idx);
         // Neighbours may switch between exposed edges and interior fill.
-        for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) if (this.inBounds(x + dx, y + dy)) this.renderTile((y + dy) * this.doc.size.w + x + dx);
+        for (const [dx, dy] of [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]]) if (this.inBounds(x + dx, y + dy)) this.renderTile((y + dy) * this.doc.size.w + x + dx);
         this.markDirty();
     }
 
@@ -142,6 +146,8 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
         this.doc.entities = this.doc.entities.filter((e) => e.id !== id);
         this.entitySprites.get(id)?.destroy();
         this.entitySprites.delete(id);
+        this.entityPivots.get(id)?.destroy();
+        this.entityPivots.delete(id);
         if (this.selectedId === id) this.select(null);
         this.markDirty();
     }
@@ -172,6 +178,8 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
         for (let i = 0; i < this.doc.terrain.length; i++) if (this.doc.terrain[i]) this.renderTile(i);
         this.entitySprites.forEach((s) => s.destroy());
         this.entitySprites.clear();
+        this.entityPivots.forEach((s) => s.destroy());
+        this.entityPivots.clear();
         this.doc.entities.forEach((e) => this.renderEntity(e));
         this.drawOverlay();
     }
@@ -192,6 +200,8 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
     /** Preview with the same footprint + texture game-core's factory uses in test-play. */
     private renderEntity(e: LevelEntity) {
         this.entitySprites.get(e.id)?.destroy();
+        this.entityPivots.get(e.id)?.destroy();
+        this.entityPivots.delete(e.id);
         const type = canonicalType(e.type);
         const size = type ? footprint(type, e.props) : { w: 1, h: 1 };
         const centreY = (e.y + 1 - size.h / 2) * TILE;
@@ -205,6 +215,12 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
             .setOrigin(0, 1)
             .setDisplaySize(size.w * (stretch ? 1 : tex.displaySize?.w ?? 1) * TILE, size.h * (stretch ? 1 : tex.displaySize?.h ?? 1) * TILE)
             .setDepth(10);
+        if (type === 'seesaw') {
+            const pivot = elementTexture('seesaw_pivot');
+            if (this.textures.exists(pivot.key)) this.entityPivots.set(e.id,
+                this.add.image((e.x + size.w / 2) * TILE, centreY + TILE * 0.1, pivot.key, pivot.frame)
+                    .setOrigin(0.5, 0).setDisplaySize(TILE * (pivot.displaySize?.w ?? 0.8), TILE * (pivot.displaySize?.h ?? 0.7)).setDepth(9));
+        }
         if (e.id === this.selectedId) img.setTint(0xd9ccff);
         this.entitySprites.set(e.id, img);
         this.drawOverlay();
@@ -517,7 +533,7 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
         u.push(EventBus.subscribe('editor:delete-selected', () => this.deleteSelected()));
         u.push(
             EventBus.subscribe('editor:zoom', (z) => {
-                this.cameras.main.setZoom(Phaser.Math.Clamp(z, 0.25, 2));
+                this.cameras.main.setZoom(Math.round(Phaser.Math.Clamp(z, 0.25, 2) * TILE) / TILE);
                 this.emitStatus();
             }),
         );

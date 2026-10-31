@@ -21,7 +21,8 @@ import { REG, SCENES, SIM_HZ, STEP_MS, THEME_SKY, TILE } from '../constants';
 import { decodeLevel } from '../level/serialize';
 import { SAMPLE_LEVEL } from '../level';
 import { TERRAIN_BY_ID, type LevelDoc, type LevelFileV1, type Waypoint } from '../level/types';
-import { elementTexture, groundTexture, hasSfx, isPixelArt } from '../assets/registry';
+import { groundTexture, hasSfx, playerTexture } from '../assets/registry';
+import { characterDisplay } from '../render/artwork';
 import { drawMechanisms } from '../render/mechanisms';
 import { createBackground } from '../render/background';
 import { coreTextures, terrainDef, toCoreDef } from '../elements/bridge';
@@ -36,7 +37,8 @@ export interface PlaySceneData {
     spawn?: Waypoint;
 }
 
-type MatterPlayer = ReturnType<typeof createMatterPlayer>;
+type MatterPlayer = ReturnType<typeof createMatterPlayer> & { form?: 'small' | 'big'; setForm?: (form: 'small' | 'big') => void; invulnerable?: boolean };
+type PlayerOptions = NonNullable<Parameters<typeof createMatterPlayer>[3]> & { onFormChange?: (form: 'small' | 'big') => void };
 type ElementRuntime = ReturnType<typeof createElementRuntime>;
 
 /** Rendered character height (the controller hull is 12×15 reference px = 48×60 px at TILE 64). */
@@ -81,6 +83,8 @@ export class PlayScene extends Phaser.Scene {
     private goalReached = false;
     private anim = '';
     private playerTex = '';
+    private renderedForm: 'small' | 'big' = 'small';
+    private formTransition?: { start: number; from: number; to: number };
     private keys!: Record<'left' | 'right' | 'up' | 'down' | 'a' | 'd' | 'w' | 's' | 'space' | 'z' | 'x' | 'shift', Phaser.Input.Keyboard.Key>;
     protected unsubs: Array<() => void> = [];
 
@@ -122,6 +126,8 @@ export class PlayScene extends Phaser.Scene {
         this.checkpointHits = [];
         this.currentInput = EMPTY_INPUT;
         this.anim = '';
+        this.renderedForm = 'small';
+        this.formTransition = undefined;
     }
 
     create() {
@@ -167,16 +173,18 @@ export class PlayScene extends Phaser.Scene {
 
         // 3. game-core Mario-like controller on a Matter compound body.
         const sp = this.tileCenter(this.spawnTile);
-        this.player = createMatterPlayer(this, sp.x, sp.y, {
+        const playerOptions: PlayerOptions = {
             tile: TILE,
             input: () => this.currentInput,
             surface: this.runtime.surface,
             carry: this.runtime.carry,
-        });
+            onFormChange: (form) => this.onPlayerFormChange(form),
+        };
+        this.player = createMatterPlayer(this, sp.x, sp.y, playerOptions);
         this.runtime.attachPlayer(this.player);
         this.matter.world.on(Phaser.Physics.Matter.Events.AFTER_UPDATE, this.afterFixedStep, this);
 
-        const tex = elementTexture('player');
+        const tex = playerTexture('small');
         this.playerTex = tex.key;
         this.playerSprite = this.add.sprite(sp.x, sp.y, tex.key, tex.frame).setOrigin(0.5, 1).setDepth(50);
         this.playerSprite.setScale(PLAYER_DISPLAY_H / Math.max(1, this.playerSprite.height));
@@ -185,7 +193,7 @@ export class PlayScene extends Phaser.Scene {
         // 4. Fixed 60 Hz clock shared by runtime + player (game-core accumulator).
         installFixedMatterClock(this);
 
-        this.cameras.main.startFollow(this.playerSprite, isPixelArt(), 0.15, 0.15, 0, TILE);
+        this.cameras.main.startFollow(this.playerSprite, true, 0.15, 0.15, 0, TILE);
         this.fitZoom();
         this.bindKeys();
         this.bindBus();
@@ -228,10 +236,27 @@ export class PlayScene extends Phaser.Scene {
 
     }
 
+    private onPlayerFormChange(form: 'small' | 'big') {
+        if (form === this.renderedForm) return;
+        this.formTransition = { start: this.frame, from: this.renderedForm === 'big' ? PLAYER_DISPLAY_H * 2 : PLAYER_DISPLAY_H, to: form === 'big' ? PLAYER_DISPLAY_H * 2 : PLAYER_DISPLAY_H };
+        this.renderedForm = form;
+        this.anim = '';
+    }
+
     private syncSprite() {
         const b = this.player.body;
         const hull = b.parts[1] ?? b;
-        this.playerSprite.setPosition(hull.position.x, hull.bounds.max.y);
+        // Tolerate a game-core checkout that has not received the form API yet.
+        const form = typeof this.player.setForm === 'function' && this.player.form === 'big' ? 'big' : 'small';
+        this.onPlayerFormChange(form);
+        const tex = playerTexture(form);
+        if (tex.key !== this.playerTex) {
+            this.playerTex = tex.key;
+            this.playerSprite.setTexture(tex.key, tex.frame);
+            this.anim = '';
+        }
+        this.playerSprite.setPosition(Math.round(hull.position.x), Math.round(hull.bounds.max.y));
+        this.playerSprite.setVisible(!this.player.invulnerable || Math.floor(this.frame / 5) % 2 === 0);
         const s = this.player.state;
         this.playerSprite.setFlipX(s.facing < 0);
         const name = ANIM_FOR[s.mode] ?? 'idle';
@@ -242,12 +267,20 @@ export class PlayScene extends Phaser.Scene {
             if (this.anims.exists(key)) this.playerSprite.play(key, true);
             else if (this.anims.exists(fallback)) this.playerSprite.play(fallback, true);
         }
-        // Frame dimensions can differ across poses: scale visible art after selecting the frame.
-        const tex = elementTexture('player');
-        const display = tex.displaySize;
-        const height = hull.bounds.max.y - hull.bounds.min.y;
-        const crouch = s.mode === MovementState.crouch ? 0.7 : 1;
-        this.playerSprite.setDisplaySize(display ? height * display.w / display.h : TILE * 0.8, height * crouch);
+        // Fixed atlas cells preserve pose proportions; the feet stay on the hull through size changes.
+        const hullHeight = hull.bounds.max.y - hull.bounds.min.y;
+        let height = hullHeight;
+        const transition = this.formTransition;
+        if (transition) {
+            const elapsed = this.frame - transition.start;
+            if (elapsed >= 40) this.formTransition = undefined;
+            else height = [transition.from, (transition.from + transition.to) / 2, transition.to][Math.floor(elapsed / 4) % 3];
+        }
+        const display = characterDisplay(tex.key, this.playerSprite.frame.name, height, form === 'big' && s.mode === MovementState.crouch);
+        height = display.height;
+        this.playerSprite.y += Math.round(display.feetOffset);
+        const ratio = tex.displaySize ? tex.displaySize.w / tex.displaySize.h : this.playerSprite.width / Math.max(1, this.playerSprite.height);
+        this.playerSprite.setDisplaySize(Math.round(height * ratio), Math.round(height));
         this.playerSprite.setOrigin(tex.anchor?.x ?? 0.5, tex.anchor?.y ?? 1);
         if (s.mode === MovementState.walk || s.mode === MovementState.run) this.playerSprite.anims.timeScale = Phaser.Math.Clamp(Math.abs(s.vx) / (SUBPIXEL * (s.mode === MovementState.run ? MOVEMENT.runMax : MOVEMENT.walkMax)), 0.45, 1.8);
         else this.playerSprite.anims.timeScale = 1;
@@ -267,7 +300,7 @@ export class PlayScene extends Phaser.Scene {
     /** Keep about 22 tiles across; tall windows expose more vertical space. */
     private fitZoom() {
         const { width } = this.scale;
-        const z = Phaser.Math.Clamp((width || 1280) / (22 * TILE), 0.35, 1.5);
+        const z = Math.round(Phaser.Math.Clamp((width || 1280) / (22 * TILE), 0.35, 1.5) * TILE) / TILE;
         this.cameras.main.setZoom(z).setDeadzone(3 * TILE * z, 2 * TILE * z);
     }
 

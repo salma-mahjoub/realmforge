@@ -27,7 +27,7 @@ function harness(){
 function setup(){const h=harness(),map=new Map<string|number,ElementInstance>();return {...h,map,add(type:ElementDef['type'],props:Record<string,unknown>={},id:string|number=type,x=0,y=0){const e=ELEMENTS[type].create(h.scene,{id,type,x,y,props},{tile:64,linkResolver:id=>map.get(id),groupResolver:group=>[...map.values()].filter(e=>e.def.props?.group===group)});map.set(id,e);return e;}};}
 describe('element palette',()=>{
   it('covers the complete SPEC palette and editor defaults are valid',()=>{
-    expect(ELEMENT_TYPES).toHaveLength(38);
+    expect(ELEMENT_TYPES).toHaveLength(39);
     for(const type of ELEMENT_TYPES){expect(ELEMENTS[type].create).toBeTypeOf('function');const p=normalizeProps(type);expect(Object.keys(p)).toHaveLength(ELEMENT_PROPS[type].length);for(const descriptor of ELEMENT_PROPS[type]){expect(descriptor).toHaveProperty('default');if(descriptor.kind==='number'){expect(p[descriptor.name]).toBeGreaterThanOrEqual(descriptor.min!);expect(p[descriptor.name]).toBeLessThanOrEqual(descriptor.max!);}}}
   });
   it('constructs, serializes and cleans up every factory using real Matter bodies',()=>{

@@ -1,11 +1,19 @@
 import Phaser from 'phaser';
 import type { ElementInstance } from '@realmforge/game-core';
+import { elementTexture } from '../assets/registry';
 import { TILE } from '../constants';
 
 /** Constraint joints have no visible art in Matter unless debug is on. Draw them independently. */
 export function drawMechanisms(scene: Phaser.Scene, elements: Map<string | number, ElementInstance>) {
     const graphics = scene.add.graphics().setDepth(-1);
     const effects = scene.add.graphics().setDepth(2);
+    const pivots = new Map<string | number, Phaser.GameObjects.Image>();
+    const pivotRef = elementTexture('seesaw_pivot');
+    if (scene.textures.exists(pivotRef.key)) for (const [id, element] of elements) {
+        if (element.def.type !== 'seesaw') continue;
+        pivots.set(id, scene.add.image(element.def.x * TILE, element.def.y * TILE + TILE * 0.1, pivotRef.key, pivotRef.frame)
+            .setOrigin(0.5, 0).setDisplaySize(TILE * (pivotRef.displaySize?.w ?? 0.8), TILE * (pivotRef.displaySize?.h ?? 0.7)).setDepth(-1));
+    }
     const update = () => {
         graphics.clear();
         effects.clear();
@@ -31,7 +39,7 @@ export function drawMechanisms(scene: Phaser.Scene, elements: Map<string | numbe
                 }
                 effects.strokePath();
             }
-            if (element.def.type === 'seesaw') {
+            if (element.def.type === 'seesaw' && !pivots.has(element.def.id)) {
                 const { x, y } = body.position;
                 graphics.fillStyle(0x53677d).fillTriangle(x, y + 4, x - TILE * 0.3, y + TILE * 0.65, x + TILE * 0.3, y + TILE * 0.65);
                 graphics.fillStyle(0xa7bacd).fillCircle(x, y + 4, TILE * 0.1);
@@ -55,5 +63,9 @@ export function drawMechanisms(scene: Phaser.Scene, elements: Map<string | numbe
         }
     };
     scene.events.on(Phaser.Scenes.Events.POST_UPDATE, update);
-    scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => scene.events.off(Phaser.Scenes.Events.POST_UPDATE, update));
+    update();
+    scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+        scene.events.off(Phaser.Scenes.Events.POST_UPDATE, update);
+        pivots.forEach((pivot) => pivot.destroy());
+    });
 }

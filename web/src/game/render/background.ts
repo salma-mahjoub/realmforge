@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { isPixelArt, themeLayers } from '../assets/registry';
+import { themeLayers } from '../assets/registry';
 
 /** Camera-space layers: cover the viewport at every zoom and tile horizontally in world space. */
 export function createBackground(scene: Phaser.Scene, theme: string, dim = false) {
@@ -7,7 +7,7 @@ export function createBackground(scene: Phaser.Scene, theme: string, dim = false
         ...layer,
         sprite: scene.add.tileSprite(0, 0, 1, 1, layer.key).setOrigin(0.5).setScrollFactor(0).setDepth(-100 + i).setAlpha(dim ? 0.7 : 1),
     }));
-    scene.cameras.main.setRoundPixels(isPixelArt());
+    scene.cameras.main.setRoundPixels(true);
     const update = () => {
         const cam = scene.cameras.main;
         const width = cam.width / cam.zoom, height = cam.height / cam.zoom;

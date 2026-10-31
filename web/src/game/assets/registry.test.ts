@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { elementTexture, getAnimations, groundTexture, isPixelArt, pruneMissing, readManifest, themeLayers } from './registry';
+import { elementTexture, getAnimations, completeGroundVariants, groundTexture, groundVariantNames, playerTexture, isPixelArt, pruneMissing, readManifest, themeLayers } from './registry';
 import { fetchPackManifest, manifestUrl } from './pack';
 
 describe('asset packs', () => {
@@ -38,4 +38,63 @@ describe('asset packs', () => {
         expect(groundTexture('snow', grid, 3, 4, 1, 2).key).toBe('snow_fill');
         expect(groundTexture('snow', grid, 3, 4, 1, 1).key).toBe('snow_ground');
     });
+});
+
+
+describe('terrain topology and forms', () => {
+    const names = ['single', 'pillar_bottom', 'single_left', 'bottom_left', 'pillar_top', 'pillar', 'top_left', 'left',
+        'single_right', 'bottom_right', 'horizontal', 'bottom', 'top_right', 'right', 'top', 'fill'];
+
+    it('selects every cardinal shape, including floating strips and one-tile pillars', () => {
+        readManifest({ elements: Object.fromEntries(names.map((name) => [`grass_${name}`, { path: `${name}.png` }])), themes: { grass: {} } }, ['ground']);
+        for (let mask = 0; mask < 16; mask++) {
+            const grid = new Uint8Array([1, mask & 1 ? 1 : 0, 1, mask & 8 ? 1 : 0, 1, mask & 2 ? 1 : 0, 1, mask & 4 ? 1 : 0, 1]);
+            expect(groundTexture('grass', grid, 3, 3, 1, 1).key).toBe(`grass_${names[mask]}`);
+        }
+    });
+
+    it('normalizes irrelevant diagonals to the 47 connected blob shapes', () => {
+        const variants = new Set<string>();
+        for (let mask = 0; mask < 256; mask++) {
+            const grid = new Uint8Array(9).fill(1);
+            for (const [bit, cell] of [1, 5, 7, 3, 2, 8, 6, 0].entries()) grid[cell] = (mask >> bit) & 1;
+            variants.add(groundVariantNames(grid, 3, 3, 1, 1)[0]);
+        }
+        expect(variants.size).toBe(47);
+    });
+
+    it('uses inner corners under a pit lip and updates diagonal topology', () => {
+        readManifest({ elements: { snow_fill: { path: 'fill.png' }, snow_inner_top_right: { path: 'inner.png' } }, themes: { snow: {} } }, ['ground']);
+        const grid = new Uint8Array(9).fill(1);
+        grid[2] = 0;
+        expect(groundTexture('snow', grid, 3, 3, 1, 1).key).toBe('snow_inner_top_right');
+        grid[2] = 1;
+        expect(groundTexture('snow', grid, 3, 3, 1, 1).key).toBe('snow_fill');
+    });
+
+    it('resolves both form atlases by character id and keeps a legacy-pack fallback', () => {
+        readManifest({ characters: { mario: { path: 'big.png' }, mario_small: { path: 'small.png' } } }, ['player']);
+        expect(playerTexture('big').key).toBe('characters-mario');
+        expect(playerTexture('small').key).toBe('characters-mario_small');
+        readManifest({ characters: { purple: { path: 'purple.png' } } }, ['player']);
+        expect(playerTexture('big')).toEqual(playerTexture('small'));
+    });
+});
+
+
+it('composes every concave blob from corner quarters without losing exposed cardinal edges', () => {
+    const names = ['ground', 'top', 'top_left', 'top_right', 'fill', 'left', 'right', 'bottom', 'bottom_left', 'bottom_right',
+        'pillar_top', 'pillar', 'pillar_bottom', 'single', 'horizontal', 'single_left', 'single_right',
+        'inner_top_left', 'inner_top_right', 'inner_bottom_left', 'inner_bottom_right'];
+    readManifest({ elements: Object.fromEntries(names.map((name) => [`snow_${name}`, { path: `${name}.png` }])), themes: { snow: {} } }, ['ground']);
+    const compositions = new Map<string, { base: string; corners: number }>();
+    completeGroundVariants((base, corners, id) => {
+        compositions.set(id, { base: base.key, corners: corners.length });
+        return { key: id };
+    });
+    expect(compositions.size).toBe(31);
+    expect(compositions.get('snow:mask_15')).toEqual({ base: 'snow_fill', corners: 4 });
+    expect(compositions.get('snow:mask_7')).toEqual({ base: 'snow_left', corners: 2 });
+    const grid = new Uint8Array([0, 1, 0, 1, 1, 1, 0, 1, 0]);
+    expect(groundTexture('snow', grid, 3, 3, 1, 1).key).toBe('snow:mask_15');
 });

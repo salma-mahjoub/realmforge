@@ -52,6 +52,7 @@ interface ManifestV1 {
     elements?: Record<string, ImageEntry>;
     characters?: Record<string, ImageEntry>;
     enemies?: Record<string, ImageEntry>;
+    items?: Record<string, ImageEntry>;
     themes?: Record<string, ImageEntry & { background?: ImageEntry; tileWidth?: number; tileHeight?: number; margin?: number; spacing?: number; tiles?: Record<string, number | ImageEntry>; parallax?: { file: string; scrollFactor: number; y?: number }[] }>;
     sfx?: Record<string, { path?: string }>;
 }
@@ -63,8 +64,8 @@ const ALIASES: Partial<Record<ElementType | 'player', string[]>> = {
     switch_block: ['switch-block'],
 };
 
-/** Preferred playable character for the local player (violet, like the mockups). */
-const PLAYER_CHARACTERS = ['small', 'mario_small', 'mario', 'purple', 'green', 'pink', 'beige'];
+/** Character id; form selection happens independently of the pack's preferred colour. */
+const PLAYER_CHARACTERS = ['mario', 'purple', 'green', 'pink', 'beige'];
 
 let base = '/assets/';
 
@@ -79,6 +80,23 @@ const themedTextures = new Map<string, TextureRef>(); // `${theme}:${type}`
 export interface BackgroundLayer { key: string; scrollFactor: number; y?: number }
 const backgrounds = new Map<string, BackgroundLayer[]>();
 const variants = new Map<string, TextureRef>();
+const characters = new Map<string, TextureRef>();
+let playerCharacter = '';
+export const isCharacterTexture = (key: string) => [...characters.values()].some((ref) => ref.key === key);
+
+/** Form atlases share an id; packs without small art keep their existing character. */
+export function playerTexture(form: 'small' | 'big'): TextureRef {
+    return characters.get(form === 'small' ? `${playerCharacter}_small` : playerCharacter)
+        ?? characters.get(playerCharacter) ?? elementTexture('player');
+}
+
+/** Replace terrain UVs with padded copies without changing the source pack. */
+export function mapTerrainTextures(map: (ref: TextureRef) => TextureRef): void {
+    for (const [name, ref] of variants) if (/^(ground|fill|top|bottom|left|right|inner|pillar|single|horizontal|mask|blob)(_|$)/.test(name.split(':')[1])) variants.set(name, map(ref));
+    for (const refs of [elementTextures, themedTextures]) {
+        for (const [name, ref] of refs) if (/(^|:)ground$/.test(name)) refs.set(name, map(ref));
+    }
+}
 let pixelArt = false;
 let sourceTile = 64;
 export const isPixelArt = () => pixelArt;
@@ -103,13 +121,46 @@ export function themeLayers(theme: string): readonly BackgroundLayer[] {
     return backgrounds.get(theme) ?? [];
 }
 
-/** Pick exposed top edges and interior fill without changing the collision grid. */
+/** Cardinal mask first, diagonals only at connected corners (47-tile blob topology). */
+export function groundVariantNames(grid: readonly number[] | Uint8Array, w: number, h: number, x: number, y: number): string[] {
+    // The bottom of a level continues underground. Side boundaries remain exposed.
+    const ground = (cx: number, cy: number) => cx >= 0 && cx < w && (cy >= h || (cy >= 0 && grid[cy * w + cx] === 1));
+    const n = ground(x, y - 1), e = ground(x + 1, y), s = ground(x, y + 1), west = ground(x - 1, y);
+    const mask = (n ? 1 : 0) | (e ? 2 : 0) | (s ? 4 : 0) | (west ? 8 : 0);
+    const cardinal = ['single', 'pillar_bottom', 'single_left', 'bottom_left', 'pillar_top', 'pillar', 'top_left', 'left',
+        'single_right', 'bottom_right', 'horizontal', 'bottom', 'top_right', 'right', 'top', 'fill'][mask];
+    const corners: string[] = [];
+    if (n && west && !ground(x - 1, y - 1)) corners.push('top_left');
+    if (n && e && !ground(x + 1, y - 1)) corners.push('top_right');
+    if (s && west && !ground(x - 1, y + 1)) corners.push('bottom_left');
+    if (s && e && !ground(x + 1, y + 1)) corners.push('bottom_right');
+    const blob = mask | (n && e && ground(x + 1, y - 1) ? 16 : 0) | (e && s && ground(x + 1, y + 1) ? 32 : 0)
+        | (s && west && ground(x - 1, y + 1) ? 64 : 0) | (west && n && ground(x - 1, y - 1) ? 128 : 0);
+    return [`mask_${blob}`, `blob_${blob}`, ...(corners.length ? [`${cardinal}_inner_${corners.join('_')}`, `inner_${corners.join('_')}`, ...corners.map((c) => `inner_${c}`)] : []),
+        cardinal, ...(cardinal.startsWith('pillar') ? ['pillar', !n ? 'top' : !s ? 'bottom' : 'fill'] : []),
+        ...(!n ? [!west ? 'top_left' : !e ? 'top_right' : 'top', 'ground'] : [!west ? 'left' : !e ? 'right' : !s ? 'bottom' : 'fill', 'inner', 'fill'])];
+}
+
+/** Compose concave quarters over the cardinal shape when a pack has corner art but no full blob atlas. */
+export function completeGroundVariants(compose: (base: TextureRef, corners: { ref: TextureRef; x: number; y: number }[], id: string) => TextureRef): void {
+    for (const theme of backgrounds.keys()) for (let mask = 0; mask < 256; mask++) {
+        const grid = new Uint8Array(9).fill(1);
+        for (const [bit, cell] of [1, 5, 7, 3, 2, 8, 6, 0].entries()) grid[cell] = (mask >> bit) & 1;
+        const names = groundVariantNames(grid, 3, 3, 1, 1), id = `${theme}:${names[0]}`;
+        if (variants.has(id)) continue;
+        const cornerNames = [...new Set(names.filter((name) => /^inner_(top|bottom)_(left|right)$/.test(name)))];
+        if (!cornerNames.length) continue;
+        const corners = cornerNames.map((name) => ({ ref: variants.get(`${theme}:${name}`), x: name.endsWith('right') ? 1 : 0, y: name.startsWith('inner_bottom') ? 1 : 0 }));
+        if (!corners.every((corner) => corner.ref)) continue;
+        // Fully connected diagonals select the exposed cardinal edges without any inner-corner preference.
+        for (const cell of [0, 2, 6, 8]) grid[cell] = 1;
+        const base = groundTexture(theme, grid, 3, 3, 1, 1);
+        variants.set(id, compose(base, corners as { ref: TextureRef; x: number; y: number }[], id));
+    }
+}
+
 export function groundTexture(theme: string, grid: readonly number[] | Uint8Array, w: number, h: number, x: number, y: number): TextureRef {
-    const ground = (cx: number, cy: number) => cy >= h || (cx >= 0 && cx < w && cy >= 0 && grid[cy * w + cx] === 1);
-    const top = !ground(x, y - 1), left = !ground(x - 1, y), right = !ground(x + 1, y);
-    const names = top ? [left ? 'top_left' : right ? 'top_right' : 'top', 'ground']
-        : [left ? 'left' : right ? 'right' : !ground(x, y + 1) ? 'bottom' : 'fill', 'inner', 'fill'];
-    for (const name of names) {
+    for (const name of groundVariantNames(grid, w, h, x, y)) {
         const ref = variants.get(`${theme}:${name}`);
         if (ref) return ref;
     }
@@ -126,7 +177,7 @@ export function hasSfx(key: string): boolean {
 
 /** Drop mappings whose texture failed to load so lookups fall back to placeholders. */
 export function pruneMissing(exists: (key: string) => boolean): void {
-    for (const map of [elementTextures, themedTextures, variants]) {
+    for (const map of [elementTextures, themedTextures, variants, characters]) {
         for (const [k, ref] of map) if (!exists(ref.key)) map.delete(k);
     }
     for (const [k, layers] of backgrounds) backgrounds.set(k, layers.filter((layer) => exists(layer.key)));
@@ -142,6 +193,8 @@ export function readManifest(manifest: unknown, knownTypes: readonly string[], m
     pixelArt = m.pixelArt === true;
     sourceTile = m.sourceTile ?? 64;
     variants.clear();
+    characters.clear();
+    playerCharacter = '';
     elementTextures.clear();
     themedTextures.clear();
     backgrounds.clear();
@@ -180,7 +233,7 @@ export function readManifest(manifest: unknown, knownTypes: readonly string[], m
         return null;
     };
 
-    const els = m.elements ?? {};
+    const els = { ...m.items, ...m.elements };
     const themes = Object.keys(m.themes ?? {});
     for (const type of knownTypes) {
         const names = [type, ...(ALIASES[type as ElementType] ?? [])];
@@ -210,11 +263,15 @@ export function readManifest(manifest: unknown, knownTypes: readonly string[], m
 
     // characters: queue all (remote racers use other colours), pick the local player's one
     const chars = m.characters ?? {};
-    for (const [name, e] of Object.entries(chars)) queue(e, `characters-${name}`);
+    for (const [name, e] of Object.entries(chars)) {
+        const ref = queue(e, `characters-${name}`);
+        if (ref) characters.set(name, ref);
+    }
     for (const name of [...PLAYER_CHARACTERS, ...Object.keys(chars)]) {
         const ref = queue(chars[name], `characters-${name}`);
         if (ref) {
-            elementTextures.set('player', ref);
+            playerCharacter = name.endsWith('_small') ? name.slice(0, -6) : name;
+            elementTextures.set('player', characters.get(`${playerCharacter}_small`) ?? ref);
             break;
         }
     }

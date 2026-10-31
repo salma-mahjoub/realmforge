@@ -1,4 +1,4 @@
-export const ELEMENT_TYPES = ['ground','brick','question_block','ice','slime','one_way','semi_solid','spikes','lava','saw','falling_block','crate','seesaw','pendulum_ball','chain_bridge','spring','conveyor_belt','moving_platform','elevator','rotating_platform','walker','shell','flyer','jumper','cannon','coin','big_coin','key','powerup_double_jump','powerup_dash','start','checkpoint','goal','door','pipe','locked_door','switch','switch_block'] as const;
+export const ELEMENT_TYPES = ['ground','brick','question_block','ice','slime','one_way','semi_solid','spikes','lava','saw','falling_block','crate','seesaw','pendulum_ball','chain_bridge','spring','conveyor_belt','moving_platform','elevator','rotating_platform','walker','shell','flyer','jumper','cannon','coin','big_coin','key','powerup_double_jump','powerup_dash','start','checkpoint','goal','door','pipe','locked_door','switch','switch_block','mushroom'] as const;
 export type ElementType = typeof ELEMENT_TYPES[number];
 export type EntityId = string | number;
 export interface Point { x:number; y:number }
@@ -7,7 +7,7 @@ export interface PropDescriptor { name:string; kind:'number'|'boolean'|'string'|
 const number=(name:string,min:number,max:number,value:number):PropDescriptor=>({name,kind:'number',min,max,default:value});
 const common:PropDescriptor[]=[number('width',0.1,300,1),number('height',0.1,30,1),{name:'group',kind:'string',default:''},{name:'enabled',kind:'boolean',default:true}];
 export const ELEMENT_PROPS = Object.fromEntries(ELEMENT_TYPES.map(type=>[type,[...common,
-  ...(['saw','conveyor_belt','moving_platform','elevator','rotating_platform','walker','shell','flyer','jumper','cannon'].includes(type)?[number('speed',0,32,1),number('direction',-1,1,1)]:[]),
+  ...(['saw','conveyor_belt','moving_platform','elevator','rotating_platform','walker','shell','flyer','jumper','cannon','mushroom'].includes(type)?[number('speed',0,32,1),number('direction',-1,1,1)]:[]),
   ...(['moving_platform','elevator'].includes(type)?[{name:'path',kind:'path' as const,default:[]},number('distance',0,100,4)]:[]),
   ...(['falling_block','jumper','cannon','switch'].includes(type)?[number('timer',1,3600,type==='falling_block'?30:120)]:[]),
   ...(['door','pipe','locked_door','switch'].includes(type)?[{name:'link',kind:'link' as const,default:''}]:[]),

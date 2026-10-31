@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import {ELEMENTS,inventoryFor,surfaceForBody,carryAtBody,type ElementInstance,type ElementPlayer,type ElementContext} from './index.js';
+import {ELEMENTS,inventoryFor,surfaceForBody,carryAtBody,hurtPlayer,type ElementInstance,type ElementPlayer,type ElementContext} from './index.js';
 import type {ElementDef,EntityId} from './schema.js';
 import {EMPTY_INPUT,type InputState} from '../input.js';
 import {springLaunch,MovementState} from '../controller.js';
@@ -38,6 +38,7 @@ export function createElementRuntime(scene:Phaser.Scene,options:{tile:number;tex
     const input=options.input?.()??EMPTY_INPUT;
     for(const e of elements.values()){
       if(!e.enabled)continue;
+      if(['brick','question_block'].includes(e.def.type))continue; // Head bumps are handled before the step, never on side/top contact.
       const b=e.bodies[0]!;
       if(e.def.type==='falling_block'&&above(b))e.activate(player,input);
       const nearTop=above(b)&&['spring','walker','shell','flyer','jumper'].includes(e.def.type);
@@ -47,7 +48,7 @@ export function createElementRuntime(scene:Phaser.Scene,options:{tile:number;tex
       if(['door','pipe','locked_door'].includes(e.def.type)&&!input.up)continue;
       if(e.def.type==='switch'&&!input.up&&!input.down)continue;
       if(e.def.type==='falling_block'&&e.phase==='falling'&&main().position.y>b.position.y)player.setState({...player.state,mode:MovementState.dead});
-      if(e.def.type==='cannon'&&e.bodies.slice(1).some(b=>touching(main(),b)))player.setState({...player.state,mode:MovementState.dead});
+      if(e.def.type==='cannon'&&e.bodies.slice(1).some(b=>touching(main(),b)))hurtPlayer(player);
       if(e.activate(player,input))options.onEvent?.(e.def.type,e);
     }
     for(const shell of elements.values())if(shell.enabled&&shell.phase==='projectile'&&shell.def.type==='shell')for(const enemy of elements.values())if(enemy!==shell&&enemy.enabled&&['walker','shell','flyer','jumper','cannon'].includes(enemy.def.type)&&touching(shell.bodies[0]!,enemy.bodies[0]!))enemy.destroy();

@@ -1,10 +1,12 @@
-import { MOVEMENT as M, toFixed as fp } from './constants.js';
+import { MOVEMENT as M, PLAYER, toFixed as fp } from './constants.js';
 import { encodeInput, decodeInput, inputEdges, type InputState } from './input.js';
 export enum MovementState { idle='idle', walk='walk', run='run', skid='skid', jump='jump', fall='fall', crouch='crouch', wallSlide='wallSlide', dead='dead' }
+export type PlayerForm = 'small' | 'big';
 export interface ControllerState {
   x:number; y:number; vx:number; vy:number; frame:number; mode:MovementState; facing:-1|1;
   coyote:number; jumpBuffer:number; previousInput:number; jumpRow:number; jumpCut:boolean;
   airMax:number; wallLock:number;
+  form:PlayerForm; crouched:boolean; invulnerableFrames:number;
 }
 export interface Contacts {
   grounded?:boolean; left?:boolean; right?:boolean; head?:boolean;
@@ -12,11 +14,29 @@ export interface Contacts {
   headCorrectionX?:number;
   /** Moving platform displacement per frame, reference fixed units. */
   carryX?:number; carryY?:number;
+  /** Trusted level events/clearance, derived again when resolving a replay. */
+  mushroom?:boolean; hurt?:boolean; standBlocked?:boolean;
 }
 export interface Surface { kind?:'normal'|'ice'|'slime'; conveyor?:number }
 export const NORMAL_SURFACE: Readonly<Surface> = Object.freeze({kind:'normal'});
 export function createControllerState(x=0,y=0): ControllerState {
-  return {x:fp(x),y:fp(y),vx:0,vy:0,frame:0,mode:MovementState.idle,facing:1,coyote:0,jumpBuffer:0,previousInput:0,jumpRow:0,jumpCut:false,airMax:fp(M.walkMax),wallLock:0};
+  return {x:fp(x),y:fp(y),vx:0,vy:0,frame:0,mode:MovementState.idle,facing:1,coyote:0,jumpBuffer:0,previousInput:0,jumpRow:0,jumpCut:false,airMax:fp(M.walkMax),wallLock:0,form:'small',crouched:false,invulnerableFrames:0};
+}
+export const controllerHeight = (s:Pick<ControllerState,'form'|'crouched'>):number => s.form==='big'&&!s.crouched ? PLAYER.bigHeight : PLAYER.smallHeight;
+function resizeState(state:Readonly<ControllerState>,form:PlayerForm,crouched:boolean):ControllerState {
+  const next={...state,form,crouched};
+  next.y-=fp((controllerHeight(next)-controllerHeight(state))/2);
+  return next;
+}
+/** Keep feet anchored. A blocked growth succeeds in the short, crouched big hull. */
+export function setControllerForm(state:Readonly<ControllerState>,form:PlayerForm,standBlocked=false):ControllerState {
+  if(state.mode===MovementState.dead||state.form===form)return {...state};
+  return resizeState(state,form,form==='big'&&(standBlocked||state.mode===MovementState.crouch));
+}
+export function hurtController(state:Readonly<ControllerState>):ControllerState {
+  if(state.mode===MovementState.dead||state.invulnerableFrames>0)return {...state};
+  if(state.form==='small')return {...state,mode:MovementState.dead,vx:0,vy:0};
+  return {...setControllerForm(state,'small'),invulnerableFrames:PLAYER.invulnerableFrames};
 }
 const approach = (v:number,target:number,delta:number) => v < target ? Math.min(target,v+delta) : Math.max(target,v-delta);
 function launch(s:ControllerState, velocity:number):void {
@@ -24,8 +44,11 @@ function launch(s:ControllerState, velocity:number):void {
 }
 /** No mutation, clocks, random numbers, browser or engine dependencies. +Y is down. */
 export function stepController(state:Readonly<ControllerState>, input:InputState, contacts:Contacts={}, surface:Surface=NORMAL_SURFACE):ControllerState {
-  const s={...state,frame:state.frame+1,previousInput:encodeInput(input)};
+  let s={...state,frame:state.frame+1,previousInput:encodeInput(input),invulnerableFrames:Math.max(0,state.invulnerableFrames-1)};
   if(s.mode===MovementState.dead) return {...s,vx:0,vy:0};
+  if(contacts.mushroom)s=setControllerForm(s,'big',contacts.standBlocked);
+  if(contacts.hurt&&state.invulnerableFrames===0)s=hurtController(s);
+  if(s.mode===MovementState.dead)return {...s,vx:0,vy:0};
   const edge=inputEdges(input,decodeInput(state.previousInput));
   // A rising body must not regain jumps from a trailing foot sensor.
   let grounded=!!contacts.grounded && s.vy>=0;
@@ -33,7 +56,8 @@ export function stepController(state:Readonly<ControllerState>, input:InputState
   s.jumpBuffer=edge.jumpPressed ? M.jumpBufferFrames : state.jumpBuffer;
   s.wallLock=Math.max(0,state.wallLock-1);
   const dir=Number(input.right)-Number(input.left);
-  const crouch=grounded && input.down;
+  const crouch=(grounded && input.down)||(s.form==='big'&&(!!contacts.standBlocked||(s.crouched&&input.down)));
+  s=resizeState(s,s.form,s.form==='big'&&crouch);
   const ice=surface.kind==='ice', slime=surface.kind==='slime';
   const max=fp((input.run ? M.runMax : M.walkMax)*(slime ? 0.5 : 1));
   const friction=fp(M.releaseFriction*(ice ? 0.2 : slime ? 3 : 1));

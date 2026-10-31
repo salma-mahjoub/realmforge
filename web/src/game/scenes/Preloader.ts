@@ -101,7 +101,10 @@ export class Preloader extends Phaser.Scene {
         for (const [type, alternate, fps] of [['coin', 'coin_side', 6], ['big_coin', 'coin_side', 6], ['goal', 'goal_wave', 4]] as const) {
             const first = elementTexture(type), second = elementTexture(alternate);
             const key = `${first.key}:idle`;
-            if (!this.anims.exists(key) && this.textures.exists(first.key) && this.textures.exists(second.key)) {
+            const existing = this.anims.get(key);
+            // A static HD replacement may expose a one-frame idle; keep the real side frame spinning.
+            if ((!existing || existing.frames.length < 2) && first.key !== second.key && this.textures.exists(first.key) && this.textures.exists(second.key)) {
+                if (existing) this.anims.remove(key);
                 this.anims.create({ key, frames: [{ key: first.key, frame: first.frame }, { key: second.key, frame: second.frame }], frameRate: fps, repeat: -1 });
             }
         }

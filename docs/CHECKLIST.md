@@ -75,9 +75,11 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] **Mario pack (NSMBU style, default)** `web/public/packs/mario/`: 117/117 element IDs, 21 parallax layers over 4 themes, validator passes (`assets/packs/mario`). Private class demo only, see AGENTS.md.
 - [x] Pack switch (`VITE_ASSET_PACK` + in-game Art toggle), Kenney as fallback
 - [x] Parallax backgrounds, body-sized sprites (character 60 px, ~22 tiles visible), state animations, ground auto-tiling, editor zoom + sprite thumbnails
-- [ ] Mario pack fidelity: some sprites are low-res captures (Mario, blocks, coins look upscaled and blurry); big Luigi is a Mario recolour; slime, crate and pendulum are substitutes
-- [ ] Seesaw still renders as a thin plank; terrain edge tiles beside pits show dark artefacts
-- [ ] Big/small player state (the controller has a single 48×60 hull)
+- [x] High-resolution asset pass: scale audit reduced 50 violations to 0; padded terrain atlases and 47 neighbour masks per theme. Audit: `assets/packs/mario/AUDIT.md`.
+- [ ] Exact NSMBU fidelity: Luigi and small Mario use NSMB Wii fallbacks; some Luigi poses and object animations are substitutes/stills (see pack README).
+- [x] Seesaw pivot/visual scaling and terrain edge-mask/padding fixes; screenshots in `docs/screenshots/`.
+- [ ] Seesaw physical plank remains 0.25 tile thick (visual improvement does not change physics).
+- [x] Small/big forms: feet-anchored hull resize, ceiling-safe crouch growth, mushroom pickup, big-only brick breaking, shrink on damage and 90-frame invulnerability; replay tests. Kenney mushroom uses a placeholder.
 
 ## 4. Web app — `web/` (Vite, React 19, Phaser 3.90 + Matter, wagmi 2 / viem / RainbowKit)
 - [x] 8 routes styled after the mockups, 404 page, no console errors
@@ -139,3 +141,7 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 
 ### Cut order if behind schedule
 Season distribution → co-op → remix royalties → race escrow. **Never cut:** both contracts, the token flow between them, signature checks, tests.
+
+## Latest verification — visual/player-form pass
+
+Coordinator re-ran root `npm test` and `npm run build`: game-core 53, contracts 42 (+9 todo), server 31, web 18 passing; all builds pass. Captures use a separate render-polish fixture, not the canonical hash-vector level.

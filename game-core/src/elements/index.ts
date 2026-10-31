@@ -1,11 +1,13 @@
 import type Phaser from 'phaser';
 import { createElementVisual, positionElementVisual, bounceVisuals, stompVisuals, type ElementTexture, type ElementVisual } from './display.js';
 import { COLLISION_CATEGORIES as C, worldToFixed } from '../constants.js';
-import { MovementState, springLaunch, stompBounce, type Surface, type ControllerState } from '../controller.js';
+import { MovementState, springLaunch, stompBounce, hurtController, type PlayerForm, type Surface, type ControllerState } from '../controller.js';
+import { createMushroom } from './mushroom.js';
 import { EMPTY_INPUT, type InputState } from '../input.js';
 import { ELEMENT_TYPES, ELEMENT_PROPS, normalizeProps, type ElementType, type ElementDef, type EntityId, type Point } from './schema.js';
 export * from './schema.js';
-export interface ElementPlayer { body:MatterJS.BodyType; readonly state:Readonly<ControllerState>; setState(state:ControllerState):void }
+export interface ElementPlayer { body:MatterJS.BodyType; readonly state:Readonly<ControllerState>; readonly form?:PlayerForm; readonly invulnerable?:boolean; setForm?(form:PlayerForm):void; hurt?():void; setState(state:ControllerState):void }
+export function hurtPlayer(player:ElementPlayer):void {if(player.hurt)player.hurt();else player.setState(hurtController(player.state));}
 export interface ElementContext { tile:number; textures?:Record<string,ElementTexture>; linkResolver:(id:EntityId)=>ElementInstance|ElementDef|undefined; groupResolver?:(group:string)=>ElementInstance[] }
 export interface ElementInstance {
   readonly def:ElementDef; bodies:MatterJS.BodyType[]; constraints:MatterJS.ConstraintType[];
@@ -71,11 +73,12 @@ function create(scene:Phaser.Scene,inputDef:ElementDef,ctx:ElementContext):Eleme
         return true;
       }
       if(type==='falling_block'){if(triggerFrame<0){triggerFrame=frame;item.phase='shaking';}return true;}
-      if(type==='brick'){item.destroy();return true;}
+      if(type==='brick'){if(player&&(player.form??player.state.form)==='big')item.destroy();else bounceVisuals(scene,visuals);return true;}
       if(type==='question_block'){if(used)return false;bounceVisuals(scene,visuals);used=true;item.phase='used';if(inv){if(p.reward==='key')inv.keys++;else if(p.reward==='powerup_double_jump')inv.doubleJump=true;else if(p.reward==='powerup_dash')inv.dash=true;else inv.coins+=p.reward==='big_coin'?10:1;}return true;}
       if(!player||!inv)return false;
       if(type==='spring'){bounceVisuals(scene,visuals);player.setState(springLaunch(player.state,-Number(p.launch)));return true;}
-      if(['spikes','lava','saw','pendulum_ball'].includes(type)){player.setState({...player.state,mode:MovementState.dead,vx:0,vy:0});return true;}
+      if(['spikes','saw','pendulum_ball'].includes(type)){hurtPlayer(player);return true;}
+      if(type==='lava'){player.setState({...player.state,mode:MovementState.dead,vx:0,vy:0});return true;}
       if(type==='locked_door' && !used){if(inv.keys<=0)return false;inv.keys--;used=true;item.phase='unlocked';body.isSensor=true;}
       if(['door','pipe','locked_door'].includes(type)){
         if(inv.teleportCooldown>0)return false;
@@ -92,7 +95,7 @@ function create(scene:Phaser.Scene,inputDef:ElementDef,ctx:ElementContext):Eleme
         const stomp=player.state.vy>=0 && player.body.bounds.max.y<=body.bounds.min.y+t*0.4;
         if(stomp){player.setState(stompBounce(player.state,input.jump));if(type==='shell'){item.phase='resting';B.setVelocity(body,{x:0,y:body.velocity.y});}else {stompVisuals(scene,visuals);item.destroy();}return true;}
         if(type==='shell' && item.phase==='resting'){item.phase='projectile';direction=player.body.position.x<body.position.x?1:-1;return true;}
-        player.setState({...player.state,mode:MovementState.dead,vx:0,vy:0});return true;
+        hurtPlayer(player);return true;
       }
       return false;
     },
@@ -132,7 +135,7 @@ export function carryAtBody(body:MatterJS.BodyType|undefined,point:Point):Point 
 }
 const angular=new WeakMap<MatterJS.BodyType,number>();
 export const ELEMENTS=Object.fromEntries(ELEMENT_TYPES.map(type=>{
-  const factory=(scene:Phaser.Scene,def:ElementDef,ctx:ElementContext)=>create(scene,def,ctx);
+  const factory=(scene:Phaser.Scene,def:ElementDef,ctx:ElementContext)=>type==='mushroom'?createMushroom(scene,def,ctx):create(scene,def,ctx);
   return [type,Object.assign(factory,{props:ELEMENT_PROPS[type],create:factory})];
 })) as Record<ElementType,ElementFactory>;
 

@@ -74,6 +74,7 @@ const P: Record<ElementType, Presentation> = {
     flyer: { label: 'Flyer', category: 'enemies', color: 0xd94ad0 },
     jumper: { label: 'Jumper', category: 'enemies', color: 0xff8a3d },
     cannon: { label: 'Cannon', category: 'enemies', color: 0x2b2f3a },
+    mushroom: { label: 'Super Mushroom', category: 'items', color: 0xe85165 },
     coin: { label: 'Coin', category: 'items', color: 0xffc83d },
     big_coin: { label: 'Big Coin', category: 'items', color: 0xffb000 },
     key: { label: 'Key', category: 'items', color: 0xffe066 },

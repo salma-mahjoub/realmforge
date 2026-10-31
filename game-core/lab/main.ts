@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import {createMatterPlayer,installFixedMatterClock} from '../src/adapters/phaserMatter';
-import {COLLISION_CATEGORIES as C,createControllerState,fixedToWorld,fromFixed,springLaunch} from '../src/index';
+import {COLLISION_CATEGORIES as C,createControllerState,createElementRuntime,MovementState,fixedToWorld,fromFixed,springLaunch} from '../src/index';
 class Lab extends Phaser.Scene {
   create(){
     this.cameras.main.setBounds(0,0,3000,850);
@@ -18,18 +18,26 @@ class Lab extends Phaser.Scene {
     const keys=keyboard.addKeys('LEFT,RIGHT,UP,DOWN,A,D,W,S,SHIFT,X,SPACE,Z,R') as Record<string,Phaser.Input.Keyboard.Key>;
     const down=(...names:string[])=>names.some(n=>keys[n]!.isDown);
     const read=()=>({left:down('LEFT','A'),right:down('RIGHT','D'),up:down('UP','W'),down:down('DOWN','S'),run:down('SHIFT','X'),jump:down('SPACE','Z')});
+    const runtime=createElementRuntime(this,{tile:64,input:read});
+    runtime.add({id:'grow-near-start',type:'mushroom',x:4,y:10.75,props:{speed:0.5,direction:-1}});
+    runtime.add({id:'grow-after-damage',type:'mushroom',x:13,y:10.75,props:{speed:0.5,direction:-1}});
+    runtime.add({id:'damage-test',type:'walker',x:10,y:10.75,props:{speed:1,direction:-1}});
+    runtime.add({id:'break-test',type:'brick',x:12,y:8.5});
     const player=createMatterPlayer(this,120,650,{input:read,surface:ground=>{
       if(ground?.label==='spring' && player.state.vy>=0) player.setState(springLaunch(player.state));
       return {kind:ground?.label==='ice'?'ice':ground?.label==='slime'?'slime':'normal',conveyor:ground?.label==='conveyor'?128:0};
     }});
+    runtime.attachPlayer(player);
     const graphic=this.add.rectangle(120,650,48,60,0xffb36b).setDepth(2);
     this.cameras.main.startFollow(graphic,true,0.15,0.15);
     installFixedMatterClock(this);
     this.events.on('update',()=>{
-      if(down('R')||player.body.position.y>1000)player.setState(createControllerState(30,150));
+      if(down('R')||player.body.position.y>1000||player.state.mode===MovementState.dead)player.setState(createControllerState(30,150));
       graphic.setPosition(player.body.position.x,player.body.position.y);
       const s=player.state;
-      labels.setText(`60 Hz · tile 64 · scale 4\nvx ${fromFixed(s.vx).toFixed(3)} / vy ${fromFixed(s.vy).toFixed(3)} ref px/frame\nworld vx ${fixedToWorld(s.vx).toFixed(2)} · ${s.mode}\ncoyote ${s.coyote} · buffer ${s.jumpBuffer} · frame ${s.frame}`);
+      const hull=player.body.parts[1]!;
+      graphic.setSize(48,hull.bounds.max.y-hull.bounds.min.y).setAlpha(player.invulnerable&&Math.floor(s.frame/6)%2===0?0.3:1);
+      labels.setText(`60 Hz · tile 64 · scale 4 · ${player.form} · invulnerability ${s.invulnerableFrames}\nvx ${fromFixed(s.vx).toFixed(3)} / vy ${fromFixed(s.vy).toFixed(3)} ref px/frame\nworld vx ${fixedToWorld(s.vx).toFixed(2)} · ${s.mode}\ncoyote ${s.coyote} · buffer ${s.jumpBuffer} · frame ${s.frame}\nMushrooms grow · enemy damages · big breaks bricks · Down crouches · R resets`);
     });
   }
 }

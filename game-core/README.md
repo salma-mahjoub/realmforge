@@ -12,7 +12,7 @@ npm run lab:build
 # Equivalent lab build: npx vite build --config lab/vite.config.ts
 ```
 
-Controls: arrows/WASD move, Shift/X run, Space/Z jump, down crouches, R resets. The lab includes ground, floating platforms, steps, ice, slime, conveyor, spring, and wall-jump walls. All graphics are colored rectangles.
+Controls: arrows/WASD move, Shift/X run, Space/Z jump, down crouches, R resets the player. The lab includes ground, floating platforms, steps, ice, slime, conveyor, spring, wall-jump walls, two mushrooms, a walker and a brick. Pick up a mushroom, try crouching beneath a platform, bump/break the brick, and touch the walker to test damage. The HUD shows form and damage protection; the player rectangle blinks while protected. Reload the lab page to respawn collected/destroyed elements. All lab graphics are colored placeholders.
 
 ```ts
 import { createControllerState, stepController, EMPTY_INPUT } from '@realmforge/game-core';
@@ -31,14 +31,28 @@ const player = createMatterPlayer(this, 120, 100, {
   input: () => currentButtons,
   surface: ground => ({kind: ground?.label === 'ice' ? 'ice' : 'normal'}),
   carry: ground => ({x: 0, y: 0}), // world px/frame; derive from platform displacement
-  onStateChange: (next, previous, state) => animate(next)
+  onStateChange: (next, previous, state) => animate(next),
+  onFormChange: form => selectCharacter(form) // big: <id>; small: <id>_small
 });
 // player.body / player.sensors / player.state / player.setState(next) / player.destroy()
+player.setForm('big'); // feet anchored; crouch-grow if a ceiling blocks standing
+player.hurt(); // big -> small + 90 fixed steps of protection; small -> dead
+// player.form: 'small' | 'big'; player.invulnerable: boolean
 ```
 
 Set terrain's collision category to `COLLISION_CATEGORIES.solid` (4). The SPEC names categories but does not assign bit numbers; exported values are player=1, enemy=2, solid=4, oneWay=8, hazard=16, pickup=32, sensor=64. Terrain masks must include player. Sensors query solid/one-way categories and ignore triggers. One-way categories alone do not implement drop-through or conditional collisions: the host level system must filter them. The compound player opts out of world gravity, has infinite inertia (fixed rotation), and zero friction/static friction/air friction. Enemy/hazard/pickup responses belong to the host.
 
-Phaser 3.90 no longer uses `isFixed` internally; the manual clock supplies fixed delta explicitly. The clock disables world auto-update, sets the legacy `runner.isFixed` marker and modern `runner.delta`, and advances 16.6667 ms steps through an accumulator. At most 250 ms of render delta is consumed per render frame; excess time is dropped after stalls. Call only one clock installer per scene. The adapter reads current sensor overlaps each step, validates corner-correction clearance, applies controller velocity including carry/conveyor, then synchronizes collision-resolved position. It does not overwrite collision positions with a second position integration. Destroy/shutdown removes listeners and the body. Crouch keeps the standing hull.
+Phaser 3.90 no longer uses `isFixed` internally; the manual clock supplies fixed delta explicitly. The clock disables world auto-update, sets the legacy `runner.isFixed` marker and modern `runner.delta`, and advances 16.6667 ms steps through an accumulator. At most 250 ms of render delta is consumed per render frame; excess time is dropped after stalls. Call only one clock installer per scene. The adapter reads current sensor overlaps each step, validates corner-correction clearance, applies controller velocity including carry/conveyor, then synchronizes collision-resolved position. It does not overwrite collision positions with a second position integration. Destroy/shutdown removes listeners and the body.
+
+## Player forms and damage
+
+`PlayerForm = 'small' | 'big'` is exported from the package root. Players start small. At tile 64 the main collision hull is 48×60 small, 48×120 standing big, and 48×60 crouched big. Resizing keeps the main hull's feet in place and updates all four sensors without replacing the player body. Big players stay crouched while a solid ceiling prevents standing, then stand as soon as clearance permits. `state.crouched` describes the actual hull, including crouched jumps. Custom `width`/`height` options retain their small-form meaning; big height doubles it.
+
+`form`, `crouched` and `invulnerableFrames` live in `ControllerState`, so snapshots restore the hull and protection window with `setState`. `setForm` and `hurt` notify `onFormChange` immediately; mode changes also notify `onStateChange`. Repeated damage during the 90-step window is ignored without extending it. Renderers can blink using `player.invulnerable` and `state.frame`; rendering never advances the timer. Lava and host-detected pits kill regardless of form/protection; enemy side contact, cannon shots, spikes, saws and pendulums call `hurt`. Stomps retain their bounce behavior. Only big form breaks bricks from below; small form bumps them.
+
+The registered `mushroom` item falls under Matter gravity, moves horizontally, reverses at solid walls and calls `setForm('big')` once on contact. Its `speed` is reference px/step (default 1), `direction` is ±1, and its optional manifest texture/animation uses `elements.mushroom` / `items.mushroom`. The art pack supplies the artwork.
+
+The pure equivalents are `setControllerForm`, `hurtController` and `controllerHeight`. A trusted headless level solver can supply `Contacts.mushroom`, `Contacts.hurt` and `Contacts.standBlocked` to `stepController`/`simulateReplay`; these events must come from collision resolution. The replay version and six input bits are unchanged. Tests replay an actual Matter mushroom pickup and compare every resulting controller state, and separately replay a pure trusted pickup contact. This does not make Matter an authoritative cross-platform fixed-point collision solver.
 
 ## Tuning
 

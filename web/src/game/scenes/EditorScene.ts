@@ -16,7 +16,8 @@ import {
     type EditorModel,
     type TileChange,
 } from '../editor/commands';
-import { elementTexture } from '../assets/registry';
+import { createBackground } from '../render/background';
+import { elementTexture, groundTexture } from '../assets/registry';
 import { canonicalType, footprint } from '../elements/bridge';
 
 export interface EditorSceneData {
@@ -75,6 +76,7 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
         cam.setBackgroundColor(THEME_SKY[this.doc.meta.theme]);
         cam.setBounds(-TILE * 2, -TILE * 2, (w + 4) * TILE, (h + 4) * TILE);
         this.fitCamera();
+        createBackground(this, this.doc.meta.theme, true);
         this.scale.on(Phaser.Scale.Events.RESIZE, this.fitCamera, this);
 
         this.grid = this.add.tileSprite(0, 0, w * TILE, h * TILE, 'ph:grid').setOrigin(0).setDepth(5);
@@ -100,9 +102,12 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
         const cam = this.cameras.main;
         const { w, h } = this.doc.size;
         const vh = this.scale.height || 540;
-        cam.setZoom(Phaser.Math.Clamp(vh / ((h + 1) * TILE), 0.15, 1));
+        const occupied = this.doc.terrain.findIndex((v) => v !== 0);
+        const top = occupied < 0 ? Math.max(0, h - 14) : Math.min(Math.floor(occupied / w), ...this.doc.entities.map((e) => e.y));
+        const visibleHeight = Math.min(h, Math.max(12, h - top + 2));
+        cam.setZoom(Phaser.Math.Clamp(vh / (visibleHeight * TILE), 0.35, 1));
         const viewW = this.scale.width / cam.zoom;
-        cam.centerOn(Math.min(this.doc.spawn.x * TILE + viewW / 2 - TILE * 2, w * TILE - viewW / 2 + TILE), (h * TILE) / 2);
+        cam.centerOn(Math.min(this.doc.spawn.x * TILE + viewW / 2 - TILE * 2, w * TILE - viewW / 2 + TILE), (h - visibleHeight / 2) * TILE);
         this.emitStatus();
     }
 
@@ -117,6 +122,8 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
         const idx = y * this.doc.size.w + x;
         this.doc.terrain[idx] = value;
         this.renderTile(idx);
+        // Neighbours may switch between exposed edges and interior fill.
+        for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) if (this.inBounds(x + dx, y + dy)) this.renderTile((y + dy) * this.doc.size.w + x + dx);
         this.markDirty();
     }
 
@@ -178,7 +185,7 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
         if (!type) return;
         const x = (idx % this.doc.size.w) * TILE;
         const y = Math.floor(idx / this.doc.size.w) * TILE;
-        const tex = elementTexture(type, this.doc.meta.theme);
+        const tex = type === 'ground' ? groundTexture(this.doc.meta.theme, this.doc.terrain, this.doc.size.w, this.doc.size.h, idx % this.doc.size.w, Math.floor(idx / this.doc.size.w)) : elementTexture(type, this.doc.meta.theme);
         this.tiles.set(idx, this.add.image(x, y, tex.key, tex.frame).setOrigin(0).setDisplaySize(TILE, TILE).setDepth(1));
     }
 
@@ -187,11 +194,16 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
         this.entitySprites.get(e.id)?.destroy();
         const type = canonicalType(e.type);
         const size = type ? footprint(type, e.props) : { w: 1, h: 1 };
-        const tex = elementTexture(type ?? (e.type as ElementType), this.doc.meta.theme);
+        const centreY = (e.y + 1 - size.h / 2) * TILE;
+        if (type && ['one_way', 'semi_solid', 'moving_platform', 'elevator', 'rotating_platform', 'seesaw', 'conveyor_belt'].includes(type)) size.h /= 4;
+        if (type === 'chain_bridge') size.h = 0.25;
+        const stretch = type && ['seesaw', 'chain_bridge', 'moving_platform', 'elevator', 'rotating_platform', 'conveyor_belt', 'one_way', 'semi_solid'].includes(type);
+        let tex = elementTexture(type ?? (e.type as ElementType), this.doc.meta.theme);
+        if (type === 'chain_bridge' && tex.key === 'chain_bridge') tex = elementTexture('seesaw', this.doc.meta.theme);
         const img = this.add
-            .image(e.x * TILE, (e.y + 1) * TILE, tex.key, tex.frame)
+            .image(e.x * TILE, centreY + size.h * TILE / 2, tex.key, tex.frame)
             .setOrigin(0, 1)
-            .setDisplaySize(size.w * TILE, size.h * TILE)
+            .setDisplaySize(size.w * (stretch ? 1 : tex.displaySize?.w ?? 1) * TILE, size.h * (stretch ? 1 : tex.displaySize?.h ?? 1) * TILE)
             .setDepth(10);
         if (e.id === this.selectedId) img.setTint(0xd9ccff);
         this.entitySprites.set(e.id, img);
@@ -489,6 +501,7 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
 
     private bindBus() {
         const u = this.unsubs;
+        u.push(EventBus.subscribe('assets:will-change', () => this.flushAutosave()));
         u.push(EventBus.subscribe('editor:set-tool', (t) => this.setTool(t)));
         u.push(
             EventBus.subscribe('editor:set-element', (t) => {

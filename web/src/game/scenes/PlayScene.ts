@@ -11,6 +11,7 @@ import {
     installFixedMatterClock,
     inventoryFor,
     recordInput,
+    SUBPIXEL,
     type ElementInstance,
     type InputState,
     type Replay,
@@ -20,7 +21,9 @@ import { REG, SCENES, SIM_HZ, STEP_MS, THEME_SKY, TILE } from '../constants';
 import { decodeLevel } from '../level/serialize';
 import { SAMPLE_LEVEL } from '../level';
 import { TERRAIN_BY_ID, type LevelDoc, type LevelFileV1, type Waypoint } from '../level/types';
-import { elementTexture, hasSfx, themeBackground } from '../assets/registry';
+import { elementTexture, groundTexture, hasSfx, isPixelArt } from '../assets/registry';
+import { drawMechanisms } from '../render/mechanisms';
+import { createBackground } from '../render/background';
 import { coreTextures, terrainDef, toCoreDef } from '../elements/bridge';
 import { TRACE_STRIDE, changePairs, encodeInputLog, type RunSubmission, type TraceSample } from '../run';
 
@@ -37,7 +40,7 @@ type MatterPlayer = ReturnType<typeof createMatterPlayer>;
 type ElementRuntime = ReturnType<typeof createElementRuntime>;
 
 /** Rendered character height (the controller hull is 12×15 reference px = 48×60 px at TILE 64). */
-const PLAYER_DISPLAY_H = TILE * 1.25;
+const PLAYER_DISPLAY_H = TILE * 15 / MOVEMENT.referenceTile;
 
 const ANIM_FOR: Record<MovementState, string> = {
     idle: 'idle',
@@ -47,8 +50,8 @@ const ANIM_FOR: Record<MovementState, string> = {
     jump: 'jump',
     fall: 'fall',
     crouch: 'crouch',
-    wallSlide: 'fall',
-    dead: 'fall',
+    wallSlide: 'wallSlide',
+    dead: 'dead',
 };
 
 /**
@@ -80,7 +83,7 @@ export class PlayScene extends Phaser.Scene {
     private playerTex = '';
     private keys!: Record<'left' | 'right' | 'up' | 'down' | 'a' | 'd' | 'w' | 's' | 'space' | 'z' | 'x' | 'shift', Phaser.Input.Keyboard.Key>;
     protected unsubs: Array<() => void> = [];
-    private bg?: Phaser.GameObjects.TileSprite;
+
     private readonly scaleRef = TILE / MOVEMENT.referenceTile;
 
     constructor(key: string = SCENES.Play) {
@@ -133,8 +136,7 @@ export class PlayScene extends Phaser.Scene {
             if (wall) wall.collisionFilter = { category: COLLISION_CATEGORIES.solid, mask: 0xffff, group: 0 };
         }
 
-        const bg = themeBackground(this.doc.meta.theme);
-        if (bg) this.bg = this.add.tileSprite(0, 0, 1, 1, bg).setOrigin(0.5).setScrollFactor(0).setDepth(-10);
+        createBackground(this, this.doc.meta.theme);
         this.scale.on(Phaser.Scale.Events.RESIZE, this.onResize, this);
 
         // 1. Input sampling first: one mask per physics step, read by runtime + player.
@@ -161,6 +163,8 @@ export class PlayScene extends Phaser.Scene {
             }
         }
 
+        drawMechanisms(this, this.runtime.elements);
+
         // 3. game-core Mario-like controller on a Matter compound body.
         const sp = this.tileCenter(this.spawnTile);
         this.player = createMatterPlayer(this, sp.x, sp.y, {
@@ -181,7 +185,7 @@ export class PlayScene extends Phaser.Scene {
         // 4. Fixed 60 Hz clock shared by runtime + player (game-core accumulator).
         installFixedMatterClock(this);
 
-        this.cameras.main.startFollow(this.playerSprite, true, 0.15, 0.15, 0, TILE);
+        this.cameras.main.startFollow(this.playerSprite, isPixelArt(), 0.15, 0.15, 0, TILE);
         this.fitZoom();
         this.bindKeys();
         this.bindBus();
@@ -189,6 +193,11 @@ export class PlayScene extends Phaser.Scene {
 
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.teardown());
         this.events.once(Phaser.Scenes.Events.DESTROY, () => this.teardown());
+        // Phaser registers Matter shutdown before create(). Let game-core dispose its visuals,
+        // clock and bodies while the world still exists when switching scenes or restarting.
+        const matter = this.matter as Phaser.Physics.Matter.MatterPhysics & { shutdown(): void };
+        this.events.off(Phaser.Scenes.Events.SHUTDOWN, matter.shutdown, matter);
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, matter.shutdown, matter);
         this.emitHud();
         if (import.meta.env.DEV) (window as unknown as { __play?: PlayScene }).__play = this;
         EventBus.emit('current-scene-ready', this);
@@ -216,20 +225,32 @@ export class PlayScene extends Phaser.Scene {
     update() {
         // render-rate only: sprite + parallax (simulation runs in the fixed step)
         if (this.player) this.syncSprite();
-        if (this.bg) this.bg.tilePositionX = (this.cameras.main.scrollX * 0.3) / this.bg.tileScaleX;
+
     }
 
     private syncSprite() {
         const b = this.player.body;
-        this.playerSprite.setPosition(b.position.x, b.bounds.max.y + 2);
+        const hull = b.parts[1] ?? b;
+        this.playerSprite.setPosition(hull.position.x, hull.bounds.max.y);
         const s = this.player.state;
         this.playerSprite.setFlipX(s.facing < 0);
         const name = ANIM_FOR[s.mode] ?? 'idle';
         if (name !== this.anim) {
             this.anim = name;
             const key = `${this.playerTex}:${name}`;
+            const fallback = `${this.playerTex}:${s.mode === MovementState.dead || s.mode === MovementState.wallSlide ? 'fall' : 'idle'}`;
             if (this.anims.exists(key)) this.playerSprite.play(key, true);
+            else if (this.anims.exists(fallback)) this.playerSprite.play(fallback, true);
         }
+        // Frame dimensions can differ across poses: scale visible art after selecting the frame.
+        const tex = elementTexture('player');
+        const display = tex.displaySize;
+        const height = hull.bounds.max.y - hull.bounds.min.y;
+        const crouch = s.mode === MovementState.crouch ? 0.7 : 1;
+        this.playerSprite.setDisplaySize(display ? height * display.w / display.h : TILE * 0.8, height * crouch);
+        this.playerSprite.setOrigin(tex.anchor?.x ?? 0.5, tex.anchor?.y ?? 1);
+        if (s.mode === MovementState.walk || s.mode === MovementState.run) this.playerSprite.anims.timeScale = Phaser.Math.Clamp(Math.abs(s.vx) / (SUBPIXEL * (s.mode === MovementState.run ? MOVEMENT.runMax : MOVEMENT.walkMax)), 0.45, 1.8);
+        else this.playerSprite.anims.timeScale = 1;
     }
 
     /** Position in tile cell coordinates (same convention as level spawn/goal). */
@@ -243,15 +264,11 @@ export class PlayScene extends Phaser.Scene {
         this.fitZoom();
     }
 
-    /** Show ~11 tiles vertically whatever the canvas size (HUD/labels live in React, not here). */
+    /** Keep about 22 tiles across; tall windows expose more vertical space. */
     private fitZoom() {
-        const { width, height } = this.scale;
-        const z = Phaser.Math.Clamp((height || 540) / (11 * TILE), 0.4, 1.25);
-        this.cameras.main.setZoom(z);
-        if (this.bg) {
-            this.bg.setPosition(width / 2, height / 2).setSize(width / z, height / z);
-            this.bg.setTileScale(height / z / this.bg.texture.getSourceImage().height);
-        }
+        const { width } = this.scale;
+        const z = Phaser.Math.Clamp((width || 1280) / (22 * TILE), 0.35, 1.5);
+        this.cameras.main.setZoom(z).setDeadzone(3 * TILE * z, 2 * TILE * z);
     }
 
     protected sfx(key: string) {
@@ -300,7 +317,7 @@ export class PlayScene extends Phaser.Scene {
                 let n = 1;
                 while (x + n < w && t[y * w + x + n] === v) n++;
                 for (let i = 0; i < n; i++) {
-                    const tex = elementTexture('ground', theme);
+                    const tex = groundTexture(theme, t, w, h, x + i, y);
                     this.add.image((x + i) * TILE, y * TILE, tex.key, tex.frame).setOrigin(0).setDisplaySize(TILE, TILE);
                 }
                 this.matter.add.rectangle((x + n / 2) * TILE, y * TILE + TILE / 2, n * TILE, TILE, {
@@ -350,6 +367,11 @@ export class PlayScene extends Phaser.Scene {
     }
 
     protected die() {
+        // Show a death pose without delaying or changing the deterministic respawn.
+        const ghost = this.add.sprite(this.playerSprite.x, this.playerSprite.y, this.playerTex, this.playerSprite.frame.name)
+            .setOrigin(0.5, 1).setDisplaySize(this.playerSprite.displayWidth, this.playerSprite.displayHeight).setDepth(51).setFlipX(this.playerSprite.flipX);
+        if (this.anims.exists(`${this.playerTex}:dead`)) ghost.play(`${this.playerTex}:dead`);
+        this.tweens.add({ targets: ghost, y: ghost.y - TILE, alpha: 0, duration: 350, onComplete: () => ghost.destroy() });
         const cp = this.tileCenter(this.respawnTile);
         this.player.setState(createControllerState(cp.x / this.scaleRef, cp.y / this.scaleRef));
         this.cameras.main.flash(150, 255, 80, 80);

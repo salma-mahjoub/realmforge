@@ -72,7 +72,12 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] Kenney packs + OpenGameArt music, all CC0, recorded in `assets/CREDITS.md`
 - [x] SVG originals + PNG rasters, atlases, 64 px tilesets for 4 themes, `manifest.json`
 - [x] 37/37 element IDs covered, reproducible `npm run build:assets` (4 MB)
-- [ ] Extra character skins (optional, stretch goal)
+- [x] **Mario pack (NSMBU style, default)** `web/public/packs/mario/`: 117/117 element IDs, 21 parallax layers over 4 themes, validator passes (`assets/packs/mario`). Private class demo only, see AGENTS.md.
+- [x] Pack switch (`VITE_ASSET_PACK` + in-game Art toggle), Kenney as fallback
+- [x] Parallax backgrounds, body-sized sprites (character 60 px, ~22 tiles visible), state animations, ground auto-tiling, editor zoom + sprite thumbnails
+- [ ] Mario pack fidelity: some sprites are low-res captures (Mario, blocks, coins look upscaled and blurry); big Luigi is a Mario recolour; slime, crate and pendulum are substitutes
+- [ ] Seesaw still renders as a thin plank; terrain edge tiles beside pits show dark artefacts
+- [ ] Big/small player state (the controller has a single 48×60 hull)
 
 ## 4. Web app — `web/` (Vite, React 19, Phaser 3.90 + Matter, wagmi 2 / viem / RainbowKit)
 - [x] 8 routes styled after the mockups, 404 page, no console errors

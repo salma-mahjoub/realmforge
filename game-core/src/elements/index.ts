@@ -1,11 +1,12 @@
 import type Phaser from 'phaser';
+import { createElementVisual, positionElementVisual, bounceVisuals, stompVisuals, type ElementTexture, type ElementVisual } from './display.js';
 import { COLLISION_CATEGORIES as C, worldToFixed } from '../constants.js';
 import { MovementState, springLaunch, stompBounce, type Surface, type ControllerState } from '../controller.js';
 import { EMPTY_INPUT, type InputState } from '../input.js';
 import { ELEMENT_TYPES, ELEMENT_PROPS, normalizeProps, type ElementType, type ElementDef, type EntityId, type Point } from './schema.js';
 export * from './schema.js';
 export interface ElementPlayer { body:MatterJS.BodyType; readonly state:Readonly<ControllerState>; setState(state:ControllerState):void }
-export interface ElementContext { tile:number; textures?:Record<string,{texture:string;frame?:string|number}>; linkResolver:(id:EntityId)=>ElementInstance|ElementDef|undefined; groupResolver?:(group:string)=>ElementInstance[] }
+export interface ElementContext { tile:number; textures?:Record<string,ElementTexture>; linkResolver:(id:EntityId)=>ElementInstance|ElementDef|undefined; groupResolver?:(group:string)=>ElementInstance[] }
 export interface ElementInstance {
   readonly def:ElementDef; bodies:MatterJS.BodyType[]; constraints:MatterJS.ConstraintType[];
   enabled:boolean; phase:string; carry:Point; surface:Surface;
@@ -31,14 +32,14 @@ function create(scene:Phaser.Scene,inputDef:ElementDef,ctx:ElementContext):Eleme
   const t=ctx.tile,scale=t/16,type=def.type,B=scene.matter.body;
   const x=def.x*t,y=def.y*t,w=Number(p.width)*t*(type==='seesaw'?Number(p.length):1),h=Number(p.height)*t;
   const category=enemies.has(type)?C.enemy:sensors.has(type)?(['spikes','lava','saw','pendulum_ball'].includes(type)?C.hazard:['start','checkpoint','goal','door','pipe','switch'].includes(type)?C.sensor:C.pickup):['one_way','semi_solid'].includes(type)?C.oneWay:C.solid;
-  const bodies:MatterJS.BodyType[]=[],constraints:MatterJS.ConstraintType[]=[],visuals:Phaser.GameObjects.Image[]=[];
+  const bodies:MatterJS.BodyType[]=[],constraints:MatterJS.ConstraintType[]=[],visuals:ElementVisual[]=[];
   const isSensor=sensors.has(type);
   const make=(bx:number,by:number,bw:number,bh:number,isStatic=!dynamic.has(type))=>{
     const config={isStatic,isSensor,friction:type==='ice'?0.01:type==='slime'?0.9:0.1,frictionAir:0,label:type,collisionFilter:{category,mask:0xffff,group:0}};
     const b=['saw','pendulum_ball'].includes(type)?scene.matter.add.circle(bx,by,Math.min(bw,bh)/2,config):scene.matter.add.rectangle(bx,by,bw,bh,config);
     bodies.push(b);
     const key=ctx.textures?.[type]?.texture,frame=ctx.textures?.[type]?.frame;
-    if(key && scene.textures.exists(key))visuals.push(scene.add.image(bx,by,key,frame).setDisplaySize(bw,bh));
+    if(key && scene.textures.exists(key))visuals.push(createElementVisual(scene,type,{...ctx.textures?.[type],texture:key,frame},bx,by,bw,bh,t));
     else {const key=`elements-fallback-${type}`;if(!scene.textures.exists(key)){const g=scene.add.graphics();g.fillStyle(category===C.hazard?0xe85165:category===C.enemy?0xbc77ed:category===C.pickup?0xffd66b:0x66bda8);g.fillRect(0,0,32,32);g.lineStyle(2,0x182b42);g.strokeRect(0,0,32,32);g.generateTexture(key,32,32);g.destroy();}visuals.push(scene.add.image(bx,by,key).setDisplaySize(bw,bh));}
     return b;
   };
@@ -71,9 +72,9 @@ function create(scene:Phaser.Scene,inputDef:ElementDef,ctx:ElementContext):Eleme
       }
       if(type==='falling_block'){if(triggerFrame<0){triggerFrame=frame;item.phase='shaking';}return true;}
       if(type==='brick'){item.destroy();return true;}
-      if(type==='question_block'){if(used)return false;used=true;item.phase='used';if(inv){if(p.reward==='key')inv.keys++;else if(p.reward==='powerup_double_jump')inv.doubleJump=true;else if(p.reward==='powerup_dash')inv.dash=true;else inv.coins+=p.reward==='big_coin'?10:1;}return true;}
+      if(type==='question_block'){if(used)return false;bounceVisuals(scene,visuals);used=true;item.phase='used';if(inv){if(p.reward==='key')inv.keys++;else if(p.reward==='powerup_double_jump')inv.doubleJump=true;else if(p.reward==='powerup_dash')inv.dash=true;else inv.coins+=p.reward==='big_coin'?10:1;}return true;}
       if(!player||!inv)return false;
-      if(type==='spring'){player.setState(springLaunch(player.state,-Number(p.launch)));return true;}
+      if(type==='spring'){bounceVisuals(scene,visuals);player.setState(springLaunch(player.state,-Number(p.launch)));return true;}
       if(['spikes','lava','saw','pendulum_ball'].includes(type)){player.setState({...player.state,mode:MovementState.dead,vx:0,vy:0});return true;}
       if(type==='locked_door' && !used){if(inv.keys<=0)return false;inv.keys--;used=true;item.phase='unlocked';body.isSensor=true;}
       if(['door','pipe','locked_door'].includes(type)){
@@ -89,7 +90,7 @@ function create(scene:Phaser.Scene,inputDef:ElementDef,ctx:ElementContext):Eleme
       }
       if(enemies.has(type) && type!=='cannon'){
         const stomp=player.state.vy>=0 && player.body.bounds.max.y<=body.bounds.min.y+t*0.4;
-        if(stomp){player.setState(stompBounce(player.state,input.jump));if(type==='shell'){item.phase='resting';B.setVelocity(body,{x:0,y:body.velocity.y});}else item.destroy();return true;}
+        if(stomp){player.setState(stompBounce(player.state,input.jump));if(type==='shell'){item.phase='resting';B.setVelocity(body,{x:0,y:body.velocity.y});}else {stompVisuals(scene,visuals);item.destroy();}return true;}
         if(type==='shell' && item.phase==='resting'){item.phase='projectile';direction=player.body.position.x<body.position.x?1:-1;return true;}
         player.setState({...player.state,mode:MovementState.dead,vx:0,vy:0});return true;
       }
@@ -118,7 +119,7 @@ function create(scene:Phaser.Scene,inputDef:ElementDef,ctx:ElementContext):Eleme
         item.carry={x:body.position.x-lastPosition.x,y:body.position.y-lastPosition.y};lastPosition={...body.position};
         // Angular displacement is evaluated at the player's contact point by the runtime.
         angular.set(body,body.angle-lastAngle);lastAngle=body.angle;
-        bodies.forEach((b,i)=>visuals[i]?.setPosition(b.position.x,b.position.y).setRotation(b.angle));
+        bodies.forEach((b,i)=>{const v=visuals[i];if(v)positionElementVisual(v,b.position.x,b.position.y,b.angle);if(enemies.has(type)&&b.velocity.x!==0)v?.setFlipX?.(b.velocity.x<0);});
       }
     },
     destroy(){if(destroyed)return;destroyed=true;item.enabled=false;for(const c of constraints)scene.matter.world.removeConstraint(c);for(const b of bodies){instances.delete(b);scene.matter.world.remove(b);}for(const v of visuals)v.destroy();scene.events.off('shutdown',item.destroy);},

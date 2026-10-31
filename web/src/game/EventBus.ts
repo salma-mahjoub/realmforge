@@ -65,7 +65,8 @@ export interface RemotePlayerState {
 export interface BusEvents {
     // lifecycle
     'current-scene-ready': [scene: Phaser.Scene];
-    'assets-ready': [info: { manifest: boolean; textures: number }];
+    'assets:will-change': [];
+    'assets-ready': [info: { manifest: boolean; textures: number; pack?: string; pixelArt?: boolean }];
 
     // React → EditorScene
     'editor:set-tool': [tool: EditorTool];

@@ -15,11 +15,14 @@ import type { ElementType, Theme } from '../level/types';
 export interface TextureRef {
     key: string;
     frame?: string | number;
+    displaySize?: { w: number; h: number };
+    anchor?: { x: number; y: number };
 }
 
 export type ManifestFile =
     | { kind: 'image'; key: string; url: string }
     | { kind: 'atlas'; key: string; textureURL: string; atlasURL: string }
+    | { kind: 'sheet'; key: string; url: string; frameWidth: number; frameHeight: number; margin?: number; spacing?: number }
     | { kind: 'audio'; key: string; urls: string[] };
 
 export interface AnimDef {
@@ -30,22 +33,26 @@ export interface AnimDef {
     repeat: number;
 }
 
-interface ImageEntry {
+export interface ImageEntry {
     texture?: string;
     path?: string;
     image?: string;
     atlas?: string;
     frame?: string | number;
+    displaySize?: { w?: number; h?: number; width?: number; height?: number } | [number, number];
+    anchor?: { x: number; y: number } | [number, number];
     animations?: Record<string, { frames?: string[]; frameRate?: number; repeat?: number }>;
 }
 
 interface ManifestV1 {
     schema?: number;
     baseUrl?: string;
+    pixelArt?: boolean;
+    sourceTile?: number;
     elements?: Record<string, ImageEntry>;
     characters?: Record<string, ImageEntry>;
     enemies?: Record<string, ImageEntry>;
-    themes?: Record<string, ImageEntry & { background?: ImageEntry }>;
+    themes?: Record<string, ImageEntry & { background?: ImageEntry; tileWidth?: number; tileHeight?: number; margin?: number; spacing?: number; tiles?: Record<string, number | ImageEntry>; parallax?: { file: string; scrollFactor: number; y?: number }[] }>;
     sfx?: Record<string, { path?: string }>;
 }
 
@@ -57,7 +64,7 @@ const ALIASES: Partial<Record<ElementType | 'player', string[]>> = {
 };
 
 /** Preferred playable character for the local player (violet, like the mockups). */
-const PLAYER_CHARACTERS = ['purple', 'green', 'pink', 'beige'];
+const PLAYER_CHARACTERS = ['small', 'mario_small', 'mario', 'purple', 'green', 'pink', 'beige'];
 
 let base = '/assets/';
 
@@ -69,7 +76,13 @@ export function assetUrl(p: string): string {
 
 const elementTextures = new Map<string, TextureRef>();
 const themedTextures = new Map<string, TextureRef>(); // `${theme}:${type}`
-const backgrounds = new Map<string, string>();
+export interface BackgroundLayer { key: string; scrollFactor: number; y?: number }
+const backgrounds = new Map<string, BackgroundLayer[]>();
+const variants = new Map<string, TextureRef>();
+let pixelArt = false;
+let sourceTile = 64;
+export const isPixelArt = () => pixelArt;
+export const packSourceTile = () => sourceTile;
 const animations: AnimDef[] = [];
 const sfx = new Set<string>();
 
@@ -78,12 +91,29 @@ export function placeholderKey(type: string): string {
 }
 
 /** Texture for an element; prefers a theme-specific variant (e.g. `snow_ground`). */
-export function elementTexture(type: ElementType | 'player', theme?: Theme | string): TextureRef {
+export function elementTexture(type: string, theme?: Theme | string): TextureRef {
     return (theme && themedTextures.get(`${theme}:${type}`)) || elementTextures.get(type) || { key: placeholderKey(type) };
 }
 
 export function themeBackground(theme: string): string | undefined {
-    return backgrounds.get(theme);
+    return backgrounds.get(theme)?.[0]?.key;
+}
+
+export function themeLayers(theme: string): readonly BackgroundLayer[] {
+    return backgrounds.get(theme) ?? [];
+}
+
+/** Pick exposed top edges and interior fill without changing the collision grid. */
+export function groundTexture(theme: string, grid: readonly number[] | Uint8Array, w: number, h: number, x: number, y: number): TextureRef {
+    const ground = (cx: number, cy: number) => cy >= h || (cx >= 0 && cx < w && cy >= 0 && grid[cy * w + cx] === 1);
+    const top = !ground(x, y - 1), left = !ground(x - 1, y), right = !ground(x + 1, y);
+    const names = top ? [left ? 'top_left' : right ? 'top_right' : 'top', 'ground']
+        : [left ? 'left' : right ? 'right' : !ground(x, y + 1) ? 'bottom' : 'fill', 'inner', 'fill'];
+    for (const name of names) {
+        const ref = variants.get(`${theme}:${name}`);
+        if (ref) return ref;
+    }
+    return elementTexture('ground', theme);
 }
 
 export function getAnimations(): readonly AnimDef[] {
@@ -96,19 +126,22 @@ export function hasSfx(key: string): boolean {
 
 /** Drop mappings whose texture failed to load so lookups fall back to placeholders. */
 export function pruneMissing(exists: (key: string) => boolean): void {
-    for (const map of [elementTextures, themedTextures]) {
+    for (const map of [elementTextures, themedTextures, variants]) {
         for (const [k, ref] of map) if (!exists(ref.key)) map.delete(k);
     }
-    for (const [k, key] of backgrounds) if (!exists(key)) backgrounds.delete(k);
+    for (const [k, layers] of backgrounds) backgrounds.set(k, layers.filter((layer) => exists(layer.key)));
 }
 
 /**
  * Build the load list + element texture map from the manifest. Pure (no Phaser).
  * Unknown/unsupported sections are ignored rather than guessed at.
  */
-export function readManifest(manifest: unknown, knownTypes: readonly string[]): ManifestFile[] {
+export function readManifest(manifest: unknown, knownTypes: readonly string[], manifestDirectory = "/assets/"): ManifestFile[] {
     const m = (manifest ?? {}) as ManifestV1;
-    base = typeof m.baseUrl === 'string' ? (m.baseUrl.endsWith('/') ? m.baseUrl : `${m.baseUrl}/`) : '/assets/';
+    base = typeof m.baseUrl === 'string' ? (m.baseUrl.endsWith('/') ? m.baseUrl : `${m.baseUrl}/`) : manifestDirectory;
+    pixelArt = m.pixelArt === true;
+    sourceTile = m.sourceTile ?? 64;
+    variants.clear();
     elementTextures.clear();
     themedTextures.clear();
     backgrounds.clear();
@@ -123,6 +156,10 @@ export function readManifest(manifest: unknown, knownTypes: readonly string[]): 
         if (!e) return null;
         const key = e.texture || fallbackKey;
         const img = e.image || e.path;
+        const d = e.displaySize;
+        const displaySize = d ? (Array.isArray(d) ? { w: d[0], h: d[1] } : { w: d.w ?? d.width ?? 1, h: d.h ?? d.height ?? 1 }) : undefined;
+        const anchor = Array.isArray(e.anchor) ? { x: e.anchor[0], y: e.anchor[1] } : e.anchor;
+        const metadata = { displaySize, anchor };
         if (e.atlas && img) {
             if (!loaded.has(key)) {
                 loaded.add(key);
@@ -131,14 +168,14 @@ export function readManifest(manifest: unknown, knownTypes: readonly string[]): 
                     if (a.frames?.length) animations.push({ key: `${key}:${name}`, texture: key, frames: a.frames, frameRate: a.frameRate ?? 8, repeat: a.repeat ?? -1 });
                 }
             }
-            return { key, frame: e.frame ?? e.animations?.idle?.frames?.[0] };
+            return { key, frame: e.frame ?? e.animations?.idle?.frames?.[0] ?? Object.values(e.animations ?? {})[0]?.frames?.[0], ...metadata };
         }
         if (img && /\.(png|jpe?g|webp)$/i.test(img)) {
             if (!loaded.has(key)) {
                 loaded.add(key);
                 files.push({ kind: 'image', key, url: assetUrl(img) });
             }
-            return { key };
+            return { key, ...metadata };
         }
         return null;
     };
@@ -174,7 +211,7 @@ export function readManifest(manifest: unknown, knownTypes: readonly string[]): 
     // characters: queue all (remote racers use other colours), pick the local player's one
     const chars = m.characters ?? {};
     for (const [name, e] of Object.entries(chars)) queue(e, `characters-${name}`);
-    for (const name of PLAYER_CHARACTERS) {
+    for (const name of [...PLAYER_CHARACTERS, ...Object.keys(chars)]) {
         const ref = queue(chars[name], `characters-${name}`);
         if (ref) {
             elementTextures.set('player', ref);
@@ -182,9 +219,38 @@ export function readManifest(manifest: unknown, knownTypes: readonly string[]): 
         }
     }
 
+    // Queue auxiliary frames as well (spring_extended, coin_side, terrain edges).
+    for (const [name, entry] of Object.entries(els)) {
+        const ref = queue(entry, name);
+        if (ref) {
+            if (!elementTextures.has(name)) elementTextures.set(name, ref);
+            for (const theme of themes) if (name.startsWith(`${theme}_`)) variants.set(`${theme}:${name.slice(theme.length + 1)}`, ref);
+        }
+    }
     for (const [theme, t] of Object.entries(m.themes ?? {})) {
-        const ref = queue(t.background, `background_${theme}`);
-        if (ref) backgrounds.set(theme, ref.key);
+        // Theme sheets provide the same variants when there are no individual PNGs.
+        if (t.path && t.tiles && t.tileWidth) {
+            const key = t.texture ?? `tiles-${theme}`;
+            files.push({ kind: 'sheet', key, url: assetUrl(t.path), frameWidth: t.tileWidth, frameHeight: t.tileHeight ?? t.tileWidth, margin: t.margin, spacing: t.spacing });
+            for (const [name, frame] of Object.entries(t.tiles)) {
+                const ref = typeof frame === 'number' ? { key, frame } : queue(frame, `${theme}_${name}`);
+                if (ref) {
+                    if (!variants.has(`${theme}:${name}`)) variants.set(`${theme}:${name}`, ref);
+                    const type = name === 'question' ? 'question_block' : name;
+                    if (knownTypes.includes(type) && !themedTextures.has(`${theme}:${type}`)) themedTextures.set(`${theme}:${type}`, ref);
+                }
+            }
+        }
+        const layers: BackgroundLayer[] = [];
+        for (const [i, layer] of (t.parallax ?? []).entries()) {
+            const ref = queue({ path: layer.file }, `parallax:${theme}:${i}`);
+            if (ref) layers.push({ key: ref.key, scrollFactor: layer.scrollFactor, y: layer.y });
+        }
+        if (!layers.length) {
+            const ref = queue(t.background ?? els[`background_${theme}`], `background_${theme}`);
+            if (ref) layers.push({ key: ref.key, scrollFactor: 0.25 });
+        }
+        backgrounds.set(theme, layers);
     }
 
     for (const [key, s] of Object.entries(m.sfx ?? {})) {

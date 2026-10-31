@@ -3,11 +3,22 @@ import { CATEGORIES, ELEMENTS, ELEMENT_BY_TYPE, elementsIn, type ElementDef, typ
 import type { ElementCategory, ElementType, EntityProps, LevelEntity, Waypoint } from '../../game/level/types';
 import { EventBus } from '../../game/EventBus';
 import { canonicalType } from '../../game/elements/bridge';
+import { isPixelArt } from '../../game/assets/registry';
+import { spriteThumbnail } from '../../game/render/artwork';
 import { hex } from '../../components/ui';
 
 const QUICK: ElementType[] = ['ground', 'spring', 'coin'];
 
 function Swatch({ def }: { def: ElementDef }) {
+    const [, refresh] = useState(0);
+    const [theme, setTheme] = useState('snow');
+    useEffect(() => {
+        const ready = EventBus.subscribe('assets-ready', () => refresh((v) => v + 1));
+        const level = EventBus.subscribe('editor:level-changed', (file) => setTheme(file.meta.theme));
+        return () => { ready(); level(); };
+    }, []);
+    const image = spriteThumbnail(def.type, theme);
+    if (image) return <img src={image} alt="" style={{ width: 48, height: 42, objectFit: 'contain', imageRendering: isPixelArt() ? 'pixelated' : 'auto' }} />;
     const round = def.category === 'items' || def.category === 'enemies';
     return <span className="swatch" style={{ background: hex(def.color), borderRadius: round ? 999 : 6, width: round ? 30 : 44 }} />;
 }

@@ -18,7 +18,7 @@ export interface RaceSceneData extends PlaySceneData {
  * Finish order / timing authority is the server — `play:finished` here is only a local claim.
  */
 export class RaceScene extends PlayScene {
-    private remotes = new Map<string, { sprite: Phaser.GameObjects.Image; label: Phaser.GameObjects.Text; target: RemotePlayerState }>();
+    private remotes = new Map<string, { sprite: Phaser.GameObjects.Sprite; label: Phaser.GameObjects.Text; target: RemotePlayerState }>();
     roomCode?: string;
 
     constructor() {
@@ -69,8 +69,9 @@ export class RaceScene extends PlayScene {
                 const tex = elementTexture('player');
                 const x = p.x * TILE + TILE / 2;
                 const y = p.y * TILE + TILE / 2;
-                const sprite = this.add.image(x, y, tex.key, tex.frame).setTint(p.color).setAlpha(0.85).setDepth(40);
-                sprite.setScale((TILE * 1.25) / Math.max(1, sprite.height));
+                const sprite = this.add.sprite(x, y, tex.key, tex.frame).setTint(p.color).setAlpha(0.85).setDepth(40);
+                const height = 15 / MOVEMENT.referenceTile * TILE;
+                sprite.setDisplaySize(tex.displaySize ? height * tex.displaySize.w / tex.displaySize.h : 0.8 * TILE, height);
                 const label = this.add
                     .text(x, y - 52, shortAddress(p.address), { fontFamily: 'system-ui, sans-serif', fontSize: '12px', color: '#ffffff', backgroundColor: '#0f1424aa', padding: { x: 4, y: 2 } })
                     .setOrigin(0.5)
@@ -79,7 +80,9 @@ export class RaceScene extends PlayScene {
                 this.remotes.set(p.sessionId, r);
             }
             r.target = p;
-            r.sprite.setFlipX(p.vx < 0);
+            if (p.vx !== 0) r.sprite.setFlipX(p.vx < 0);
+            const key = `${r.sprite.texture.key}:${p.anim ?? (Math.abs(p.vy) > 0.05 ? 'jump' : Math.abs(p.vx) > 0.01 ? 'run' : 'idle')}`;
+            if (this.anims.exists(key)) r.sprite.play(key, true);
         }
         for (const [id, r] of this.remotes) {
             if (!seen.has(id)) {

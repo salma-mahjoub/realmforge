@@ -4,6 +4,7 @@ import { Preloader } from './scenes/Preloader';
 import { EditorScene } from './scenes/EditorScene';
 import { PlayScene } from './scenes/PlayScene';
 import { RaceScene } from './scenes/RaceScene';
+import { selectedPack } from './assets/pack';
 import { REG, type GameSceneKey } from './constants';
 
 export interface StartGameOptions {
@@ -29,7 +30,7 @@ export default function StartGame(parent: string | HTMLElement, opts: StartGameO
             height: '100%',
         },
         fps: { target: 60, smoothStep: false },
-        render: { pixelArt: false, antialias: true, preserveDrawingBuffer: true },
+        render: { pixelArt: selectedPack() === 'mario', antialias: selectedPack() !== 'mario', preserveDrawingBuffer: true },
         input: { keyboard: true, mouse: true, touch: true },
         scene: [Boot, Preloader, EditorScene, PlayScene, RaceScene],
         callbacks: {

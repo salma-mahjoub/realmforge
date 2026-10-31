@@ -9,7 +9,7 @@
  */
 import { ELEMENT_PROPS, ELEMENT_TYPES, type ElementDef as CoreElementDef, type ElementType } from '@realmforge/game-core';
 import type { LevelEntity, Theme, Waypoint } from '../level/types';
-import { elementTexture } from '../assets/registry';
+import { elementTexture, type TextureRef } from '../assets/registry';
 
 /** Pre-integration names that may still exist in autosaves / imported files. */
 const LEGACY_TYPES: Record<string, ElementType> = {
@@ -104,11 +104,12 @@ export function terrainDef(type: ElementType, x: number, y: number, run = 1): Co
 }
 
 /** Manifest textures (theme variants first, then generic, then generated placeholders) per element type. */
-export function coreTextures(theme: Theme): Record<string, { texture: string; frame?: string | number }> {
-    const out: Record<string, { texture: string; frame?: string | number }> = {};
+export function coreTextures(theme: Theme): Record<string, Omit<TextureRef, 'key'> & { texture: string }> {
+    const out: Record<string, Omit<TextureRef, 'key'> & { texture: string }> = {};
     for (const type of ELEMENT_TYPES) {
         const ref = elementTexture(type, theme);
-        out[type] = { texture: ref.key, frame: ref.frame };
+        const art = type === 'chain_bridge' && ref.key === 'chain_bridge' ? elementTexture('seesaw', theme) : ref;
+        out[type] = { ...art, texture: art.key };
     }
     return out;
 }

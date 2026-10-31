@@ -45,17 +45,25 @@ export function createMatterPlayer(scene:Phaser.Scene,x:number,y:number,opts:Mat
   /** Keep part identities (and runtime references), rebuild their hull around the feet. */
   function resize(height:number) {
     if(height===hullHeight)return;
-    const center={x:body.position.x,y:main.bounds.max.y-height/2};
+    // Bounds include a velocity sweep; the foot sensor marks the physical
+    // bottom even while falling, so changing form must anchor to that point.
+    const center={x:body.position.x,y:sensors.foot.position.y-height/2};
+    // setParts' auto-hull path adds the parent's existing position to the
+    // child hull. Rebuild at the origin, then place the whole compound back
+    // in world space; otherwise repeated resizes offset its hull/broadphase
+    // bounds while leaving the actual collision parts behind.
+    Body.setPosition(body,{x:0,y:0});
     const shape=(part:MatterJS.BodyType,px:number,py:number,pw:number,ph:number,chamfer=false)=>{
       const replacement=Bodies.rectangle(px,py,pw,ph,chamfer?{chamfer:{radius:scale}}:{});
       Body.setPosition(part,{x:px,y:py});Body.setVertices(part,replacement.vertices!);
     };
-    shape(main,center.x,center.y,w,height,true);
-    shape(sensors.foot,center.x,center.y+height/2,w-4*scale,2*scale);
-    shape(sensors.head,center.x,center.y-height/2,w-4*scale,2*scale);
-    shape(sensors.left,center.x-w/2,center.y,2*scale,height-4*scale);
-    shape(sensors.right,center.x+w/2,center.y,2*scale,height-4*scale);
-    Body.setParts(body,[main,...Object.values(sensors)]);Body.setInertia(body,Infinity);
+    shape(main,0,0,w,height,true);
+    shape(sensors.foot,0,height/2,w-4*scale,2*scale);
+    shape(sensors.head,0,-height/2,w-4*scale,2*scale);
+    shape(sensors.left,-w/2,0,2*scale,height-4*scale);
+    shape(sensors.right,w/2,0,2*scale,height-4*scale);
+    Body.setParts(body,[main,...Object.values(sensors)]);
+    Body.setPosition(body,center);Body.setInertia(body,Infinity);
     hullHeight=height;
   }
   function notify(old:Readonly<ControllerState>) {

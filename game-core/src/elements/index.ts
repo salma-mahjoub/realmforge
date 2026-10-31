@@ -1,8 +1,9 @@
 import type Phaser from 'phaser';
-import { createElementVisual, positionElementVisual, bounceVisuals, stompVisuals, type ElementTexture, type ElementVisual } from './display.js';
+import { createElementVisual, createSeesawPivotVisual, positionElementVisual, bounceVisuals, stompVisuals, type ElementTexture, type ElementVisual } from './display.js';
 import { COLLISION_CATEGORIES as C, worldToFixed } from '../constants.js';
 import { MovementState, springLaunch, stompBounce, hurtController, type PlayerForm, type Surface, type ControllerState } from '../controller.js';
 import { createMushroom } from './mushroom.js';
+import { configureSeesaw, SEESAW } from './seesaw.js';
 import { EMPTY_INPUT, type InputState } from '../input.js';
 import { ELEMENT_TYPES, ELEMENT_PROPS, normalizeProps, type ElementType, type ElementDef, type EntityId, type Point } from './schema.js';
 export * from './schema.js';
@@ -45,7 +46,9 @@ function create(scene:Phaser.Scene,inputDef:ElementDef,ctx:ElementContext):Eleme
     else {const key=`elements-fallback-${type}`;if(!scene.textures.exists(key)){const g=scene.add.graphics();g.fillStyle(category===C.hazard?0xe85165:category===C.enemy?0xbc77ed:category===C.pickup?0xffd66b:0x66bda8);g.fillRect(0,0,32,32);g.lineStyle(2,0x182b42);g.strokeRect(0,0,32,32);g.generateTexture(key,32,32);g.destroy();}visuals.push(scene.add.image(bx,by,key).setDisplaySize(bw,bh));}
     return b;
   };
-  const body=make(x,y,w,['one_way','semi_solid','moving_platform','elevator','rotating_platform','seesaw','chain_bridge','conveyor_belt'].includes(type)?h/4:h);
+  const body=make(x,y,w,type==='seesaw'?h*SEESAW.thickness:['one_way','semi_solid','moving_platform','elevator','rotating_platform','chain_bridge','conveyor_belt'].includes(type)?h/4:h);
+  const releaseSeesaw=type==='seesaw'?configureSeesaw(scene,body,w,h):undefined;
+  const pivot=type==='seesaw'?createSeesawPivotVisual(scene,ctx.textures?.seesaw_pivot,x,y,t):undefined;
   if(enemies.has(type)){B.setInertia(body,Infinity);if(type==='flyer')body.ignoreGravity=true;}
   if(type==='seesaw')constraints.push(scene.matter.add.worldConstraint(body,0,1,{pointA:{x,y},pointB:{x:0,y:0}}));
   if(type==='pendulum_ball'){B.setPosition(body,{x:x+t*Number(p.length)/2,y:y+t*Number(p.length)});constraints.push(scene.matter.add.worldConstraint(body,t*Number(p.length),0.95,{pointA:{x,y}}));}
@@ -59,7 +62,7 @@ function create(scene:Phaser.Scene,inputDef:ElementDef,ctx:ElementContext):Eleme
   const basePath=(p.path as Point[]|undefined)??[];
   const path=basePath.length?basePath.map(v=>({x:v.x*t,y:v.y*t})):[{x,y},{x:x+(type==='elevator'?0:Number(p.distance??4)*t),y:y+(type==='elevator'?-Number(p.distance??4)*t:0)}];
   const item:ElementInstance={def,bodies,constraints,enabled:true,phase:'idle',carry:{x:0,y:0},surface:{kind:type==='ice'?'ice':type==='slime'?'slime':'normal',conveyor:type==='conveyor_belt'?worldToFixed(Number(p.speed)*direction,scale):0},
-    setEnabled(enabled){item.enabled=enabled;for(const b of bodies)b.collisionFilter.mask=enabled?0xffff:0;for(const v of visuals)v.setAlpha(enabled?1:0.2);},
+    setEnabled(enabled){item.enabled=enabled;for(const b of bodies)b.collisionFilter.mask=enabled?0xffff:0;for(const v of visuals)v.setAlpha(enabled?1:0.2);pivot?.setAlpha(enabled?1:0.2);},
     serialize:()=>structuredClone(def),
     activate(player,input=EMPTY_INPUT){
       if(!item.enabled||destroyed)return false;
@@ -125,7 +128,7 @@ function create(scene:Phaser.Scene,inputDef:ElementDef,ctx:ElementContext):Eleme
         bodies.forEach((b,i)=>{const v=visuals[i];if(v)positionElementVisual(v,b.position.x,b.position.y,b.angle);if(enemies.has(type)&&b.velocity.x!==0)v?.setFlipX?.(b.velocity.x<0);});
       }
     },
-    destroy(){if(destroyed)return;destroyed=true;item.enabled=false;for(const c of constraints)scene.matter.world.removeConstraint(c);for(const b of bodies){instances.delete(b);scene.matter.world.remove(b);}for(const v of visuals)v.destroy();scene.events.off('shutdown',item.destroy);},
+    destroy(){if(destroyed)return;destroyed=true;releaseSeesaw?.();item.enabled=false;for(const c of constraints)scene.matter.world.removeConstraint(c);for(const b of bodies){instances.delete(b);scene.matter.world.remove(b);}for(const v of visuals)v.destroy();pivot?.destroy();scene.events.off('shutdown',item.destroy);},
   };
   for(const b of bodies)instances.set(b,item);
   item.setEnabled(Boolean(p.enabled));scene.events.once('shutdown',item.destroy);return item;

@@ -1,12 +1,23 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {raster as render,compose} from './image.js';
+import {createHash} from 'node:crypto';
+import {raster as render,rasterTrimmedBottom,compose} from './image.js';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const out=path.resolve(root,'../web/public/assets');
-interface Art {id:string; category:string; source:string; width?:number; height?:number; note?:string; pack:string}
+interface Art {id:string; category:string; source:string; width?:number; height?:number; note?:string; pack:string; trimBottom?:boolean; anchor?:{x:number;y:number}}
 interface Recipe {art:Art[]; characters:Record<string,Record<string,{sources:string[];frameRate:number;note?:string}>>; enemies:Record<string,string[]>; audio:Record<string,{source:string;category:string;pack:string;loop?:boolean}>; themes:Record<string,string[]>}
 const recipe=JSON.parse(await fs.readFile(path.join(root,'sources/recipe.json'),'utf8')) as Recipe;
+// Kept beside the fetched source so curation of the legacy recipe cannot drop this pickup.
+const mushroomDir=path.join(root,'sources/custom/kenney-mushroom');
+const mushroom=JSON.parse(await fs.readFile(path.join(mushroomDir,'source.json'),'utf8')) as {
+ author:string;url:string;license:string;files:{local:string;sha256:string}[];art:Art[];
+};
+for(const file of mushroom.files){
+ const data=await fs.readFile(path.join(mushroomDir,file.local));
+ if(createHash('sha256').update(data).digest('hex')!==file.sha256)throw Error(`Mushroom source checksum mismatch: ${file.local}`);
+}
+recipe.art=recipe.art.filter(a=>!mushroom.art.some(extra=>extra.id===a.id)).concat(mushroom.art);
 const manifest:Record<string,any>={schema:1,baseUrl:'/assets/',tileSize:64,license:'CC0-1.0',elements:{},characters:{},enemies:{},themes:{},ui:{},editor:{},sfx:{},music:{}};
 await fs.mkdir(out,{recursive:true});
 async function save(rel:string,data:Buffer|string){await fs.mkdir(path.dirname(path.join(out,rel)),{recursive:true});await fs.writeFile(path.join(out,rel),data);}
@@ -14,13 +25,14 @@ async function json(rel:string,data:unknown){await save(rel,JSON.stringify(data,
 async function raster(source:string,w=64,h=64){return render(path.join(root,'sources',source),w,h);}
 for(const art of recipe.art){
  const rel=`${art.category}/${art.id}.png`; const w=art.width??64,h=art.height??64;
- await save(rel,await raster(art.source,w,h));
- const entry={texture:art.id,path:rel,width:w,height:h,source:art.source,pack:art.pack,...(art.note?{note:art.note}:{})};
+ await save(rel,art.trimBottom?await rasterTrimmedBottom(path.join(root,'sources',art.source),w,h):await raster(art.source,w,h));
+ const entry={texture:art.id,path:rel,width:w,height:h,source:art.source,pack:art.pack,...(art.note?{note:art.note}:{}),...(art.anchor?{anchor:art.anchor}:{})};
  if(art.source.endsWith('.svg')){const svg=`${art.category}/svg/${art.id}.svg`;await save(svg,await fs.readFile(path.join(root,'sources',art.source)));Object.assign(entry,{svg});}
  if(art.category==='ui')manifest.ui[art.id]=entry;
  else if(art.category==='icons/editor')manifest.editor[art.id]=entry;
  else manifest.elements[art.id]=entry;
 }
+manifest.items={mushroom:manifest.elements.mushroom};
 async function atlas(dir:string,entries:{name:string;source:string}[],size:number){
  const cols=Math.min(8,entries.length),rows=Math.ceil(entries.length/cols),stride=size+4;
  const frames:Record<string,unknown>={};const composites=[];
@@ -64,7 +76,7 @@ const aliases:Record<string,string>={'ground':'grass_ground','brick':'grass_bric
 for(const [alias,id] of Object.entries(aliases)){if(alias===id)continue;if(!manifest.elements[id])throw Error(`Missing alias target ${id}`);manifest.elements[alias]={...manifest.elements[id],aliasOf:id};}
 const packs=JSON.parse(await fs.readFile(path.join(root,'sources/packs.json'),'utf8')) as {id:string;url:string;license:string;author:string}[];
 const musicPacks=JSON.parse(await fs.readFile(path.join(root,'sources/oga-packs.json'),'utf8')) as {id:string;url:string;license?:string;author?:string}[];
-await json('credits.json',{license:'CC0-1.0',art:packs.map(({id,url,license,author})=>({id,url,license,author})),music:musicPacks.filter(p=>p.id.startsWith('music-')).map(p=>({id:p.id,url:p.url,license:p.license,author:p.author})),supplements:{author:'RealmForge contributors',license:'CC0-1.0'}});
+await json('credits.json',{license:'CC0-1.0',art:packs.map(({id,url,license,author})=>({id,url,license,author})),mushroom:{author:mushroom.author,url:mushroom.url,license:mushroom.license,source:'Vector/Tiles/mushroom_red.svg'},music:musicPacks.filter(p=>p.id.startsWith('music-')).map(p=>({id:p.id,url:p.url,license:p.license,author:p.author})),supplements:{author:'RealmForge contributors',license:'CC0-1.0'}});
 manifest.credits='credits.json';
 await json('manifest.json',manifest);
 console.log(`Built ${recipe.art.length} images, ${Object.keys(recipe.characters).length} character atlases, ${Object.keys(recipe.enemies).length} enemy atlases, ${Object.keys(recipe.themes).length} tilesets and ${Object.keys(recipe.audio).length} audio files.`);

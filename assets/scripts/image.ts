@@ -29,6 +29,31 @@ export async function raster(file:string,width:number,height:number):Promise<Buf
  const img=await loadImage(await fs.readFile(file)),scale=Math.min(width/img.width,height/img.height),w=img.width*scale,h=img.height*scale;
  const canvas=createCanvas(width,height);canvas.getContext('2d').drawImage(img,(width-w)/2,(height-h)/2,w,h);return canvas.toBuffer('image/png');
 }
+/** Trim empty tile margins before fitting fetched vector art, keeping its feet on the canvas baseline. */
+export async function rasterTrimmedBottom(file:string,width:number,height:number):Promise<Buffer>{
+ if(!file.endsWith('.svg'))throw Error(`Trimmed vector raster requires SVG: ${file}`);
+ const data=await fs.readFile(file,'utf8'),root=data.match(/<svg\b[^>]*>/)?.[0];
+ if(!root)throw Error(`Missing SVG root: ${file}`);
+ const nativeW=Number(root.match(/\bwidth="([\d.]+)"/)?.[1]),nativeH=Number(root.match(/\bheight="([\d.]+)"/)?.[1]);
+ if(!(nativeW>0&&nativeH>0))throw Error(`SVG needs numeric dimensions: ${file}`);
+ // loadImage rasterizes SVG at its root dimensions. Enlarge that viewport first,
+ // preserving native coordinates, rather than interpolating an already small bitmap.
+ const scale=Math.max(8,Math.ceil(Math.max(width/nativeW,height/nativeH)*4));
+ const viewport=root.replace(/\bwidth="[^"]+"/,`width="${nativeW*scale}"`).replace(/\bheight="[^"]+"/,`height="${nativeH*scale}"`);
+ const scaled=viewport.includes('viewBox=')?viewport:viewport.replace(/>$/,` viewBox="0 0 ${nativeW} ${nativeH}">`);
+ const img=await loadImage(Buffer.from(data.replace(root,scaled))),canvas=createCanvas(img.width,img.height);
+ canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+ const png=PNG.sync.read(canvas.toBuffer('image/png'));
+ let left=png.width,top=png.height,right=-1,bottom=-1;
+ for(let y=0;y<png.height;y++)for(let x=0;x<png.width;x++)if(png.data[(y*png.width+x)*4+3]!>0){
+  left=Math.min(left,x);top=Math.min(top,y);right=Math.max(right,x);bottom=Math.max(bottom,y);
+ }
+ if(right<left)throw Error(`Empty source: ${file}`);
+ const sw=right-left+1,sh=bottom-top+1,fit=Math.min(width/sw,height/sh),w=sw*fit,h=sh*fit;
+ const out=createCanvas(width,height);
+ out.getContext('2d').drawImage(canvas,left,top,sw,sh,(width-w)/2,height-h,w,h);
+ return out.toBuffer('image/png');
+}
 export function thumbnail(data:Buffer,width:number,height:number):Buffer{
  const src=PNG.sync.read(data),scale=Math.min(width/src.width,height/src.height),w=Math.max(1,Math.round(src.width*scale)),h=Math.max(1,Math.round(src.height*scale)),dst=blank(w,h);
  for(let y=0;y<h;y++)for(let x=0;x<w;x++){

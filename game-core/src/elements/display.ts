@@ -11,11 +11,20 @@ const visualOffsets = new WeakMap<object, { x: number; y: number }>();
 const visualSizes = new WeakMap<object, { scaleX: number; scaleY: number }>();
 export type ElementVisual = Phaser.GameObjects.Image | Phaser.GameObjects.Sprite;
 
+/** Optional host-provided pivot art. The axle stays fixed while only the deck rotates. */
+export function createSeesawPivotVisual(scene: Phaser.Scene, ref: ElementTexture | undefined, x: number, y: number, tile: number): ElementVisual | undefined {
+    if (!ref || !scene.textures.exists(ref.texture)) return;
+    // Same placement as the web mechanism overlay: the top overlaps the lower half
+    // of a 0.45-tile deck, with the pin hidden behind it rather than floating below it.
+    return scene.add.image(x, y + tile * 0.1, ref.texture, ref.frame)
+        .setOrigin(0.5, 0).setDisplaySize(tile * (ref.displaySize?.w ?? 0.75), tile * (ref.displaySize?.h ?? 0.75)).setDepth(-1);
+}
+
 /** Rendering only: never changes bodies or the fixed-step controller. */
 export function createElementVisual(scene: Phaser.Scene, type: string, ref: ElementTexture, x: number, y: number, w: number, h: number, _tile: number): ElementVisual {
     // Headless game-core hosts can provide images without an animation manager.
     const visual = scene.add.sprite ? scene.add.sprite(x, y, ref.texture, ref.frame) : scene.add.image(x, y, ref.texture, ref.frame);
-    // Seesaw w/h are the actual Matter plank dimensions, including its quarter-tile thickness.
+    // Stretch platforms to the actual Matter deck, including the seesaw's 0.45-tile thickness.
     const stretch = ['seesaw', 'chain_bridge', 'moving_platform', 'elevator', 'rotating_platform', 'conveyor_belt', 'one_way', 'semi_solid'].includes(type);
     visual.setDisplaySize(w * (stretch ? 1 : ref.displaySize?.w ?? 1), h * (stretch ? 1 : ref.displaySize?.h ?? 1));
     visualSizes.set(visual, { scaleX: visual.scaleX, scaleY: visual.scaleY });

@@ -50,6 +50,12 @@
       "author": "Kenney"
     }
   ],
+  "mushroom": {
+    "author": "Kenney / Kenney Vleugels",
+    "url": "https://kenney.nl/assets/new-platformer-pack",
+    "license": "CC0-1.0",
+    "source": "Vector/Tiles/mushroom_red.svg"
+  },
   "music": [
     {
       "id": "music-overworld",

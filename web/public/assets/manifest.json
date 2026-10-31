@@ -858,6 +858,20 @@
       },
       "frame": "jumper_0"
     },
+    "mushroom": {
+      "texture": "mushroom",
+      "path": "items/mushroom.png",
+      "width": 128,
+      "height": 128,
+      "source": "custom/kenney-mushroom/mushroom_red.svg",
+      "pack": "new-platformer-pack",
+      "note": "Authentic Kenney red mushroom SVG; transparent tile margins trimmed, proportionally rasterized to 128px and bottom-centered. Static art; movement and growth belong to game-core.",
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "svg": "items/svg/mushroom.svg"
+    },
     "ground": {
       "texture": "grass_ground",
       "path": "tiles/grass/grass_ground.png",
@@ -2360,6 +2374,20 @@
       "source": "new-platformer-pack/Vector/Tiles/block_blue.svg",
       "pack": "new-platformer-pack",
       "svg": "icons/editor/svg/palette_switch_block.svg"
+    },
+    "palette_mushroom": {
+      "texture": "palette_mushroom",
+      "path": "icons/editor/palette_mushroom.png",
+      "width": 128,
+      "height": 128,
+      "source": "custom/kenney-mushroom/mushroom_red.svg",
+      "pack": "new-platformer-pack",
+      "note": "Authentic Kenney red mushroom SVG; transparent tile margins trimmed, proportionally rasterized to 128px and bottom-centered. Static art; movement and growth belong to game-core.",
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "svg": "icons/editor/svg/palette_mushroom.svg"
     }
   },
   "sfx": {
@@ -2414,6 +2442,22 @@
       "path": "music/castle_01.ogg",
       "pack": "music-sprinter",
       "loop": true
+    }
+  },
+  "items": {
+    "mushroom": {
+      "texture": "mushroom",
+      "path": "items/mushroom.png",
+      "width": 128,
+      "height": 128,
+      "source": "custom/kenney-mushroom/mushroom_red.svg",
+      "pack": "new-platformer-pack",
+      "note": "Authentic Kenney red mushroom SVG; transparent tile margins trimmed, proportionally rasterized to 128px and bottom-centered. Static art; movement and growth belong to game-core.",
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "svg": "items/svg/mushroom.svg"
     }
   },
   "credits": "credits.json"

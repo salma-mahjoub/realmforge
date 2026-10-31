@@ -5,13 +5,13 @@ import assert from 'node:assert/strict';
 import {dimensions,visiblePixels} from './image.js';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../web/public/assets');
 const m=JSON.parse(await fs.readFile(path.join(root,'manifest.json'),'utf8'));
-const required=['ground','brick','question_block','ice','slime','one_way','semi_solid','spikes','lava','saw','falling_block','crate','seesaw','pendulum_ball','chain_bridge','spring','conveyor_belt','moving_platform','elevator','rotating_platform','walker','shell','flyer','jumper','cannon','coin','big_coin','key','powerup_double_jump','powerup_dash','start','checkpoint','goal','door','locked_door','switch','switch_block'];
+const required=['ground','brick','question_block','ice','slime','one_way','semi_solid','spikes','lava','saw','falling_block','crate','seesaw','pendulum_ball','chain_bridge','spring','conveyor_belt','moving_platform','elevator','rotating_platform','walker','shell','flyer','jumper','cannon','coin','big_coin','key','powerup_double_jump','powerup_dash','start','checkpoint','goal','door','locked_door','switch','switch_block','mushroom'];
 for(const id of required)assert(m.elements[id],`Missing element ${id}`);
 let references=0;
 async function visit(v:any):Promise<void>{
  if(!v||typeof v!=='object')return;
  for(const [key,value] of Object.entries(v)){
-  if(['path','image','atlas','svg'].includes(key)&&typeof value==='string'){assert(!value.includes('..'));assert((await fs.stat(path.join(root,value))).size>0,value);references++;}
+  if(['path','image','atlas','svg','credits'].includes(key)&&typeof value==='string'){assert(!value.includes('..'));assert((await fs.stat(path.join(root,value))).size>0,value);references++;}
   else if(value&&typeof value==='object')await visit(value);
  }
 }

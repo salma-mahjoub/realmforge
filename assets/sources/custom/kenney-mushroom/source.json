@@ -1,0 +1,58 @@
+{
+  "author": "Kenney / Kenney Vleugels",
+  "pack": "new-platformer-pack",
+  "version": "1.1",
+  "license": "CC0-1.0",
+  "url": "https://kenney.nl/assets/new-platformer-pack",
+  "download": "https://kenney.nl/media/pages/assets/new-platformer-pack/1896103897-1764756702/kenney_new-platformer-pack-1.1.zip",
+  "archiveSha256": "553b907f3f0e505ab65f56f245ccaff3123c8fe3f3a0dfce9373b996bfc18cc2",
+  "files": [
+    {
+      "archivePath": "Vector/Tiles/mushroom_red.svg",
+      "local": "mushroom_red.svg",
+      "sha256": "b3ecd0aef4cecc8effb778aea5968f0aa90ed8f9aa3636d2866f2defc73a6cb8"
+    },
+    {
+      "archivePath": "License.txt",
+      "local": "License.txt",
+      "sha256": "f0bc5a99a4710f75a2d507e2ab153025af203d9a6b5a698df737a47684316077"
+    }
+  ],
+  "licenseEvidence": {
+    "bundled": "License.txt",
+    "declaration": "License: (Creative Commons Zero, CC0)",
+    "page": "https://kenney.nl/assets/new-platformer-pack",
+    "pageField": "Creative Commons CC0",
+    "verified": "2026-10-31"
+  },
+  "art": [
+    {
+      "id": "mushroom",
+      "category": "items",
+      "source": "custom/kenney-mushroom/mushroom_red.svg",
+      "pack": "new-platformer-pack",
+      "width": 128,
+      "height": 128,
+      "trimBottom": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "note": "Authentic Kenney red mushroom SVG; transparent tile margins trimmed, proportionally rasterized to 128px and bottom-centered. Static art; movement and growth belong to game-core."
+    },
+    {
+      "id": "palette_mushroom",
+      "category": "icons/editor",
+      "source": "custom/kenney-mushroom/mushroom_red.svg",
+      "pack": "new-platformer-pack",
+      "width": 128,
+      "height": 128,
+      "trimBottom": true,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "note": "Authentic Kenney red mushroom SVG; transparent tile margins trimmed, proportionally rasterized to 128px and bottom-centered. Static art; movement and growth belong to game-core."
+    }
+  ]
+}

@@ -22,7 +22,7 @@ Evaluated on 2026-10-30 against `docs/SPEC.md` §3.2. License checks used each c
 
 ## Element coverage
 
-All 37 canonical IDs have a runtime visual and editor palette thumbnail. A visual labeled **composed** or **supplement** is usable shipped art, not a missing file.
+The original 37 canonical IDs plus `mushroom` have a runtime visual and editor palette thumbnail. A visual labeled **composed** or **supplement** is usable shipped art, not a missing file.
 
 | Category | Canonical manifest IDs | Coverage |
 |---|---|---|
@@ -31,11 +31,11 @@ All 37 canonical IDs have a runtime visual and editor palette thumbnail. A visua
 | Dynamic | `crate`, `seesaw`, `pendulum_ball`, `chain_bridge`, `spring`, `conveyor_belt` | 6/6. Native crate, weight, spring and conveyor; original seesaw and repeatable chain-bridge link strip. Native `chain_link` and `spring_extended` also shipped. |
 | Moving | `moving_platform`, `elevator`, `rotating_platform` | 3/3 original platform graphics with directional editor markings. Render each platform as a single object; animate position/rotation in game code. |
 | Enemies | `walker`, `shell`, `flyer`, `jumper`, `cannon` | 5/5. Native slime, snail shell, fly and frog; original cannon. All have Phaser JSON hash atlases. Walker stomp and snail walk/kick states are separately defined. Cannon is a static pose awaiting game-controlled firing effects. |
-| Items | `coin`, `big_coin`, `key`, `powerup_double_jump`, `powerup_dash` | 5/5. Native coin/key, enlarged native big coin, original double-arrow/lightning badges. |
+| Items | `coin`, `big_coin`, `key`, `powerup_double_jump`, `powerup_dash`, `mushroom` | 6/6. Native coin/key/mushroom, enlarged native big coin, original double-arrow/lightning badges. Mushroom keeps its existing grow-to-big behavior. |
 | Flow | `start`, `checkpoint`, `goal`, `door`, `locked_door`, `switch`, `switch_block` | 7/7. Native sign/flags/switch/block, full-height door compositions with key-lock overlay. Door art serves linked teleports; a separate pipe variant is optional under §3.2. |
 | Themes and backgrounds | `grass`, `desert`, `snow`, `castle` | 4/4 tilesets, each with identical terrain index ordering. Native grass/desert backgrounds; original snow mountains and castle silhouettes. All backgrounds repeat horizontally. |
 | Player animations | `green`, `pink`, `purple`, `beige`: `idle`, `walk`, `run`, `jump`, `fall`, `skid`, `crouch` | 4×7 states. Walk and run share two native poses at different rates; fall and skid are explicitly derived poses, not newly drawn multi-frame animation cycles. |
-| UI / palette | 13 UI images, 14 tools, 37 element thumbnails | Covered. All runtime images are PNG, with SVG companions where available. |
+| UI / palette | 13 UI images, 14 tools, 38 element thumbnails | Covered. All runtime images are PNG, with SVG companions where available. |
 | Gameplay SFX | `jump`, `coin`, `stomp`, `spring`, `death`, `goal` | 6/6 Oggs; plus one menu click. Stomp uses a short bump, spring uses the high-jump sound, death uses hurt, goal uses a jingle. |
 | Level music | `grass_01`, `snow_01`, `castle_01` | 3 original CC0 Ogg loops. Set `loop: true` from the manifest; desert may reuse `grass_01`. |
 
@@ -48,3 +48,20 @@ Characters remain 128px square for bottom-center anchoring; terrain is 64px. The
 ## Reproduction and verification
 
 `npm run build:assets` reads the committed input subset and writes only `web/public/assets/`. Full archives remain ignored. `scripts/supplements.py` and `scripts/curate.py` can regenerate the input subset after downloading, but normal builds do not require Python or the network. `npm run check` uses TypeScript strict with unchecked-index checking. `npm run verify` checks all canonical IDs, seven animation states per player, atlas frames/bounds, theme grids, required audio and every manifest file reference, and enforces a 40 MiB runtime limit. `npm run preview` creates `assets/PREVIEW.png` for visual review. Music files are decoded with ffmpeg for format integrity; the authors describe them as loops, but browser audio transition behavior still depends on the game's Web Audio playback implementation.
+
+### Mushroom replacement — 2026-10-31
+
+Searched existing downloaded packs first: New Platformer Pack 1.1 already includes `Vector/Tiles/mushroom_red.svg` and `mushroom_brown.svg`. Selected red to match the existing vector palette. No external substitute, Nintendo image, generated image or new drawing is needed. The official [Kenney pack page](https://kenney.nl/assets/new-platformer-pack) states Creative Commons CC0, and the archive's actual licence declares Creative Commons Zero, CC0. The original SVG and licence are retained byte-for-byte under `sources/custom/kenney-mushroom/`, alongside a hash-pinned provenance record. See [CREDITS.md](CREDITS.md).
+
+The original 64×64 SVG is a decorative tile with art in its lower central area. The build renders the vector at 512×512 **before** cropping its alpha bounds, then fits the visible shape proportionally into a 128×128 canvas, bottom-centered (visible bounds `0,19–127,127`). This avoids enlarging a pre-rasterized 64px image. The unchanged original SVG is shipped beside the PNG; its viewport still includes the original tile margins. Manifest `elements.mushroom` and `items.mushroom` share the same entry, `editor.palette_mushroom` has the same image, and `anchor: {x:0.5,y:1}` puts the stem at the body bottom. No animation frames are claimed. Body dimensions, speed, growth and fixed-step movement are defined by existing game-core code.
+
+`scripts/build.ts` merges the additional mushroom recipe from `sources/custom/kenney-mushroom/source.json` after reading the legacy recipe. This survives re-curation without editing another owner's `sources/recipe.json`; it also verifies source/licence checksums before writing outputs. Restore the exact SVG/licence with `python3 scripts/fetch-mushroom.py` (uses the verified existing archive or fetches the pinned official URL; refuses changed bytes). Then run, from `assets/`:
+
+```sh
+npm run build:assets
+npm run check
+npm run verify
+npx tsx --tsconfig ../web/tsconfig.json test-mushroom.ts
+```
+
+The focused check compares provenance hashes, original SVG bytes, raster regeneration, palette parity, visible bounds and silhouette, then exercises the actual web registry → `coreTextures` → game-core `createMushroom` using the existing headless Matter harness for all four themes. It rejects fallback texture generation and confirms the unchanged 64×64 default collision body, speed and bottom anchor. Other Kenney pose reuse and static-object limitations listed above remain; exact NSMBU poses and physical seesaw changes belong to the concurrent owners. The coordinator must update the shared checklist to remove “Kenney mushroom uses a placeholder” after review.

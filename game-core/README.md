@@ -86,3 +86,5 @@ const final = simulateReplay(initial, log, (state, frame) => trustedLevel.resolv
 ```
 
 Replay environment callbacks return `{contacts, surface, resolvedPosition?}` (the optional position contains collision-resolved fixed-point `x`/`y`). Identical inputs, initial state, tuning and collision results produce identical final state. Version 1 logs reject invalid masks/versions. The server must own collision/level resolution, cap replay length and verify level identity; never trust client contacts. Matter itself uses floating point and is not an authoritative deterministic server solver. Headless collision/level validation remains host integration work.
+
+The seesaw now uses a 0.45-tile collision/render deck with a center hinge, preserved mass/inertia and ±30° stops. Run `npx vite --config docs/seesaw-lab.vite.config.ts` and open `/docs/seesaw-lab.html` for the focused collision/pivot lab. [Seesaw validation](docs/SEESAW_VALIDATION.md) records level-clearance consequences, test/build logs, browser evidence and an existing grown-player broadphase defect requiring adapter-owner follow-up.

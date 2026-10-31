@@ -76,10 +76,13 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] Pack switch (`VITE_ASSET_PACK` + in-game Art toggle), Kenney as fallback
 - [x] Parallax backgrounds, body-sized sprites (character 60 px, ~22 tiles visible), state animations, ground auto-tiling, editor zoom + sprite thumbnails
 - [x] High-resolution asset pass: scale audit reduced 50 violations to 0; padded terrain atlases and 47 neighbour masks per theme. Audit: `assets/packs/mario/AUDIT.md`.
-- [ ] Exact NSMBU fidelity: Luigi and small Mario use NSMB Wii fallbacks; some Luigi poses and object animations are substitutes/stills (see pack README).
+- [x] Genuine 16-frame coin and 13-frame 10-coin animations; authentic locked-door texture; scale audit now measures opaque content, not padded canvas
+- [ ] Exact NSMBU fidelity: Luigi and small Mario still use NSMB Wii fallbacks; skid/wall-slide poses, Goomba/Paragoomba cycles, spring, checkpoint and goal states are stills or substitutes. Sources searched and blockers: `assets/packs/mario/RESOLUTION_REPORT.md`.
 - [x] Seesaw pivot/visual scaling and terrain edge-mask/padding fixes; screenshots in `docs/screenshots/`.
-- [ ] Seesaw physical plank remains 0.25 tile thick (visual improvement does not change physics).
-- [x] Small/big forms: feet-anchored hull resize, ceiling-safe crouch growth, mushroom pickup, big-only brick breaking, shrink on damage and 90-frame invulnerability; replay tests. Kenney mushroom uses a placeholder.
+- [x] Seesaw deck 0.45 tile thick with matching art, centre hinge, ±30° stops; 14 regressions + browser evidence (`game-core/docs/SEESAW_VALIDATION.md`)
+- [x] Growth collision fix: rebuilt compound body no longer offset by the old position; feet anchored to the foot sensor; 16 adapter regressions (`game-core/test/adapterGrowth.test.ts`)
+- [ ] A hard centred landing by big Mario leaves the seesaw tilted ~4° (no restoring force); contact stays solid
+- [x] Small/big forms: feet-anchored hull resize, ceiling-safe crouch growth, mushroom pickup, big-only brick breaking, shrink on damage and 90-frame invulnerability; replay tests. Kenney mushroom is the genuine CC0 Kenney asset.
 
 ## 4. Web app — `web/` (Vite, React 19, Phaser 3.90 + Matter, wagmi 2 / viem / RainbowKit)
 - [x] 8 routes styled after the mockups, 404 page, no console errors
@@ -145,3 +148,7 @@ Season distribution → co-op → remix royalties → race escrow. **Never cut:*
 ## Latest verification — visual/player-form pass
 
 Coordinator re-ran root `npm test` and `npm run build`: game-core 53, contracts 42 (+9 todo), server 31, web 18 passing; all builds pass. Captures use a separate render-polish fixture, not the canonical hash-vector level.
+
+## Latest verification — fidelity/seesaw/growth pass
+
+Coordinator re-ran root `npm test` and `npm run build`: game-core 83, contracts 42 (+9 todo), server 31, web 18 passing; all builds pass. Mario pack validator: all checks PASS (118/118 element IDs, 12.0 MB / 25 MB budget).

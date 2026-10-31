@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="data:,"><title>RealmForge seesaw collision lab</title>
+<style>body{margin:0;background:#0f1424;color:#e9ecf6;font:15px system-ui}main{max-width:1000px;margin:20px auto}h1{font-size:24px}button,select{font:inherit;padding:8px;background:#28334f;color:white;border:1px solid #7c5cff;border-radius:5px;margin:0 5px 8px 0}canvas{display:block}p{line-height:1.5}#metrics{font:13px monospace;white-space:pre-wrap;min-height:55px}a{color:#b8aaff}</style></head>
+<body><main><h1>Seesaw · physical deck and rider contacts</h1>
+<p>0.45 tile deck · fixed axle · ±30° stops · original mass and inertia. Gold: main hull; cyan: foot sensor; violet: physical deck.</p>
+<button data-scenario="rest">Rest</button><button data-scenario="left">Left tilt</button><button data-scenario="right">Right tilt</button><button data-scenario="fall">Landing on right</button>
+<button id="step">Step 60 frames</button><button id="jump">Jump 1 frame</button><button id="grow">Grow / shrink</button><button id="play">Play / pause</button>
+<p>While playing: arrows move, Shift runs, Space jumps. Scenarios start paused. Character is a diagnostic hull, not animation art. Nintendo deck/pivot art is loaded from the existing private-demo pack; <a href="/docs/SEESAW_VALIDATION.md">validation and limits</a>.</p>
+<div id="metrics">Loading…</div><div id="game"></div></main><script type="module" src="./seesaw-lab.ts"></script></body></html>

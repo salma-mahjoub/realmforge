@@ -152,3 +152,31 @@ Coordinator re-ran root `npm test` and `npm run build`: game-core 53, contracts 
 ## Latest verification — fidelity/seesaw/growth pass
 
 Coordinator re-ran root `npm test` and `npm run build`: game-core 83, contracts 42 (+9 todo), server 31, web 18 passing; all builds pass. Mario pack validator: all checks PASS (118/118 element IDs, 12.0 MB / 25 MB budget).
+
+## Art, animation and UI/UX pass (31/10/2026)
+
+### UI/UX (Opus)
+- [x] Design system: tokens, Outfit + Inter fonts, lucide icons, reusable components (Button, Card, Modal with focus trap, Toast, Tabs, Tooltip, Skeleton, EmptyState, AddressChip, TokenAmount)
+- [x] All pages redesigned to mockup fidelity: Home, Browse (tabs, search, filters), Level detail + market dialogs, Market, Profile, Play (pre-run card, pause, game-over, cleared + 3-step settle), Race lobby + countdown, Editor chrome (icon toolbar, shortcuts overlay, palette search with sprite thumbnails, publish pre-flight + progress rail)
+- [x] Wallet UX: wrong-network banner with switch, missing-contracts / chain-down / server-offline banners, transaction toasts (confirm → pending → confirmed/failed) with readable contract errors, buttons disabled while pending, sample-data badges
+- [x] Loading/empty/error states, responsive to 820 px and 390 px, skip link, focus rings, ARIA, reduced motion; 41 screenshots in `docs/screenshots/ui/`
+- [x] Faucet verified end to end in a browser against Hardhat (0 → 100 FORGE)
+- [ ] Full mint and settleRun clicked through the UI with a real level clear
+- [ ] Server endpoints for profile, listings, activity and earnings (pages still on sample data)
+- [ ] Race lobby: real ready/finish state from Colyseus; live ranking
+- [ ] Indexer keeps stale data after a Hardhat restart (UI shows "Not found on this chain")
+- [ ] "Art" pack picker overlaps the canvas; editor is read-only on phones
+
+### Animation and VFX
+- [x] Speed-driven character animation, skid/turn, squash and stretch, grow/shrink, death hop, invulnerability blink
+- [x] Gameplay-tied objects: spring, ? block bump, brick debris, coin pop + score, checkpoint, goal sequence with iris, P-switch, donut, cannon, stomp poof, shell spin
+- [x] FX: skid/run dust, landing puff, camera shake, level intro card, iris transitions; pooled particles, 58 FPS measured on `/play/1`; screenshots in `docs/screenshots/vfx/`
+- [x] EventBus: `play:pause/resume/restart`, `play:state`, `play:finished`, `play:died`
+- [ ] Mushroom popping out of ? blocks needs a gameplay change in game-core
+
+### Mario pack art
+- [x] 15 animated/still objects + 3 FX (coin_pop, star, brick_debris) published under `web/public/packs/mario/objects/`; 10 genuine animation cycles; validator structural checks pass
+- [ ] Spring compress, active checkpoint, waving goal, lava animation, dust/land-puff sprites: sources blocked (procedural fallbacks active)
+- [ ] **Exact NSMBU characters blocked by Cloudflare human verification** on The Models Resource / Spriters Resource. Plan: user downloads the model rips manually to `~/Downloads/realmforge-rips/`, then a script renders them in Blender with their own animation clips. The pack validator's new "character fidelity" check fails until then (short walk/run cycles, Wii fallbacks) — it is a to-do report; CI does not run it.
+
+Verification: root `npm test` + `npm run build` — game-core 83, contracts 42 (+9 todo), server 31, web 39, all builds pass.

@@ -1,6 +1,7 @@
 import { formatEther, formatUnits, getAddress, isAddress, type Address, type Hex } from 'viem';
 import { MOCK_EARNINGS, MOCK_LEADERBOARD, MOCK_LEVELS, MOCK_LISTINGS, MOCK_RECENT_TX, mockProfile } from '../data/mock';
 import { SAMPLE_LEVEL } from '../game/level';
+import { markLive, markMock } from './dataSource';
 import type { LevelFileV1, Theme } from '../game/level/types';
 import { THEMES } from '../game/level/types';
 import type {
@@ -54,12 +55,21 @@ async function request<T>(path: string, init?: RequestInit & { json?: unknown })
 async function read<T>(path: string, mock: () => T, map?: (raw: never) => T): Promise<T> {
     try {
         const raw = await request<unknown>(path);
-        return map ? map(raw as never) : (raw as T);
+        const out = map ? map(raw as never) : (raw as T);
+        markLive(path);
+        return out;
     } catch (err) {
         if (!USE_MOCKS) throw err;
         console.info(`[api] ${path} unavailable, using mock data`);
+        markMock(path);
         return mock();
     }
+}
+
+/** Endpoints the server does not expose yet: always sample data, flagged as such. */
+function sample<T>(path: string, value: T): Promise<T> {
+    markMock(path);
+    return Promise.resolve(value);
 }
 
 const addr = (a: string | null | undefined): Address => (a && isAddress(a) ? getAddress(a) : ('0x0000000000000000000000000000000000000000' as Address));
@@ -143,10 +153,10 @@ export const api = {
         ),
 
     // Not implemented by server/ yet → mock data only (TODO(server): activity, earnings, profiles, listings).
-    getLevelActivity: (_id: number) => Promise.resolve<RecentTx[]>(USE_MOCKS ? MOCK_RECENT_TX : []),
-    getCreatorEarnings: (_id: number) => Promise.resolve<{ day: string; forge: number }[]>(USE_MOCKS ? MOCK_EARNINGS : []),
-    getProfile: (address: Address) => Promise.resolve<ProfileSummary>(mockProfile(address)),
-    listListings: () => Promise.resolve<Listing[]>(USE_MOCKS ? MOCK_LISTINGS : []),
+    getLevelActivity: (_id: number) => sample<RecentTx[]>('/levels/:id/activity', USE_MOCKS ? MOCK_RECENT_TX : []),
+    getCreatorEarnings: (_id: number) => sample<{ day: string; forge: number }[]>('/levels/:id/earnings', USE_MOCKS ? MOCK_EARNINGS : []),
+    getProfile: (address: Address) => sample<ProfileSummary>('/profiles/:address', mockProfile(address)),
+    listListings: () => sample<Listing[]>('/market/listings', USE_MOCKS ? MOCK_LISTINGS : []),
 
     // publish flow (SPEC §3.3): pin first, then the clear proof references the pinned layoutHash
     pinLevel: (body: PinRequest) => request<PinResponse>('/levels/pin', { method: 'POST', json: body }),

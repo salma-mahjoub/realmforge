@@ -4,7 +4,6 @@ import {
     EMPTY_INPUT,
     MOVEMENT,
     MovementState,
-    createControllerState,
     createElementRuntime,
     createMatterPlayer,
     createReplay,
@@ -16,7 +15,7 @@ import {
     type InputState,
     type Replay,
 } from '@realmforge/game-core';
-import { EventBus } from '../EventBus';
+import { EventBus, type PlayState } from '../EventBus';
 import { REG, SCENES, SIM_HZ, STEP_MS, THEME_SKY, TILE } from '../constants';
 import { decodeLevel } from '../level/serialize';
 import { SAMPLE_LEVEL } from '../level';
@@ -25,12 +24,15 @@ import { groundTexture, hasSfx, playerTexture } from '../assets/registry';
 import { characterDisplay } from '../render/artwork';
 import { drawMechanisms } from '../render/mechanisms';
 import { createBackground } from '../render/background';
+import { PlayEffects } from '../render/PlayEffects';
 import { coreTextures, terrainDef, toCoreDef } from '../elements/bridge';
 import { TRACE_STRIDE, changePairs, encodeInputLog, type RunSubmission, type TraceSample } from '../run';
 
 export interface PlaySceneData {
     level?: LevelFileV1;
     levelId?: string | null;
+    /** Optional creator label supplied by the React/indexer layer. */
+    creator?: string;
     /** 'editor' enables the T key to go back to the editor. */
     from?: 'editor' | 'play' | 'race';
     /** Tile-space spawn override (test-play from cursor). */
@@ -78,9 +80,18 @@ export class PlayScene extends Phaser.Scene {
     protected trace: TraceSample[] = [];
     protected checkpointHits: { id: number; f: number }[] = [];
     protected currentInput: InputState = EMPTY_INPUT;
-    private respawnTile!: Waypoint;
     private spawnTile!: Waypoint;
     private goalReached = false;
+    private creator?: string;
+    private sequence: 'intro' | 'death' | 'dead' | 'goal' | null = null;
+    private effects!: PlayEffects;
+    private previousMode = MovementState.idle;
+    private previousVy = 0;
+    private squash = 0;
+    private squashStart = 0;
+    private facing = 1;
+    private turnStart = -1000;
+    private presentationMs = 0;
     private anim = '';
     private playerTex = '';
     private renderedForm: 'small' | 'big' = 'small';
@@ -88,7 +99,6 @@ export class PlayScene extends Phaser.Scene {
     private keys!: Record<'left' | 'right' | 'up' | 'down' | 'a' | 'd' | 'w' | 's' | 'space' | 'z' | 'x' | 'shift', Phaser.Input.Keyboard.Key>;
     protected unsubs: Array<() => void> = [];
 
-    private readonly scaleRef = TILE / MOVEMENT.referenceTile;
 
     constructor(key: string = SCENES.Play) {
         super({
@@ -113,9 +123,16 @@ export class PlayScene extends Phaser.Scene {
         this.file = file;
         this.doc = decodeLevel(file);
         this.levelId = data?.levelId ?? null;
+        this.creator = data?.creator;
+        this.sequence = null;
+        this.previousMode = MovementState.idle;
+        this.previousVy = 0;
+        this.squash = 0;
+        this.facing = 1;
+        this.turnStart = -1000;
+        this.presentationMs = 0;
         this.from = data?.from ?? 'play';
         this.spawnTile = data?.spawn ?? this.doc.spawn;
-        this.respawnTile = this.spawnTile;
         this.frame = 0;
         this.finished = false;
         this.paused = false;
@@ -131,9 +148,12 @@ export class PlayScene extends Phaser.Scene {
     }
 
     create() {
+        this.time.paused = false;
+        this.tweens.resumeAll();
         const { w, h } = this.doc.size;
         const W = w * TILE;
         const H = h * TILE;
+        this.cameras.main.setAlpha(1);
         this.cameras.main.setBackgroundColor(THEME_SKY[this.doc.meta.theme]);
         this.cameras.main.setBounds(0, 0, W, H);
         // Side walls + ceiling, open bottom (falling out is a death). Walls must be "solid" for the player mask.
@@ -170,6 +190,7 @@ export class PlayScene extends Phaser.Scene {
         }
 
         drawMechanisms(this, this.runtime.elements);
+        this.effects = new PlayEffects(this, this.runtime.elements, this.doc.meta.theme);
 
         // 3. game-core Mario-like controller on a Matter compound body.
         const sp = this.tileCenter(this.spawnTile);
@@ -209,6 +230,7 @@ export class PlayScene extends Phaser.Scene {
         this.emitHud();
         if (import.meta.env.DEV) (window as unknown as { __play?: PlayScene }).__play = this;
         EventBus.emit('current-scene-ready', this);
+        this.showIntro();
     }
 
     /** BEFORE_UPDATE — once per 16.67 ms physics step. */
@@ -223,17 +245,38 @@ export class PlayScene extends Phaser.Scene {
         if (this.paused || this.finished || !this.player) return;
         this.frame++;
         const y = this.player.body.position.y;
-        if (this.player.state.mode === MovementState.dead || y > this.doc.size.h * TILE + TILE * 2) this.die();
+        if (this.player.state.mode === MovementState.dead || y > this.doc.size.h * TILE + TILE * 2) { this.die(); return; }
         if (this.frame % TRACE_STRIDE === 0) this.trace.push(this.sample());
         if (this.goalReached) this.finish();
         if (this.frame % 6 === 0) this.emitHud();
         this.afterStep();
     }
 
-    update() {
-        // render-rate only: sprite + parallax (simulation runs in the fixed step)
-        if (this.player) this.syncSprite();
+    update(_time: number, delta: number) {
+        if (this.paused) return;
+        this.presentationMs += Math.min(delta, 50);
+        this.effects?.update(delta);
+        // Cinematics animate visual offsets only; no controller steps are fabricated.
+        if (this.player && this.sequence !== 'death' && this.sequence !== 'dead' && this.sequence !== 'goal') this.syncSprite();
+    }
 
+    private showIntro() {
+        this.sequence = 'intro';
+        this.matter.world.pause();
+        this.emitPlayState('intro');
+        const cam = this.cameras.main;
+        cam.setAlpha(1);
+        this.effects.iris(true, 550);
+        const panel = this.add.rectangle(0, 0, Math.min(580, this.scale.width - 48), 156, 0x0f1424, 0.94).setStrokeStyle(2, 0xffc83d, 0.7);
+        const title = this.add.text(0, -24, this.doc.meta.name, { fontFamily: 'system-ui, sans-serif', fontSize: '28px', fontStyle: 'bold', color: '#ffffff', align: 'center', wordWrap: { width: Math.min(520, this.scale.width - 80) } }).setOrigin(0.5);
+        const subtitle = this.add.text(0, 35, this.creator ? `by ${this.creator}` : this.levelId ? `LEVEL ${this.levelId}  ·  REALMFORGE` : 'REALMFORGE  ·  TEST PLAY', { fontFamily: 'system-ui, sans-serif', fontSize: '14px', color: '#ffc83d' }).setOrigin(0.5);
+        const card = this.add.container(cam.width / 2, cam.height / 2, [panel, title, subtitle]).setScrollFactor(0).setDepth(200).setScale(1 / cam.zoom);
+        this.tweens.add({ targets: card, alpha: 0, delay: 1000, duration: 280, onComplete: () => {
+            card.destroy();
+            this.sequence = null;
+            this.matter.world.resume();
+            this.emitPlayState('playing');
+        } });
     }
 
     private onPlayerFormChange(form: 'small' | 'big') {
@@ -258,7 +301,24 @@ export class PlayScene extends Phaser.Scene {
         this.playerSprite.setPosition(Math.round(hull.position.x), Math.round(hull.bounds.max.y));
         this.playerSprite.setVisible(!this.player.invulnerable || Math.floor(this.frame / 5) % 2 === 0);
         const s = this.player.state;
-        this.playerSprite.setFlipX(s.facing < 0);
+        // Hold the old facing while braking; turn only when velocity changes direction.
+        const facing = s.mode === MovementState.skid && Math.abs(s.vx) > SUBPIXEL * 0.15 ? Math.sign(s.vx) : s.facing;
+        if (facing !== this.facing) { this.facing = facing; this.turnStart = this.presentationMs; }
+        this.playerSprite.setFlipX(this.facing < 0);
+        const grounded = [MovementState.idle, MovementState.walk, MovementState.run, MovementState.skid, MovementState.crouch].includes(s.mode);
+        const wasAirborne = [MovementState.jump, MovementState.fall, MovementState.wallSlide].includes(this.previousMode);
+        if (grounded && wasAirborne) {
+            const impact = Phaser.Math.Clamp(Math.abs(this.previousVy) / (SUBPIXEL * 6), 0.35, 1.4);
+            this.squash = impact * 0.1; this.squashStart = this.presentationMs;
+            this.effects?.burst('land_puff', this.playerSprite.x, this.playerSprite.y, impact);
+            if (impact > 1) this.cameras.main.shake(90, 0.0015);
+        } else if (s.mode === MovementState.jump && this.previousMode !== MovementState.jump) {
+            this.squash = -0.07; this.squashStart = this.presentationMs;
+        }
+        if (s.mode === MovementState.skid || (s.mode === MovementState.run && Math.abs(s.vx) >= SUBPIXEL * MOVEMENT.runMax * 0.94)) this.effects?.dust(this.playerSprite.x - this.facing * 15, this.playerSprite.y, s.mode === MovementState.skid, this.facing);
+        if (s.mode === MovementState.wallSlide && this.previousMode !== s.mode) this.effects?.burst('dust', this.playerSprite.x + s.facing * 24, this.playerSprite.y - 20, 0.5);
+        this.previousMode = s.mode;
+        this.previousVy = s.vy;
         const name = ANIM_FOR[s.mode] ?? 'idle';
         if (name !== this.anim) {
             this.anim = name;
@@ -280,7 +340,9 @@ export class PlayScene extends Phaser.Scene {
         height = display.height;
         this.playerSprite.y += Math.round(display.feetOffset);
         const ratio = tex.displaySize ? tex.displaySize.w / tex.displaySize.h : this.playerSprite.width / Math.max(1, this.playerSprite.height);
-        this.playerSprite.setDisplaySize(Math.round(height * ratio), Math.round(height));
+        const squash = this.squash * Math.max(0, 1 - (this.presentationMs - this.squashStart) / 180);
+        const turn = Math.max(0, 1 - (this.presentationMs - this.turnStart) / 95);
+        this.playerSprite.setDisplaySize(height * ratio * (1 + squash) * (1 - turn * 0.12), height * (1 - squash));
         this.playerSprite.setOrigin(tex.anchor?.x ?? 0.5, tex.anchor?.y ?? 1);
         if (s.mode === MovementState.walk || s.mode === MovementState.run) this.playerSprite.anims.timeScale = Phaser.Math.Clamp(Math.abs(s.vx) / (SUBPIXEL * (s.mode === MovementState.run ? MOVEMENT.runMax : MOVEMENT.walkMax)), 0.45, 1.8);
         else this.playerSprite.anims.timeScale = 1;
@@ -366,6 +428,7 @@ export class PlayScene extends Phaser.Scene {
 
     /** Interactions reported by the game-core element runtime (afterupdate). */
     protected onElementEvent(type: string, el: ElementInstance) {
+        this.effects?.event(type, el);
         switch (type) {
             case 'coin':
             case 'big_coin':
@@ -385,7 +448,6 @@ export class PlayScene extends Phaser.Scene {
                 const entity = this.doc.entities.find((e) => e.id === id);
                 if (entity && !this.checkpointHits.some((c) => c.id === id)) {
                     this.checkpointHits.push({ id, f: this.frame });
-                    this.respawnTile = { x: entity.x, y: entity.y };
                     this.checkpointName = `Checkpoint ${id}`;
                 }
                 break;
@@ -400,26 +462,42 @@ export class PlayScene extends Phaser.Scene {
     }
 
     protected die() {
-        // Show a death pose without delaying or changing the deterministic respawn.
-        const ghost = this.add.sprite(this.playerSprite.x, this.playerSprite.y, this.playerTex, this.playerSprite.frame.name)
-            .setOrigin(0.5, 1).setDisplaySize(this.playerSprite.displayWidth, this.playerSprite.displayHeight).setDepth(51).setFlipX(this.playerSprite.flipX);
-        if (this.anims.exists(`${this.playerTex}:dead`)) ghost.play(`${this.playerTex}:dead`);
-        this.tweens.add({ targets: ghost, y: ghost.y - TILE, alpha: 0, duration: 350, onComplete: () => ghost.destroy() });
-        const cp = this.tileCenter(this.respawnTile);
-        this.player.setState(createControllerState(cp.x / this.scaleRef, cp.y / this.scaleRef));
-        this.cameras.main.flash(150, 255, 80, 80);
+        if (this.sequence === 'death' || this.sequence === 'dead' || this.finished) return;
+        this.sequence = 'death';
+        this.currentInput = EMPTY_INPUT;
+        this.matter.world.pause();
+        this.cameras.main.stopFollow();
+        this.playerSprite.setVisible(true).setAlpha(1);
+        const key = `${this.playerTex}:dead`;
+        if (this.anims.exists(key)) this.playerSprite.play({ key, repeat: 0 });
         this.sfx('death');
-        EventBus.emit('play:died');
+        const y = this.playerSprite.y;
+        // Short hit-stop, a hop, then a fall below the viewport. Physics remains paused.
+        this.tweens.add({ targets: this.playerSprite, y: y - TILE * 1.8, delay: 180, duration: 330, ease: 'Quad.easeOut', onComplete: () => {
+            this.tweens.add({ targets: this.playerSprite, y: y + this.cameras.main.height / this.cameras.main.zoom + TILE * 2, duration: 650, ease: 'Quad.easeIn', onComplete: () => {
+                this.sequence = 'dead';
+                this.emitPlayState('dead');
+                EventBus.emit('play:died');
+            } });
+        } });
     }
 
     protected finish() {
         if (this.finished) return;
         this.finished = true;
+        this.sequence = 'goal';
         this.trace.push(this.sample());
         this.matter.world.pause();
         this.sfx('goal');
         this.emitHud();
-        this.cameras.main.flash(250, 255, 200, 61);
+        this.effects.burst('star', this.playerSprite.x, this.playerSprite.y - TILE);
+        this.effects.score(this.playerSprite.x, this.playerSprite.y - TILE * 1.8, 'COURSE CLEAR!');
+        this.playerSprite.setFlipX(false).setVisible(true);
+        const walk = `${this.playerTex}:walk`;
+        if (this.anims.exists(walk)) this.playerSprite.play(walk);
+        this.tweens.add({ targets: this.playerSprite, x: this.playerSprite.x + TILE * 2.5, duration: 1300, ease: 'Linear', onComplete: () => {
+            this.effects.iris(false, 450);
+        } });
         const run: RunSubmission = {
             timeMs: this.timeMs,
             cleared: true,
@@ -428,7 +506,7 @@ export class PlayScene extends Phaser.Scene {
             checkpoints: [...this.checkpointHits],
             inputLog: encodeInputLog(this.replay),
         };
-        EventBus.emit('play:finished', {
+        const result = {
             levelId: this.levelId,
             timeMs: this.timeMs,
             coins: this.coins,
@@ -436,6 +514,10 @@ export class PlayScene extends Phaser.Scene {
             inputs: changePairs(this.replay),
             fromSpawn: this.spawnTile.x === this.doc.spawn.x && this.spawnTile.y === this.doc.spawn.y,
             run,
+        };
+        this.time.delayedCall(1800, () => {
+            this.emitPlayState('cleared');
+            EventBus.emit('play:finished', result);
         });
     }
 
@@ -473,13 +555,8 @@ export class PlayScene extends Phaser.Scene {
 
     protected bindBus() {
         this.unsubs.push(EventBus.subscribe('play:restart', () => this.restart()));
-        this.unsubs.push(
-            EventBus.subscribe('play:pause', (p) => {
-                this.paused = p;
-                if (p) this.matter.world.pause();
-                else if (!this.finished) this.matter.world.resume();
-            }),
-        );
+        this.unsubs.push(EventBus.subscribe('play:pause', (paused = true) => this.setPaused(paused)));
+        this.unsubs.push(EventBus.subscribe('play:resume', () => this.setPaused(false)));
         this.unsubs.push(
             EventBus.subscribe('play:load-level', ({ levelId, level }) => this.scene.restart({ level, levelId, from: this.from })),
         );
@@ -490,16 +567,32 @@ export class PlayScene extends Phaser.Scene {
         );
     }
 
+    protected emitPlayState(state: PlayState['state']) {
+        EventBus.emit('play:state', { state, levelName: this.doc.meta.name, creator: this.creator });
+    }
+
+    private setPaused(paused: boolean) {
+        if (this.finished || this.sequence === 'death' || this.sequence === 'dead') return;
+        this.paused = paused;
+        this.currentInput = EMPTY_INPUT;
+        this.time.paused = paused;
+        if (paused) { this.matter.world.pause(); this.tweens.pauseAll(); }
+        else { if (this.sequence !== 'intro') this.matter.world.resume(); this.tweens.resumeAll(); }
+        for (const child of this.children.list) if (child instanceof Phaser.GameObjects.Sprite) { if (paused) child.anims.pause(); else child.anims.resume(); }
+        this.emitPlayState(paused ? 'paused' : this.sequence === 'intro' ? 'intro' : 'playing');
+    }
+
     /** Return to the editor, resuming its registry copy + undo stack (not the stale boot data). */
     protected backToEditor() {
         this.scene.start(SCENES.Editor, { resume: true });
     }
 
     protected restart() {
-        this.scene.restart({ level: this.file, levelId: this.levelId, from: this.from, spawn: this.spawnTile });
+        this.scene.restart({ level: this.file, levelId: this.levelId, from: this.from, spawn: this.spawnTile, creator: this.creator });
     }
 
     protected teardown() {
+        this.time.paused = false;
         this.unsubs.forEach((u) => u());
         this.unsubs = [];
         this.scale.off(Phaser.Scale.Events.RESIZE, this.onResize, this);

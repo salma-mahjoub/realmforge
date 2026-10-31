@@ -1,17 +1,24 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../api/client';
-import { LevelThumb, compact, shortAddr } from '../components/ui';
-import { useAsync } from '../components/useAsync';
 import { parseEther } from 'viem';
-import { useMarket } from '../contracts/hooks';
+import { Play, RefreshCw, ShoppingCart, Store, Tag } from 'lucide-react';
+import { api } from '../api/client';
+import type { Listing } from '../api/types';
+import { useMockData } from '../api/dataSource';
+import { AddressChip, Badge, Button, EmptyState, LevelCardSkeleton, LevelThumb, Select, TokenAmount, compact } from '../components/ui';
+import { useAsync } from '../components/useAsync';
+import { BuyModal, ListModal } from '../components/MarketModals';
+import { useWeb3Status } from '../web3/tx';
 
 type Sort = 'recent' | 'price-asc' | 'price-desc' | 'plays';
 
 export default function Market() {
-    const { data, loading } = useAsync(() => api.listListings(), []);
+    const { data, loading, error, reload } = useAsync(() => api.listListings(), []);
     const [sort, setSort] = useState<Sort>('recent');
-    const market = useMarket();
+    const [buying, setBuying] = useState<Listing | null>(null);
+    const [managing, setManaging] = useState<Listing | null>(null);
+    const mock = useMockData('/market/listings');
+    const web3 = useWeb3Status();
 
     const rows = [...(data ?? [])].sort((a, b) => {
         if (sort === 'price-asc') return Number(a.priceEth) - Number(b.priceEth);
@@ -19,67 +26,109 @@ export default function Market() {
         if (sort === 'plays') return b.level.plays - a.level.plays;
         return 0;
     });
-    const floor = rows.length ? Math.min(...rows.map((r) => Number(r.priceEth))) : 0;
+    const floor = rows.length ? Math.min(...rows.map((r) => Number(r.priceEth))) : null;
+    const plays = rows.reduce((a, r) => a + r.level.plays, 0);
 
     return (
-        <div className="stack" style={{ gap: 18 }}>
-            <div className="row between wrap">
+        <div className="page page-market">
+            <header className="page-head">
                 <div>
-                    <h1 style={{ fontSize: 30 }}>Level market</h1>
-                    <p className="muted" style={{ margin: '4px 0 0' }}>
-                        Fixed-price LevelNFT listings. 5% royalty to the original creator on every sale (ERC-2981).
-                    </p>
+                    <h1 className="page-title">
+                        Level market {mock && <Badge tone="neutral">Sample data</Badge>}
+                    </h1>
+                    <p className="page-sub">Fixed-price LevelNFT listings, paid in ETH. Every sale pays the original creator a 5% royalty (ERC-2981).</p>
                 </div>
-                <div className="row">
-                    <div className="panel" style={{ padding: '8px 14px' }}>
-                        <span className="muted">Listed</span> <b>{rows.length}</b>
+                <dl className="inline-stats">
+                    <div>
+                        <dt>Listed</dt>
+                        <dd>{data ? rows.length : '—'}</dd>
                     </div>
-                    <div className="panel" style={{ padding: '8px 14px' }}>
-                        <span className="muted">Floor</span> <b>{floor} ETH</b>
+                    <div>
+                        <dt>Floor</dt>
+                        <dd>{floor != null ? `${floor} ETH` : '—'}</dd>
                     </div>
-                    <select className="input" style={{ width: 170 }} value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
-                        <option value="recent">Recently listed</option>
-                        <option value="price-asc">Price: low → high</option>
-                        <option value="price-desc">Price: high → low</option>
-                        <option value="plays">Most played</option>
-                    </select>
-                </div>
+                    <div>
+                        <dt>Plays on listed levels</dt>
+                        <dd>{data ? compact(plays) : '—'}</dd>
+                    </div>
+                </dl>
+            </header>
+
+            <div className="toolbar-row">
+                <span className="results-line">{data ? `${rows.length} listing${rows.length === 1 ? '' : 's'}` : 'Loading listings…'}</span>
+                <Select aria-label="Sort listings" value={sort} onChange={(e) => setSort(e.target.value as Sort)} className="w-sort">
+                    <option value="recent">Recently listed</option>
+                    <option value="price-asc">Price: low to high</option>
+                    <option value="price-desc">Price: high to low</option>
+                    <option value="plays">Most played</option>
+                </Select>
             </div>
 
-            {loading && !data && <div className="empty">Loading listings…</div>}
-            <div className="grid-cards">
-                {rows.map((r) => (
-                    <div key={r.level.id} className="card">
-                        <Link to={`/level/${r.level.id}`}>
-                            <LevelThumb theme={r.level.theme} seed={r.level.id} />
-                        </Link>
-                        <div className="card-body stack" style={{ gap: 8 }}>
-                            <div className="row between">
-                                <Link to={`/level/${r.level.id}`} className="card-title">
-                                    #{r.level.id} {r.level.name}
+            {error && !data ? (
+                <EmptyState tone="error" title="Listings could not be loaded" action={<Button icon={<RefreshCw size={15} aria-hidden />} onClick={reload}>Retry</Button>}>
+                    {error.message}
+                </EmptyState>
+            ) : loading && !data ? (
+                <div className="level-grid" aria-busy="true">
+                    {Array.from({ length: 4 }, (_, i) => (
+                        <LevelCardSkeleton key={i} />
+                    ))}
+                </div>
+            ) : rows.length === 0 ? (
+                <EmptyState icon={<Store size={26} />} title="Nothing for sale right now" action={<Button to="/browse">Browse levels</Button>}>
+                    Owners list levels from the level page. Check back soon or publish your own.
+                </EmptyState>
+            ) : (
+                <div className="level-grid">
+                    {rows.map((r) => {
+                        const mine = web3.address?.toLowerCase() === r.seller.toLowerCase();
+                        return (
+                            <article key={r.level.id} className="market-card">
+                                <Link to={`/level/${r.level.id}`} className="market-card-media" aria-label={`Open level #${r.level.id} ${r.level.name}`}>
+                                    <LevelThumb level={r.level} />
+                                    <span className="level-card-flag">
+                                        <Tag size={12} aria-hidden /> {r.listedAgo}
+                                    </span>
                                 </Link>
-                                <span className="badge gray">{r.listedAgo}</span>
-                            </div>
-                            <div className="row between muted" style={{ fontSize: 13 }}>
-                                <span>
-                                    Seller <span className="mono">{shortAddr(r.seller)}</span>
-                                </span>
-                                <span>▶ {compact(r.level.plays)} plays</span>
-                            </div>
-                            <div className="row between">
-                                <b style={{ fontSize: 18 }}>{r.priceEth} ETH</b>
-                                <button
-                                    className="btn primary sm"
-                                    title="LevelNFT.buy(id)"
-                                    onClick={() => void market.buy(BigInt(r.level.id), parseEther(r.priceEth)).catch((e) => console.warn('[buy]', e))}
-                                >
-                                    Buy
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
+                                <div className="level-card-body">
+                                    <div className="level-card-row">
+                                        <h2 className="level-card-title">
+                                            <Link to={`/level/${r.level.id}`}>
+                                                #{r.level.id} {r.level.name}
+                                            </Link>
+                                        </h2>
+                                    </div>
+                                    <div className="market-meta">
+                                        <span>
+                                            Seller <AddressChip address={r.seller} copy={false} />
+                                        </span>
+                                        <span>
+                                            <Play size={13} aria-hidden /> {compact(r.level.plays)}
+                                        </span>
+                                    </div>
+                                    <div className="market-buy">
+                                        <TokenAmount value={r.priceEth} symbol="ETH" size="lg" maxFrac={6} />
+                                        {mine ? (
+                                            <Button size="sm" onClick={() => setManaging(r)} icon={<Tag size={14} aria-hidden />}>
+                                                Manage
+                                            </Button>
+                                        ) : (
+                                            <Button size="sm" variant="primary" onClick={() => setBuying(r)} icon={<ShoppingCart size={14} aria-hidden />} aria-label={`Buy level #${r.level.id} for ${r.priceEth} ETH`}>
+                                                Buy
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                            </article>
+                        );
+                    })}
+                </div>
+            )}
+
+            {buying && (
+                <BuyModal open onClose={() => setBuying(null)} levelId={buying.level.id} levelName={buying.level.name} priceWei={parseEther(buying.priceEth)} seller={buying.seller} creator={buying.level.creator} onDone={reload} sample={mock} />
+            )}
+            {managing && <ListModal open onClose={() => setManaging(null)} levelId={managing.level.id} levelName={managing.level.name} currentWei={parseEther(managing.priceEth)} onDone={reload} />}
         </div>
     );
 }

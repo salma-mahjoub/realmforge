@@ -62,6 +62,13 @@ export interface RemotePlayerState {
     anim?: string;
 }
 
+export interface PlayState {
+    state: 'intro' | 'playing' | 'paused' | 'dead' | 'cleared';
+    levelName?: string;
+    creator?: string;
+    lives?: number;
+}
+
 export interface BusEvents {
     // lifecycle
     'current-scene-ready': [scene: Phaser.Scene];
@@ -88,6 +95,7 @@ export interface BusEvents {
     'editor:snapshot': [dataUrl: string];
 
     // Play / Race scenes → React
+    'play:state': [state: PlayState];
     'play:hud': [hud: HudState];
     'play:finished': [result: RunFinished];
     'play:died': [];
@@ -95,7 +103,8 @@ export interface BusEvents {
     // React → Play / Race scenes
     'play:load-level': [payload: { levelId: string | null; level: LevelFileV1 }];
     'play:restart': [];
-    'play:pause': [paused: boolean];
+    'play:pause': [paused?: boolean];
+    'play:resume': [];
     'race:remote-states': [players: RemotePlayerState[]];
     'race:local-state': [state: LocalRacerState];
     'race:checkpoint': [hit: { id: number }];

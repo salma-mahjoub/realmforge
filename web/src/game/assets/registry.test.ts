@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { elementTexture, getAnimations, completeGroundVariants, groundTexture, groundVariantNames, playerTexture, isPixelArt, pruneMissing, readManifest, themeLayers } from './registry';
+import { effectTexture, elementTexture, getAnimations, completeGroundVariants, groundTexture, groundVariantNames, playerTexture, isPixelArt, pruneMissing, readManifest, themeLayers } from './registry';
 import { fetchPackManifest, manifestUrl } from './pack';
 
 describe('asset packs', () => {
@@ -97,4 +97,30 @@ it('composes every concave blob from corner quarters without losing exposed card
     expect(compositions.get('snow:mask_7')).toEqual({ base: 'snow_left', corners: 2 });
     const grid = new Uint8Array([0, 1, 0, 1, 1, 1, 0, 1, 0]);
     expect(groundTexture('snow', grid, 3, 3, 1, 1).key).toBe('snow:mask_15');
+});
+
+
+describe('additive effect manifest', () => {
+    it('queues authentic effect atlases with frames, timing, anchors and sizing', () => {
+        const files = readManifest({ schema: 1, fx: { dust: { image: 'dust.png', atlas: 'dust.json', frames: ['puff0', 'puff1'], frameRate: 24, anchor: [0.5, 1], displaySize: [1.5, 0.75] } } }, [], '/packs/mario/');
+        expect(files).toContainEqual({ kind: 'atlas', key: 'fx:dust', textureURL: '/packs/mario/dust.png', atlasURL: '/packs/mario/dust.json' });
+        expect(effectTexture('dust')).toMatchObject({ key: 'fx:dust', frame: 'puff0', anchor: { x: 0.5, y: 1 }, displaySize: { w: 1.5, h: 0.75 } });
+        expect(getAnimations()).toContainEqual({ key: 'fx:dust:idle', texture: 'fx:dust', frames: ['puff0', 'puff1'], frameRate: 24, repeat: 0 });
+        expect(effectTexture('land_puff')).toBeUndefined();
+    });
+    it('removes failed effects and clears pack-specific mappings on a pack switch', () => {
+        readManifest({ fx: { sparkle: { path: 'sparkle.png' }, star: { path: 'star.png' } } }, []);
+        pruneMissing((key) => key !== 'fx:sparkle');
+        expect(effectTexture('sparkle')).toBeUndefined();
+        expect(effectTexture('star')).toMatchObject({ key: 'fx:star' });
+        readManifest({ schema: 1, elements: {} }, []);
+        expect(effectTexture('star')).toBeUndefined();
+    });
+});
+
+
+it('keeps debris variants static instead of treating independent fragments as animation frames', () => {
+    readManifest({ fx: { brick_debris: { image: 'debris.png', atlas: 'debris.json', frame: 'chunk0', variants: ['chunk0', 'chunk1', 'chunk2', 'chunk3'] } } }, []);
+    expect(effectTexture('brick_debris')?.variants).toEqual(['chunk0', 'chunk1', 'chunk2', 'chunk3']);
+    expect(getAnimations()).toEqual([]);
 });

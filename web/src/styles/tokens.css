@@ -1,0 +1,99 @@
+/*
+ * RealmForge design tokens. Every component and page style references these, never raw values.
+ * Palette from docs/mockups: navy shell #0f1424, violet action #7c5cff, FORGE gold #ffc83d.
+ */
+:root {
+    /* surfaces (one tone step each, separated by 1px lines in app chrome) */
+    --bg: #0f1424;
+    --bg-sunken: #0a0e1b;
+    --surface: #151b30;
+    --surface-2: #1b2340;
+    --surface-3: #232c4f;
+    --line: #262f52;
+    --line-strong: #364273;
+    --scrim: rgba(6, 9, 20, 0.72);
+
+    /* ink */
+    --text: #eef0ff;
+    --text-2: #c3c8e6;
+    --muted: #8d95bb;
+    --faint: #5d668d;
+
+    /* brand + semantic */
+    --violet: #7c5cff;
+    --violet-hi: #9479ff;
+    --violet-ink: #c9bcff;
+    --violet-soft: rgba(124, 92, 255, 0.16);
+    --violet-line: rgba(124, 92, 255, 0.55);
+    --gold: #ffc83d;
+    --gold-ink: #1d1604;
+    --gold-soft: rgba(255, 200, 61, 0.1);
+    --gold-line: rgba(255, 200, 61, 0.5);
+    --green: #3ddc97;
+    --green-soft: rgba(61, 220, 151, 0.13);
+    --red: #ff5c7a;
+    --red-soft: rgba(255, 92, 122, 0.13);
+    --amber: #ffa53d;
+    --amber-soft: rgba(255, 165, 61, 0.13);
+    --cyan: #22d3ee;
+
+    /* type */
+    --font-display: 'Outfit Variable', 'Outfit', 'Inter Variable', system-ui, sans-serif;
+    --font-ui: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --fs-xs: 12px;
+    --fs-sm: 13px;
+    --fs-md: 14px;
+    --fs-base: 15px;
+    --fs-lg: 18px;
+    --fs-xl: 22px;
+    --fs-2xl: 28px;
+    --fs-3xl: clamp(28px, 3.2vw, 38px);
+    --fs-hero: clamp(34px, 4.6vw, 60px);
+
+    /* space (4px base) */
+    --s-1: 4px;
+    --s-2: 8px;
+    --s-3: 12px;
+    --s-4: 16px;
+    --s-5: 20px;
+    --s-6: 24px;
+    --s-8: 32px;
+    --s-10: 40px;
+    --s-12: 48px;
+    --gutter: clamp(16px, 2.2vw, 28px);
+
+    /* radii */
+    --r-xs: 6px;
+    --r-sm: 8px;
+    --r-md: 12px;
+    --r-lg: 16px;
+    --r-pill: 999px;
+
+    /* elevation: only for things that float (menus, dialogs, toasts) */
+    --shadow-pop: 0 18px 50px rgba(3, 5, 14, 0.55), 0 2px 8px rgba(3, 5, 14, 0.4);
+    --ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--violet-hi);
+
+    /* motion */
+    --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+    --dur-1: 120ms;
+    --dur-2: 200ms;
+    --dur-3: 320ms;
+
+    /* layout */
+    --nav-h: 64px;
+    --content-max: 1440px;
+    --z-nav: 50;
+    --z-banner: 49;
+    --z-modal: 100;
+    --z-toast: 120;
+    --z-tooltip: 130;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :root {
+        --dur-1: 0ms;
+        --dur-2: 0ms;
+        --dur-3: 0ms;
+    }
+}

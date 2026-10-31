@@ -13,6 +13,8 @@
 import type { ElementType, Theme } from '../level/types';
 
 export interface TextureRef {
+    /** Independent static particle variants; never a temporal animation. */
+    variants?: string[];
     key: string;
     frame?: string | number;
     displaySize?: { w: number; h: number };
@@ -41,6 +43,9 @@ export interface ImageEntry {
     frame?: string | number;
     displaySize?: { w?: number; h?: number; width?: number; height?: number } | [number, number];
     anchor?: { x: number; y: number } | [number, number];
+    variants?: string[];
+    frames?: string[];
+    frameRate?: number;
     animations?: Record<string, { frames?: string[]; frameRate?: number; repeat?: number }>;
 }
 
@@ -53,6 +58,7 @@ interface ManifestV1 {
     characters?: Record<string, ImageEntry>;
     enemies?: Record<string, ImageEntry>;
     items?: Record<string, ImageEntry>;
+    fx?: Record<string, ImageEntry>;
     themes?: Record<string, ImageEntry & { background?: ImageEntry; tileWidth?: number; tileHeight?: number; margin?: number; spacing?: number; tiles?: Record<string, number | ImageEntry>; parallax?: { file: string; scrollFactor: number; y?: number }[] }>;
     sfx?: Record<string, { path?: string }>;
 }
@@ -81,6 +87,9 @@ export interface BackgroundLayer { key: string; scrollFactor: number; y?: number
 const backgrounds = new Map<string, BackgroundLayer[]>();
 const variants = new Map<string, TextureRef>();
 const characters = new Map<string, TextureRef>();
+const effects = new Map<string, TextureRef>();
+/** Missing keys deliberately return undefined: the renderer supplies pooled procedural particles. */
+export const effectTexture = (name: string): TextureRef | undefined => effects.get(name);
 let playerCharacter = '';
 export const isCharacterTexture = (key: string) => [...characters.values()].some((ref) => ref.key === key);
 
@@ -177,7 +186,7 @@ export function hasSfx(key: string): boolean {
 
 /** Drop mappings whose texture failed to load so lookups fall back to placeholders. */
 export function pruneMissing(exists: (key: string) => boolean): void {
-    for (const map of [elementTextures, themedTextures, variants, characters]) {
+    for (const map of [elementTextures, themedTextures, variants, characters, effects]) {
         for (const [k, ref] of map) if (!exists(ref.key)) map.delete(k);
     }
     for (const [k, layers] of backgrounds) backgrounds.set(k, layers.filter((layer) => exists(layer.key)));
@@ -194,6 +203,7 @@ export function readManifest(manifest: unknown, knownTypes: readonly string[], m
     sourceTile = m.sourceTile ?? 64;
     variants.clear();
     characters.clear();
+    effects.clear();
     playerCharacter = '';
     elementTextures.clear();
     themedTextures.clear();
@@ -308,6 +318,11 @@ export function readManifest(manifest: unknown, knownTypes: readonly string[], m
             if (ref) layers.push({ key: ref.key, scrollFactor: 0.25 });
         }
         backgrounds.set(theme, layers);
+    }
+
+    for (const [name, entry] of Object.entries(m.fx ?? {})) {
+        const ref = queue({ ...entry, animations: entry.animations ?? (entry.frames?.length ? { idle: { frames: entry.frames, frameRate: entry.frameRate ?? 16, repeat: 0 } } : undefined) }, `fx:${name}`);
+        if (ref) effects.set(name, { ...ref, variants: entry.variants });
     }
 
     for (const [key, s] of Object.entries(m.sfx ?? {})) {

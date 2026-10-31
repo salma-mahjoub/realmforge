@@ -8,6 +8,7 @@ export interface ElementTexture {
     anchor?: { x: number; y: number };
 }
 const visualOffsets = new WeakMap<object, { x: number; y: number }>();
+const bounceOffsets = new WeakMap<object, { y: number }>();
 const visualSizes = new WeakMap<object, { scaleX: number; scaleY: number }>();
 export type ElementVisual = Phaser.GameObjects.Image | Phaser.GameObjects.Sprite;
 
@@ -24,6 +25,9 @@ export function createSeesawPivotVisual(scene: Phaser.Scene, ref: ElementTexture
 export function createElementVisual(scene: Phaser.Scene, type: string, ref: ElementTexture, x: number, y: number, w: number, h: number, _tile: number): ElementVisual {
     // Headless game-core hosts can provide images without an animation manager.
     const visual = scene.add.sprite ? scene.add.sprite(x, y, ref.texture, ref.frame) : scene.add.image(x, y, ref.texture, ref.frame);
+    // Host presentation can associate visuals with elements without exposing or changing physics.
+    visual.setData?.('elementType', type);
+    visual.setData?.('elementCentre', { x, y });
     // Stretch platforms to the actual Matter deck, including the seesaw's 0.45-tile thickness.
     const stretch = ['seesaw', 'chain_bridge', 'moving_platform', 'elevator', 'rotating_platform', 'conveyor_belt', 'one_way', 'semi_solid'].includes(type);
     visual.setDisplaySize(w * (stretch ? 1 : ref.displaySize?.w ?? 1), h * (stretch ? 1 : ref.displaySize?.h ?? 1));
@@ -34,13 +38,18 @@ export function createElementVisual(scene: Phaser.Scene, type: string, ref: Elem
         positionElementVisual(visual, x, y, 0);
     }
     const sprite = visual as Phaser.GameObjects.Sprite;
-    const animation = ['walker', 'shell', 'flyer', 'jumper'].includes(type) ? ['move', 'walk', 'idle'] : ['idle', 'loop', 'move'];
+    const animation = type === 'flyer' ? ['fly', 'move', 'walk', 'idle'] : type === 'jumper' ? ['jump', 'move', 'idle'] : ['walker', 'shell'].includes(type) ? ['walk', 'move', 'idle'] : ['idle', 'closed', 'loop', 'move'];
     if (['coin', 'big_coin'].includes(type) && sprite.on) {
         // Cross-texture fallback frames can have different native resolutions. Keep their height
         // constant while allowing the changing aspect ratio to show the coin turning.
         const aspect = visual.width / Math.max(1, visual.height);
         const fitFrame = () => visual.setDisplaySize(w * (ref.displaySize?.w ?? 1) * visual.width / Math.max(1, visual.height) / aspect, h * (ref.displaySize?.h ?? 1));
         sprite.on('animationupdate', fitFrame);
+    }
+    if (['walker', 'shell', 'flyer', 'jumper'].includes(type) && sprite.on) {
+        // Authentic shell/rest and walking frames can use different atlas cell sizes.
+        // Keep the enemy's authored footprint stable when Phaser swaps native frame dimensions.
+        sprite.on('animationupdate', () => visual.setDisplaySize(w * (ref.displaySize?.w ?? 1), h * (ref.displaySize?.h ?? 1)));
     }
     let animated = false;
     for (const name of animation) {
@@ -56,6 +65,7 @@ export function createElementVisual(scene: Phaser.Scene, type: string, ref: Elem
 
 export function positionElementVisual(visual: ElementVisual, x: number, y: number, angle: number) {
     const offset = visualOffsets.get(visual) ?? { x: 0, y: 0 };
+    y += bounceOffsets.get(visual)?.y ?? 0;
     visual.setPosition(x + offset.x * Math.cos(angle) - offset.y * Math.sin(angle), y + offset.x * Math.sin(angle) + offset.y * Math.cos(angle)).setRotation(angle);
 }
 
@@ -68,15 +78,27 @@ export function bounceVisuals(scene: Phaser.Scene, visuals: ElementVisual[]) {
         const { scaleX, scaleY } = visualSizes.get(visual) ?? visual;
         visual.setScale(scaleX, scaleY);
         const sprite = visual as Phaser.GameObjects.Sprite;
-        const key = `${visual.texture.key}:bounce`;
+        const key = [`${visual.texture.key}:compress`, `${visual.texture.key}:bump`, `${visual.texture.key}:bounce`].find((k) => scene.anims?.exists(k)) ?? `${visual.texture.key}:bounce`;
         if (sprite.play && scene.anims?.exists(key)) {
             sprite.play({ key, repeat: 0 });
             sprite.once('animationcomplete', () => {
-                const idle = `${refTexture(sprite)}:idle`;
-                if (sprite.active && scene.anims?.exists(idle)) sprite.play(idle);
+                const texture = refTexture(sprite);
+                const extend = `${texture}:extend`;
+                const idle = `${texture}:${sprite.getData?.('restAnimation') ?? 'idle'}`;
+                if (sprite.active && scene.anims?.exists(extend)) {
+                    sprite.play({ key: extend, repeat: 0 });
+                    sprite.once('animationcomplete', () => { if (sprite.active && scene.anims?.exists(idle)) sprite.play(idle); });
+                } else if (sprite.active && scene.anims?.exists(idle)) sprite.play(idle);
             });
         }
-        scene.tweens.add({ targets: visual, scaleX: scaleX * 1.15, scaleY: scaleY * 0.55, duration: 75, yoyo: true, ease: 'Sine.easeOut' });
+        const type = visual.getData?.('elementType');
+        if (type === 'question_block' || type === 'brick') {
+            let offset = bounceOffsets.get(visual);
+            if (!offset) { offset = { y: 0 }; bounceOffsets.set(visual, offset); }
+            scene.tweens.killTweensOf(offset);
+            offset.y = 0;
+            scene.tweens.add({ targets: offset, y: -visual.displayHeight * 0.18, duration: 80, yoyo: true, ease: 'Quad.easeOut' });
+        } else scene.tweens.add({ targets: visual, scaleX: scaleX * 1.1, scaleY: scaleY * 0.55, duration: 85, yoyo: true, ease: 'Sine.easeOut' });
     }
 }
 

@@ -102,15 +102,28 @@ export function bounceVisuals(scene: Phaser.Scene, visuals: ElementVisual[]) {
     }
 }
 
-/** A short squash survives removal of an enemy's collision body. */
+/** Presentation survives removal of the enemy body; authored death art keeps its shape. */
 export function stompVisuals(scene: Phaser.Scene, visuals: ElementVisual[]) {
-    if (!scene.tweens || !scene.add.sprite) return;
+    if (!scene.add.sprite) return;
     for (const visual of visuals) {
         const ghost = scene.add.sprite(visual.x, visual.y, visual.texture.key, visual.frame.name)
             .setDisplaySize(visual.displayWidth, visual.displayHeight).setDepth(visual.depth).setOrigin(0.5, 1);
+        ghost.setFlipX(visual.flipX);
         ghost.y += (1 - visual.originY) * visual.displayHeight;
         const key = `${visual.texture.key}:stomp`;
-        if (scene.anims.exists(key)) ghost.play(key);
-        scene.tweens.add({ targets: ghost, scaleY: ghost.scaleY * 0.25, alpha: 0, duration: 220, onComplete: () => ghost.destroy() });
+        const animation = scene.anims?.get(key);
+        if (animation && animation.frames.length > 1 && Number.isFinite(animation.duration) && animation.duration > 0) {
+            // The Goomba cycle is already flat: no second squash or early fade.
+            // Scope completion to this animation and force one play even in looping packs.
+            const timeout = scene.time.delayedCall(animation.duration + Math.max(100, animation.duration * 0.1), () => ghost.destroy());
+            ghost.once(`animationcomplete-${key}`, () => ghost.destroy());
+            ghost.once('destroy', () => timeout.remove(false));
+            ghost.play({ key, repeat: 0 });
+        } else {
+            // Kenney/static packs have no timed death cycle. Retain their brief squash.
+            if (animation) ghost.play({ key, repeat: 0 });
+            if (scene.tweens) scene.tweens.add({ targets: ghost, scaleY: ghost.scaleY * 0.25, alpha: 0, duration: 220, onComplete: () => ghost.destroy() });
+            else scene.time.delayedCall(220, () => ghost.destroy());
+        }
     }
 }

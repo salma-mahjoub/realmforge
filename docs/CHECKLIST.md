@@ -77,7 +77,8 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] Parallax backgrounds, body-sized sprites (character 60 px, ~22 tiles visible), state animations, ground auto-tiling, editor zoom + sprite thumbnails
 - [x] High-resolution asset pass: scale audit reduced 50 violations to 0; padded terrain atlases and 47 neighbour masks per theme. Audit: `assets/packs/mario/AUDIT.md`.
 - [x] Genuine 16-frame coin and 13-frame 10-coin animations; authentic locked-door texture; scale audit now measures opaque content, not padded canvas
-- [ ] Exact NSMBU fidelity: Luigi and small Mario still use NSMB Wii fallbacks; skid/wall-slide poses, Goomba/Paragoomba cycles, spring, checkpoint and goal states are stills or substitutes. Sources searched and blockers: `assets/packs/mario/RESOLUTION_REPORT.md`.
+- [x] Downloaded Goomba integration: final entry-by-entry manifest merge after source rebuild; 16 walk / 14 already-flattened stomp frames; uniform source aspect and bottom-center feet; full animation completion with static Kenney fallback. Regression tests and real keyboard/Matter browser evidence: `docs/screenshots/goomba/`.
+- [ ] Exact NSMBU fidelity: Luigi and small Mario still use NSMB Wii fallbacks; skid/wall-slide poses, Paragoomba cycles, spring, checkpoint and goal states are stills or substitutes. Sources searched and blockers: `assets/packs/mario/RESOLUTION_REPORT.md`.
 - [x] Seesaw pivot/visual scaling and terrain edge-mask/padding fixes; screenshots in `docs/screenshots/`.
 - [x] Seesaw deck 0.45 tile thick with matching art, centre hinge, ±30° stops; 14 regressions + browser evidence (`game-core/docs/SEESAW_VALIDATION.md`)
 - [x] Growth collision fix: rebuilt compound body no longer offset by the old position; feet anchored to the foot sensor; 16 adapter regressions (`game-core/test/adapterGrowth.test.ts`)
@@ -177,6 +178,24 @@ Coordinator re-ran root `npm test` and `npm run build`: game-core 83, contracts 
 ### Mario pack art
 - [x] 15 animated/still objects + 3 FX (coin_pop, star, brick_debris) published under `web/public/packs/mario/objects/`; 10 genuine animation cycles; validator structural checks pass
 - [ ] Spring compress, active checkpoint, waving goal, lava animation, dust/land-puff sprites: sources blocked (procedural fallbacks active)
-- [ ] **Exact NSMBU characters blocked by Cloudflare human verification** on The Models Resource / Spriters Resource. Plan: user downloads the model rips manually to `~/Downloads/realmforge-rips/`, then a script renders them in Blender with their own animation clips. The pack validator's new "character fidelity" check fails until then (short walk/run cycles, Wii fallbacks) — it is a to-do report; CI does not run it.
+- [x] Downloaded Nintendo/DogToon64 Mario + Luigi archives safely extracted and inspected: 24 DAE models, 86 source files, 18 reproducible bind-pose PNGs. Preserve as inspection evidence only (`assets/packs/mario/character-model-import/MODEL_REPORT.md`); no gameplay animation mapping.
+- [ ] **Exact NSMBU character animation remains blocked: no original clips.** All 24 downloaded DAE files contain zero animation/clip/channel/sampler elements. Compatible original timed clips plus a verified evaluator are still needed for all four standard forms. Current player art stays active; full pack fidelity gate still fails on short cycles and Wii/pose fallbacks.
 
 Verification: root `npm test` + `npm run build` — game-core 83, contracts 42 (+9 todo), server 31, web 39, all builds pass.
+
+
+## Goomba integration verification — 1 November 2026
+- [x] Final source-first pack build and entry-by-entry Goomba merge; all unrelated manifest entries, aliases, completed objects and model previews preserved. Two real rebuilds plus native aspect/PNG-encoding regressions: 19 pack tests.
+- [x] Display-only changes: web artwork preparation preserves the 120×100 walker canvas; runtime stomp uses animation completion/duration without extra flattening; static Kenney fallback retained. Game-core 87 tests + build; web 40 tests + production build.
+- [x] Actual keyboard-driven PlayScene/Matter stomp on the saved local fixture: all 16 walk and 14 stomp frames observed, uniform 0.64 scale and bottom-center feet, ~587 ms completion. Screenshots, 1.66-second browser GIF and raw observations: `docs/screenshots/goomba/`.
+- [x] Goomba import exact-RGBA/hash/atlas validation and real web registry checks pass. All 214 pre-existing uncommitted import/model files preserved byte-for-byte; model validator passes (18 stills, no original clips).
+- [ ] Full pack validator still has a pre-existing publication byte-check failure when its object prepare step re-encodes PNGs differently. The focused builder verifies exact decoded RGBA plus atlas bytes without rewriting published art. Exact character fidelity remains open: original compatible Mario/Luigi clips are absent; short cycles, Wii/pose fallbacks and Paragoomba motion remain unresolved.
+
+## Downloaded Goomba and model-import follow-up
+
+- [x] Downloaded SMM2 NSMBU Goomba sheet (Nintendo; ripped by DogToon64) integrated reproducibly: 16 walk and 14 stomp frames, uniform source-native scaling and feet anchors; no extra squash or 220 ms truncation.
+- [x] Real keyboard/Matter gameplay captures in `docs/screenshots/goomba/`: all frames observed, stomp completes in about 587 ms.
+- [x] Mario/Luigi downloaded ZIPs inspected and rendered for inspection: 18 transparent previews, original ZIP/source hashes and reproducible pipeline in `assets/packs/mario/character-model-import/`.
+- [ ] Original Mario/Luigi animation clips still missing: all 24 downloaded model files have no animation channels. Inspection renders are not used as player animations.
+
+Coordinator verification: game-core 87, contracts 42 (+9 todo), server 31, web 40 tests pass; root production build passes. Pack structural validation passes; strict character-fidelity checks intentionally remain failing for documented fallback poses/short cycles. Original downloads are untouched.

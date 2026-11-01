@@ -28,6 +28,10 @@ export function prepareArtwork(scene: Phaser.Scene) {
         texture.setFilter(isPixelArt() ? Phaser.Textures.FilterMode.NEAREST : Phaser.Textures.FilterMode.LINEAR);
         if (/^(background|parallax|tiles-|ph:)/.test(key)) continue;
         const character = isCharacterTexture(key);
+        const walker = elementTexture('walker');
+        // Imported Goomba frames share a feet-normalized canvas across walk/death.
+        // Trimming each pose here destroys its authored scale, aspect and foot alignment.
+        if (key === walker.key && walker.anchor?.x === 0.5 && walker.anchor?.y === 1) continue;
         // Terrain keeps its full tile box for seamless joins.
         if (/(ground|fill|left|right|bottom|brick|question|ice|slime|one_way|semi_solid)/.test(key)) continue;
         for (const name of Object.keys(texture.frames)) {

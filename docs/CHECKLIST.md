@@ -100,6 +100,7 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [ ] Pages read real indexer/contract data instead of `data/mock.ts` (profile, market listings, activity and earnings still mock: these need server endpoints)
 - [ ] Free Reown/WalletConnect project ID in `web/.env.local` (currently a 403 warning)
 - [ ] RaceScene waits for the server countdown/start; ghost replays rendered
+- [~] Race lobby on-chain (`useRace`): create with escrow, join with escrow, settle with the server-signed ranking (deadline included), refund after the timeout; wired in `Room.tsx`, type-checked and unit-tested, **not yet clicked with two wallets**
 - [ ] Wallet connect + transactions tested in a browser with MetaMask
 - [ ] Read the minted token ID from the publish receipt
 

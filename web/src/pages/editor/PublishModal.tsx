@@ -162,7 +162,10 @@ export function PublishModal({ level, clear, onClose, onTestPlay }: { level: Lev
                     /* other contract's log */
                 }
             }
-            mark(3, 'done', id !== undefined ? `Minted level #${id}` : 'Minted');
+            // A mined transaction is not a minted level: a call to an address without code (wrong network or
+            // contract address) also succeeds, but emits nothing.
+            if (id === undefined) throw new Error('The transaction was mined but no level was minted. Check that your wallet is on the network this app targets and that the contract address is right.');
+            mark(3, 'done', `Minted level #${id}`);
             setMinted({ id, hash: out.hash });
         } catch (e) {
             mark(i, 'error', humanizeError(e));

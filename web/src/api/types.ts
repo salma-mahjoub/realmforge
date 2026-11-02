@@ -131,6 +131,16 @@ export interface RunRejected {
 }
 
 /** Row of GET /levels and GET /levels/:id (SQLite indexer, snake_case). */
+/** GET /season/current: the live ranking of the running season and the closed ones. */
+export interface SeasonRankingResponse {
+    season: number;
+    players: { address: Address; score: number }[];
+    creators: { address: Address; score: number }[];
+    /** basis points, players first then creators */
+    shares: number[];
+    closed: { season: number; pool: string; hash: string }[];
+}
+
 export interface LevelRow {
     id: number;
     creator: string;

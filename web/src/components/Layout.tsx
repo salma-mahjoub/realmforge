@@ -26,6 +26,7 @@ const NAV = [
     { to: '/editor', label: 'Editor' },
     { to: '/room/new', label: 'Race', match: '/room' },
     { to: '/market', label: 'Market' },
+    { to: '/season', label: 'Season' },
 ];
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {

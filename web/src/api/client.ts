@@ -17,6 +17,7 @@ import type {
     PinRequest,
     PinResponse,
     ProfileSummary,
+    SeasonRankingResponse,
     RecentTx,
     RunRejected,
     SubmitRunRequest,
@@ -179,6 +180,10 @@ export const api = {
                 listedAgo: r.listed_at ? timeAgo(r.listed_at) : '',
             })),
         ),
+
+    // seasons (docs/SEASONS.md): live ranking, and the server-signed ranking the admin submits to closeSeason
+    getSeason: () => request<SeasonRankingResponse>('/season/current'),
+    requestSeasonProof: () => request<unknown>('/season/close-proof', { method: 'POST' }),
 
     // publish flow (SPEC §3.3): pin first, then the clear proof references the pinned layoutHash
     pinLevel: (body: PinRequest) => request<PinResponse>('/levels/pin', { method: 'POST', json: body }),

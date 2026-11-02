@@ -46,6 +46,16 @@ for Sepolia.
 | 11 | Player + Buyer | **Race 1v1**: one creates a room with a 10 FORGE stake, the other joins with the code and escrows 10; both press ready; race to the goal | pot 20: **1st +12, 2nd +5**, level owner **+2**, season pool **+1**. The lobby shows the server-signed ranking and a **Settle on-chain** button |
 | 12 | anyone | If a race is never settled, wait one hour | **Refund** returns every stake |
 
+| 13 | admin | **Season** page: the ranking lists the player and the creator with their points and projected prize. After 30 days (on the local chain: `evm_increaseTime`), the admin presses **Close season** | `SeasonClosed`; the pool is paid 50% to the players and 50% to the creators in proportion to their points; `season` becomes 2 |
+
+Scripted checks you can run on the local chain (no browser, no wallet) to rehearse or to prove the flow:
+
+```bash
+npm run e2e:chain    # faucet → pin → clear proof → publish → validate → settleRun and settleRunWithPermit
+npm run e2e:race     # 1v1 race: escrow, signed ranking, 60/25/10/5 payout, expired result refused, refund
+npm run e2e:season   # the server's ranking is signed and accepted by closeSeason (after the clock jumps 30 days)
+```
+
 Bonus checks for the oral exam:
 - replay the same signed run (reload and settle again): `NonceAlreadyUsed`;
 - let the signature expire (more than an hour) before settling: `SignatureExpired`;

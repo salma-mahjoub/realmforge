@@ -7,6 +7,7 @@ import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 
 import {ForgeCoin} from "../src/ForgeCoin.sol";
 import {IForgeCoin} from "../src/interfaces/IForgeCoin.sol";
+import {ILevelNFT} from "../src/interfaces/ILevelNFT.sol";
 import {MockLevelNFT} from "../src/mocks/MockLevelNFT.sol";
 
 /// @title ForgeCoin unit + fuzz tests (Student B), against MockLevelNFT — `npx hardhat test solidity`
@@ -308,6 +309,40 @@ contract ForgeCoinTest is Test {
         coin.pause(); // refunds still work while paused
         coin.refundRace(room);
         assertEq(coin.balanceOf(player), 100e18);
+    }
+
+    // ------------------------------------------------------------------ constructor / admin: revert paths
+
+    function test_Deploy_RevertsOnZeroSigner() public {
+        vm.expectRevert(ForgeCoin.ZeroAddress.selector);
+        new ForgeCoin(address(0));
+    }
+
+    function test_SetLevelNFT_RevertsOnZeroAddress() public {
+        ForgeCoin fresh = new ForgeCoin(signer);
+        vm.expectRevert(ForgeCoin.ZeroAddress.selector);
+        fresh.setLevelNFT(ILevelNFT(address(0)));
+    }
+
+    function test_SetSigner_RevertsOnZeroAddress() public {
+        vm.expectRevert(ForgeCoin.ZeroAddress.selector);
+        coin.setSigner(address(0));
+    }
+
+    function test_WithdrawTreasury_RevertsOnZeroAddress() public {
+        vm.expectRevert(ForgeCoin.ZeroAddress.selector);
+        coin.withdrawTreasury(address(0));
+    }
+
+    function test_WithdrawTreasury_RevertsWhenEmpty() public {
+        vm.expectRevert(ForgeCoin.NothingToWithdraw.selector);
+        coin.withdrawTreasury(makeAddr("treasury"));
+    }
+
+    function test_RaceCreation_RevertsWhenLevelNFTNotSet() public {
+        ForgeCoin fresh = new ForgeCoin(signer);
+        vm.expectRevert(ForgeCoin.LevelNFTNotSet.selector);
+        fresh.createRaceRoom(keccak256("room"), LEVEL, 1e18);
     }
 
     // TODO(studentB): settleRunWithPermit test (sign Permit with vm.sign), settleRace invalid ranking / outsider,

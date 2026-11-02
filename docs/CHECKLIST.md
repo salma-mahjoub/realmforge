@@ -136,7 +136,7 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] Root `README.md` + root scripts: `dev:chain`, `deploy:local`, `dev:server`, `dev:web`, `test`, `build`, `e2e:chain`
 - [x] Scripted local end-to-end run (`npm run e2e:chain`): faucet → pin → clear-proof → publish → validate → settleRun + settleRunWithPermit → plays=2, creator +7, player +30, pool 2, treasury 1
 - [ ] Browser end-to-end run: build a level → publish → second wallet plays and pays → creator earns → sell the NFT
-- [ ] Race 1v1 end to end with stake escrow
+- [~] Race 1v1 end to end with stake escrow: scripted and passing on the local chain with the real server signer (`npm run e2e:race`: escrow, signed ranking, 60/25/10/5 payout, expired result refused, refund); not yet played in the browser with two wallets
 
 ## 7. Module deliverables (BK-01)
 - [ ] **S6 intermediate version:** publish end to end + solo play + `settleRun` + browse page

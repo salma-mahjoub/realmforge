@@ -19,7 +19,8 @@
     "test:contracts": "cd contracts && npx hardhat test",
     "test:server": "npm run build:game-core && cd server && npm test",
     "test:web": "cd web && npm test",
-    "e2e:chain": "cd server && npx tsx scripts/e2e-chain-flow.ts"
+    "e2e:chain": "cd server && npx tsx scripts/e2e-chain-flow.ts",
+    "e2e:race": "cd server && npx tsx scripts/e2e-race-flow.ts"
   },
   "engines": {
     "node": ">=22.13"

@@ -153,4 +153,8 @@ export interface LevelRow {
     min_time_ms: number | null;
     name: string | null;
     theme: string | null;
+    /** FORGE (wei) the level owner has earned: GET /levels/:id only. */
+    earned?: string;
+    /** ms epoch of the latest listing: GET /market/listings only. */
+    listed_at?: number | null;
 }

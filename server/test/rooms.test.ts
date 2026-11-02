@@ -50,7 +50,7 @@ describe("RaceRoom (Colyseus)", () => {
       domain: forgeCoinDomain(31337, FORGE_COIN),
       types: raceResultTypes,
       primaryType: "RaceResult",
-      message: { roomId: res.result.roomId, ranking: res.result.ranking },
+      message: { roomId: res.result.roomId, ranking: res.result.ranking, deadline: BigInt(res.result.deadline) },
       signature: res.signature,
     });
     expect(ok).toBe(true);

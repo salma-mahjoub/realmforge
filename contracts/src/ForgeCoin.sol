@@ -98,7 +98,7 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
     bytes32 public constant RUN_RESULT_TYPEHASH = keccak256(
         "RunResult(address player,uint256 levelId,uint32 timeMs,bool cleared,uint16 coins,uint256 nonce,uint256 deadline)"
     );
-    bytes32 public constant RACE_RESULT_TYPEHASH = keccak256("RaceResult(bytes32 roomId,address[] ranking)");
+    bytes32 public constant RACE_RESULT_TYPEHASH = keccak256("RaceResult(bytes32 roomId,address[] ranking,uint256 deadline)");
     bytes32 public constant SEASON_RESULT_TYPEHASH = keccak256(
         "SeasonResult(uint256 season,address[] players,address[] creators,uint256[] shares)"
     );
@@ -416,21 +416,23 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
     ///      Only ranking[0] and ranking[1] are paid; both must be distinct room players. Pot = stake * players.
     ///      1st 60% · 2nd 25% · level owner 10% · season pool gets the remainder (5% + rounding dust),
     ///      so the sum of payouts always equals the sum of stakes.
-    ///      TODO(studentB): add a deadline/expiry to RaceResult if a settle window is required.
-    function settleRace(bytes32 roomId, address[] calldata ranking, bytes calldata sig)
+    ///      The signed result carries a `deadline`: a stale result (e.g. leaked or signed by mistake) stops being
+    ///      valid, after which the room can only be refunded. Replay is impossible anyway: a room settles once.
+    function settleRace(bytes32 roomId, address[] calldata ranking, uint256 deadline, bytes calldata sig)
         external
         nonReentrant
         whenNotPaused
     {
         Race storage race = _races[roomId];
         if (race.status != RaceStatus.Open) revert RaceNotOpen(roomId);
+        if (block.timestamp > deadline) revert SignatureExpired(deadline);
         if (race.players.length < 2 || ranking.length < 2 || ranking.length > race.players.length) {
             revert InvalidRanking();
         }
         if (ranking[0] == ranking[1] || !_inRace(race, ranking[0]) || !_inRace(race, ranking[1])) {
             revert InvalidRanking();
         }
-        _checkSignature(hashRaceResult(roomId, ranking), sig);
+        _checkSignature(hashRaceResult(roomId, ranking, deadline), sig);
 
         race.status = RaceStatus.Settled;
         uint256 pot = race.stake * race.players.length;
@@ -545,9 +547,13 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
     }
 
     /// @notice EIP-712 digest of a RaceResult. Arrays are hashed as keccak256 of the 32-byte-padded elements.
-    function hashRaceResult(bytes32 roomId, address[] calldata ranking) public view returns (bytes32) {
+    function hashRaceResult(bytes32 roomId, address[] calldata ranking, uint256 deadline)
+        public
+        view
+        returns (bytes32)
+    {
         return _hashTypedDataV4(
-            keccak256(abi.encode(RACE_RESULT_TYPEHASH, roomId, keccak256(abi.encodePacked(ranking))))
+            keccak256(abi.encode(RACE_RESULT_TYPEHASH, roomId, keccak256(abi.encodePacked(ranking)), deadline))
         );
     }
 

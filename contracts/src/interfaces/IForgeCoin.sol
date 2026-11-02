@@ -49,7 +49,7 @@ interface IForgeCoin {
     ) external;
     function createRaceRoom(bytes32 roomId, uint256 levelId, uint256 stake) external;
     function joinRace(bytes32 roomId) external;
-    function settleRace(bytes32 roomId, address[] calldata ranking, bytes calldata sig) external;
+    function settleRace(bytes32 roomId, address[] calldata ranking, uint256 deadline, bytes calldata sig) external;
     function refundRace(bytes32 roomId) external;
     function closeSeason(
         address[] calldata players,

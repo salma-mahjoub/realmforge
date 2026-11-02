@@ -11,13 +11,13 @@
  *   LevelNFT.sol  CLEAR_PROOF_TYPEHASH   ClearProof(address creator,bytes32 layoutHash,uint256 deadline)
  *                 EIP712("RealmForge LevelNFT", "1")
  *   ForgeCoin.sol RUN_RESULT_TYPEHASH    RunResult(address player,uint256 levelId,uint32 timeMs,bool cleared,uint16 coins,uint256 nonce,uint256 deadline)
- *                 RACE_RESULT_TYPEHASH   RaceResult(bytes32 roomId,address[] ranking)
+ *                 RACE_RESULT_TYPEHASH   RaceResult(bytes32 roomId,address[] ranking,uint256 deadline)
  *                 SEASON_RESULT_TYPEHASH SeasonResult(uint256 season,address[] players,address[] creators,uint256[] shares)
  *                 ERC20Permit("RealmForge ForgeCoin") -> EIP712 name "RealmForge ForgeCoin", version "1"
  *
- * NOTE: the original server brief had RaceResult carry `nonce, deadline`; the contract
- * does not (replay is prevented because a race room can be settled only once, and a
- * season only once per `season` value), so the server follows the contract.
+ * NOTE: RaceResult carries a `deadline` but no nonce: replay is prevented because a race room
+ * can be settled only once, and a season only once per `season` value. The deadline makes a
+ * stale signed result unusable (the room is then refunded after its own timeout).
  */
 import type { Address, Hex, TypedDataDomain } from "viem";
 
@@ -67,6 +67,7 @@ export const raceResultTypes = {
   RaceResult: [
     { name: "roomId", type: "bytes32" },
     { name: "ranking", type: "address[]" },
+    { name: "deadline", type: "uint256" },
   ],
 } as const;
 
@@ -101,6 +102,7 @@ export interface RunResult {
 export interface RaceResult {
   roomId: Hex;
   ranking: Address[];
+  deadline: bigint;
 }
 
 export interface SeasonResult {

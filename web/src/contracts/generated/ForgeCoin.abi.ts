@@ -1583,6 +1583,11 @@ export const forgeCoinAbi = [
         "internalType": "address[]",
         "name": "ranking",
         "type": "address[]"
+      },
+      {
+        "internalType": "uint256",
+        "name": "deadline",
+        "type": "uint256"
       }
     ],
     "name": "hashRaceResult",
@@ -2009,6 +2014,11 @@ export const forgeCoinAbi = [
         "internalType": "address[]",
         "name": "ranking",
         "type": "address[]"
+      },
+      {
+        "internalType": "uint256",
+        "name": "deadline",
+        "type": "uint256"
       },
       {
         "internalType": "bytes",

@@ -90,7 +90,7 @@ Type strings (hashed on-chain as `*_TYPEHASH` constants):
 ```
 ClearProof(address creator,bytes32 layoutHash,uint256 deadline)
 RunResult(address player,uint256 levelId,uint32 timeMs,bool cleared,uint16 coins,uint256 nonce,uint256 deadline)
-RaceResult(bytes32 roomId,address[] ranking)
+RaceResult(bytes32 roomId,address[] ranking,uint256 deadline)
 SeasonResult(uint256 season,address[] players,address[] creators,uint256[] shares)
 Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)   // OpenZeppelin ERC20Permit
 ```
@@ -109,7 +109,7 @@ export const RUN_RESULT_TYPES = { RunResult: [
 ]} as const; // domain: { name: "RealmForge ForgeCoin", version: "1", chainId, verifyingContract: forgeCoin }
 
 export const RACE_RESULT_TYPES = { RaceResult: [
-  { name: "roomId", type: "bytes32" }, { name: "ranking", type: "address[]" },
+  { name: "roomId", type: "bytes32" }, { name: "ranking", type: "address[]" }, { name: "deadline", type: "uint256" },
 ]} as const;
 
 export const SEASON_RESULT_TYPES = { SeasonResult: [
@@ -121,7 +121,7 @@ export const SEASON_RESULT_TYPES = { SeasonResult: [
 Semantics the server must respect:
 - **ClearProof**: `creator` = the wallet that will call `publish` (msg.sender). One proof = one publish (`usedProof[digest]`), and `layoutHash` can be published once (`hashUsed`).
 - **RunResult**: `nonce` is an **unordered per-player nonce** (`runNonceUsed[player][nonce]`): the server picks any unused value (e.g. a DB id). `msg.sender` must equal `player`. `deadline` is a unix timestamp in seconds.
-- **RaceResult**: `ranking[0]` = 1st and `ranking[1]` = 2nd; both must have joined the room. A room settles once (no nonce needed).
+- **RaceResult**: `ranking[0]` = 1st and `ranking[1]` = 2nd; both must have joined the room. A room settles once (no nonce needed). `deadline` is a unix timestamp in seconds; after it the signed result is rejected (`SignatureExpired`) and the room can only be refunded. `settleRace(roomId, ranking, deadline, sig)`.
 - **SeasonResult**: `season` = current `season()`; `shares` are basis points, one per winner (`players` then `creators`), summing to 10 000; ≤ 10 per category. The tx is sent by DEFAULT_ADMIN.
 - `settleRunWithPermit` takes `uint8 v` (ERC-2612 / viem `parseSignature`), not `uint256 v` as written in SPEC §5.3; the permit `value` must be the level's current `playFee`.
 

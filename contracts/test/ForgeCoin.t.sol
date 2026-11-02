@@ -327,8 +327,13 @@ contract ForgeCoinTest is Test {
 
     // ------------------------------------------------------------------ races
 
+    /// Deadline the tests give to a signed RaceResult: 10 minutes from now.
+    function _dl() internal view returns (uint256) {
+        return block.timestamp + 10 minutes;
+    }
+
     function _signRace(bytes32 roomId, address[] memory ranking) internal view returns (bytes memory) {
-        (uint8 v, bytes32 rr, bytes32 s) = vm.sign(signerPk, coin.hashRaceResult(roomId, ranking));
+        (uint8 v, bytes32 rr, bytes32 s) = vm.sign(signerPk, coin.hashRaceResult(roomId, ranking, _dl()));
         return abi.encodePacked(rr, s, v);
     }
 
@@ -345,7 +350,7 @@ contract ForgeCoinTest is Test {
         address[] memory ranking = new address[](2);
         ranking[0] = player2;
         ranking[1] = player;
-        coin.settleRace(room, ranking, _signRace(room, ranking));
+        coin.settleRace(room, ranking, _dl(), _signRace(room, ranking));
 
         assertEq(coin.balanceOf(player2), 90e18 + 12e18); // 60% of 20
         assertEq(coin.balanceOf(player), 90e18 + 5e18); // 25%
@@ -488,7 +493,7 @@ contract ForgeCoinTest is Test {
         ranking[1] = player;
         bytes memory sig = _signRace(room, ranking);
         vm.expectRevert(ForgeCoin.InvalidRanking.selector);
-        coin.settleRace(room, ranking, sig);
+        coin.settleRace(room, ranking, _dl(), sig);
     }
 
     function test_Race_Settle_RevertsWithOutsider() public {
@@ -503,7 +508,7 @@ contract ForgeCoinTest is Test {
         ranking[1] = makeAddr("outsider");
         bytes memory sig = _signRace(room, ranking);
         vm.expectRevert(ForgeCoin.InvalidRanking.selector);
-        coin.settleRace(room, ranking, sig);
+        coin.settleRace(room, ranking, _dl(), sig);
     }
 
     function test_Race_Settle_RevertsWithDuplicateRank() public {
@@ -518,7 +523,7 @@ contract ForgeCoinTest is Test {
         ranking[1] = a;
         bytes memory sig = _signRace(room, ranking);
         vm.expectRevert(ForgeCoin.InvalidRanking.selector);
-        coin.settleRace(room, ranking, sig);
+        coin.settleRace(room, ranking, _dl(), sig);
     }
 
     function test_Race_Settle_RevertsWithBadSignatureOrTwice() public {
@@ -532,17 +537,54 @@ contract ForgeCoinTest is Test {
         ranking[0] = b;
         ranking[1] = a;
 
-        (uint8 v, bytes32 rr, bytes32 s) = vm.sign(0xBAD, coin.hashRaceResult(room, ranking));
+        (uint8 v, bytes32 rr, bytes32 s) = vm.sign(0xBAD, coin.hashRaceResult(room, ranking, _dl()));
         vm.expectPartialRevert(ForgeCoin.InvalidSignature.selector);
-        coin.settleRace(room, ranking, abi.encodePacked(rr, s, v));
+        coin.settleRace(room, ranking, _dl(), abi.encodePacked(rr, s, v));
 
         bytes memory good = _signRace(room, ranking);
-        coin.settleRace(room, ranking, good);
+        coin.settleRace(room, ranking, _dl(), good);
         vm.expectRevert(abi.encodeWithSelector(ForgeCoin.RaceNotOpen.selector, room));
-        coin.settleRace(room, ranking, good);
+        coin.settleRace(room, ranking, _dl(), good);
         vm.warp(block.timestamp + 1 hours + 1);
         vm.expectRevert(abi.encodeWithSelector(ForgeCoin.RaceNotOpen.selector, room));
         coin.refundRace(room); // a settled race can never be refunded
+    }
+
+    function test_Race_Settle_RevertsWhenResultExpired() public {
+        address a = _funded("a");
+        address b = _funded("b");
+        bytes32 room = keccak256("r");
+        _openRace(room, a, 10e18);
+        vm.prank(b);
+        coin.joinRace(room);
+        address[] memory ranking = new address[](2);
+        ranking[0] = b;
+        ranking[1] = a;
+        uint256 deadline = _dl();
+        bytes memory sig = _signRace(room, ranking);
+        vm.warp(deadline + 1);
+        vm.expectRevert(abi.encodeWithSelector(ForgeCoin.SignatureExpired.selector, deadline));
+        coin.settleRace(room, ranking, deadline, sig);
+        // an expired result is not lost money: the room can still be refunded after its own timeout
+        vm.warp(block.timestamp + 1 hours);
+        coin.refundRace(room);
+        assertEq(coin.balanceOf(a), 100e18);
+        assertEq(coin.balanceOf(b), 100e18);
+    }
+
+    function test_Race_Settle_RevertsWhenDeadlineIsTampered() public {
+        address a = _funded("a");
+        address b = _funded("b");
+        bytes32 room = keccak256("r");
+        _openRace(room, a, 10e18);
+        vm.prank(b);
+        coin.joinRace(room);
+        address[] memory ranking = new address[](2);
+        ranking[0] = b;
+        ranking[1] = a;
+        bytes memory sig = _signRace(room, ranking);
+        vm.expectPartialRevert(ForgeCoin.InvalidSignature.selector);
+        coin.settleRace(room, ranking, _dl() + 1 days, sig); // longer window than the server signed
     }
 
     function test_Race_FourPlayers_StakeEqualsPayout() public {
@@ -563,7 +605,7 @@ contract ForgeCoinTest is Test {
         ranking[1] = ps[2];
         ranking[2] = ps[1];
         ranking[3] = ps[0];
-        coin.settleRace(room, ranking, _signRace(room, ranking));
+        coin.settleRace(room, ranking, _dl(), _signRace(room, ranking));
 
         // pot = 40: 1st 24, 2nd 10, owner 4, pool 2. 3rd and 4th lose their stake.
         assertEq(coin.balanceOf(ps[3]), 90e18 + 24e18);

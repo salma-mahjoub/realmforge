@@ -483,8 +483,8 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
     /// @dev Two-key: DEFAULT_ADMIN submits, the server signs `SeasonResult{season, players, creators, shares}`.
     ///      `shares` are basis points, one per winner (`players` first, then `creators`), and must sum to 10_000.
     ///      Rounding dust stays in the pool for the next season.
-    ///      TODO(studentB): ranking criteria (clears? records? plays on your levels?) are computed off-chain
-    ///                      by the indexer — document them for the oral exam.
+    ///      The ranking criteria (distinct levels cleared, records held, distinct players on a creator's levels,
+    ///      self-plays ignored) are computed off-chain by the indexer: see docs/SEASONS.md.
     function closeSeason(
         address[] calldata players,
         address[] calldata creators,

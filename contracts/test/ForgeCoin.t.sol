@@ -111,6 +111,26 @@ contract ForgeCoinTest is Test {
         vm.stopPrank();
     }
 
+    function test_Faucet_DailyBudgetStopsSybilWallets() public {
+        uint256 maxClaims = coin.FAUCET_DAILY_BUDGET() / coin.FAUCET_AMOUNT();
+        for (uint256 i; i < maxClaims; ++i) {
+            vm.prank(address(uint160(0x1000 + i)));
+            coin.claimFaucet();
+        }
+        assertEq(coin.totalSupply(), coin.FAUCET_DAILY_BUDGET());
+
+        uint256 today = block.timestamp / 1 days;
+        vm.prank(player);
+        vm.expectRevert(abi.encodeWithSelector(ForgeCoin.FaucetBudgetExhausted.selector, today));
+        coin.claimFaucet();
+        assertFalse(coin.faucetClaimed(player)); // a refused claim does not burn the one-time right
+
+        vm.warp(block.timestamp + 1 days); // the budget resets with the UTC day
+        vm.prank(player);
+        coin.claimFaucet();
+        assertEq(coin.balanceOf(player), 100e18);
+    }
+
     function test_Pause_BlocksFaucet() public {
         coin.pause();
         vm.prank(player);
@@ -295,13 +315,14 @@ contract ForgeCoinTest is Test {
     }
 
     /// Supply never exceeds the cap whatever the number of faucet claims.
-    function testFuzz_SupplyUnderCap(uint8 claims) public {
+    function testFuzz_SupplyUnderCap(uint8 rawClaims) public {
+        uint256 claims = bound(rawClaims, 0, 100); // 100 claims = the faucet's daily budget
         for (uint256 i; i < claims; ++i) {
             vm.prank(address(uint160(0x1000 + i)));
             coin.claimFaucet();
         }
         assertLe(coin.totalSupply(), coin.cap());
-        assertEq(coin.totalSupply(), uint256(claims) * 100e18);
+        assertEq(coin.totalSupply(), claims * 100e18);
     }
 
     // ------------------------------------------------------------------ races

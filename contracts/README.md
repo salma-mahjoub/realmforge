@@ -127,5 +127,5 @@ Semantics the server must respect:
 
 ## Tokenomics constants (ForgeCoin)
 
-Cap 100 M · faucet 100 once · fee split 70 % owner / 20 % season pool / 10 % treasury cut, of which half is burned (`FeeBurned`) and half held in-contract (`withdrawTreasury`) · clear reward `min(5 + 45·(1 − clears/plays), 50)` + 20 first clear + 10 record + 0.1 per coin (max 5, cleared runs only) · daily mint cap 200 per player (UTC day) · race 60/25/10 owner/5 pool, refund after 1 h · season 30 days.
+Cap 100 M · faucet 100 once per address, 10 000 per UTC day in total · fee split 70 % owner / 20 % season pool / 10 % treasury cut, of which half is burned (`FeeBurned`) and half held in-contract (`withdrawTreasury`) · clear reward `min(5 + 45·(1 − clears/plays), 50)` + 20 first clear + 10 record + 0.1 per coin (max 5, cleared runs only) · daily mint cap 200 per player (UTC day) · race 60/25/10 owner/5 pool, refund after 1 h · season 30 days.
 All amounts in FORGE wei (18 decimals). Pause blocks faucet/runs/races, never refunds or ERC-20 transfers.

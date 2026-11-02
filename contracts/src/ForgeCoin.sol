@@ -58,6 +58,8 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
     uint256 public constant MAX_SUPPLY = 100_000_000e18;
     /// @notice One-time faucet amount per address.
     uint256 public constant FAUCET_AMOUNT = 100e18;
+    /// @notice Max FORGE the faucet may mint per UTC day across all addresses (100 claims): Sybil damage control.
+    uint256 public constant FAUCET_DAILY_BUDGET = 10_000e18;
 
     /// @notice Play fee split in basis points: 70% owner · 20% season pool · 10% treasury (remainder).
     uint256 public constant OWNER_BPS = 7_000;
@@ -112,6 +114,8 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
 
     /// @notice Faucet already claimed by this address.
     mapping(address => bool) public faucetClaimed;
+    /// @notice `faucetMintedOnDay[day]` — total minted by the faucet on a UTC day (`block.timestamp / 1 days`).
+    mapping(uint256 => uint256) public faucetMintedOnDay;
     /// @notice `runNonceUsed[player][nonce]` — unordered per-player nonces for RunResult (server picks them).
     /// @dev Named differently from ERC-2612 `nonces(owner)` on purpose.
     mapping(address => mapping(uint256 => bool)) public runNonceUsed;
@@ -140,6 +144,7 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
     error LevelNFTAlreadySet();
     error LevelNFTNotSet();
     error FaucetAlreadyClaimed(address user);
+    error FaucetBudgetExhausted(uint256 day);
     error NotRunPlayer(address caller, address player);
     error SignatureExpired(uint256 deadline);
     error NonceAlreadyUsed(address player, uint256 nonce);
@@ -224,10 +229,17 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
 
     /// @inheritdoc IForgeCoin
     /// @dev Mints {FAUCET_AMOUNT} once per address. ERC20Capped reverts if the cap would be exceeded.
-    /// TODO(studentB): one-per-address is Sybil-able (fresh wallets). Consider a server-signed claim or a captcha.
+    ///      One claim per address cannot stop a Sybil attack (anyone can create fresh wallets), so the faucet
+    ///      also has a global daily budget ({FAUCET_DAILY_BUDGET}): the damage of an attack is bounded per day.
+    ///      Real identity checks (captcha, server-signed claim) would need an off-chain service and a new
+    ///      EIP-712 type; they are left out because FORGE has no market value on a testnet.
     function claimFaucet() external whenNotPaused {
         if (faucetClaimed[msg.sender]) revert FaucetAlreadyClaimed(msg.sender);
+        uint256 day = block.timestamp / 1 days;
+        uint256 minted = faucetMintedOnDay[day] + FAUCET_AMOUNT;
+        if (minted > FAUCET_DAILY_BUDGET) revert FaucetBudgetExhausted(day);
         faucetClaimed[msg.sender] = true;
+        faucetMintedOnDay[day] = minted;
         _mint(msg.sender, FAUCET_AMOUNT);
         emit FaucetClaimed(msg.sender);
     }

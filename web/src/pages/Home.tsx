@@ -9,7 +9,8 @@ import { useAsync } from '../components/useAsync';
 const SPLIT = [
     { label: 'Level owner', pct: 70, cls: 'split-owner' },
     { label: 'Season pool', pct: 20, cls: 'split-pool' },
-    { label: 'Treasury', pct: 10, cls: 'split-treasury' },
+    { label: 'Treasury', pct: 5, cls: 'split-treasury' },
+    { label: 'Burned', pct: 5, cls: 'split-burn' },
 ];
 
 export default function Home() {
@@ -89,7 +90,7 @@ export default function Home() {
                             <ForgeCoin size={22} /> <span className="num">5</span> <span className="sym">FORGE</span>
                         </span>
                     </figcaption>
-                    <div className="split-bar" role="img" aria-label="70% to the level owner, 20% to the season pool, 10% to the treasury">
+                    <div className="split-bar" role="img" aria-label="70% to the level owner, 20% to the season pool, 5% to the treasury, 5% burned">
                         {SPLIT.map((s) => (
                             <span key={s.label} className={s.cls} style={{ flexBasis: `${s.pct}%` }} />
                         ))}

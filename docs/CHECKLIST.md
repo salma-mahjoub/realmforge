@@ -199,3 +199,6 @@ Verification: root `npm test` + `npm run build` — game-core 83, contracts 42 (
 - [ ] Original Mario/Luigi animation clips still missing: all 24 downloaded model files have no animation channels. Inspection renders are not used as player animations.
 
 Coordinator verification: game-core 87, contracts 42 (+9 todo), server 31, web 40 tests pass; root production build passes. Pack structural validation passes; strict character-fidelity checks intentionally remain failing for documented fallback poses/short cycles. Original downloads are untouched.
+
+## Camera/background regression — 1 November 2026
+- [x] Reproduced before edits in real Chromium with keyboard input on `/play/1` and editor test-play, Mario/Kenney. Fixed physical camera target + grounded jump baseline/vertical velocity look-ahead, swept-bounds sprite sizing, same-render parallax and fractional-zoom rounding/backing sizes. Verified flat walk/run/jump/land/reverse, physical slopes, tall falls/springs, growth, pause/resume, editor return/zoom/pan and resize. 20 recorded trajectories (11,538 frames); 16 patched trajectory assertions pass. Web 50 tests + build, game-core 87 tests + build pass. Evidence, raw telemetry and full command output: `docs/screenshots/camera-fix/README.md`. No physics changes or commit/push.

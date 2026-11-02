@@ -24,6 +24,7 @@ import { groundTexture, hasSfx, playerTexture } from '../assets/registry';
 import { characterDisplay } from '../render/artwork';
 import { drawMechanisms } from '../render/mechanisms';
 import { createBackground } from '../render/background';
+import { PlayerCameraTarget } from '../render/PlayerCameraTarget';
 import { PlayEffects } from '../render/PlayEffects';
 import { coreTextures, terrainDef, toCoreDef } from '../elements/bridge';
 import { TRACE_STRIDE, changePairs, encodeInputLog, type RunSubmission, type TraceSample } from '../run';
@@ -71,6 +72,7 @@ export class PlayScene extends Phaser.Scene {
     protected from: PlaySceneData['from'] = 'play';
     protected player!: MatterPlayer;
     protected playerSprite!: Phaser.GameObjects.Sprite;
+    private cameraTarget!: PlayerCameraTarget;
     protected runtime!: ElementRuntime;
     protected frame = 0;
     protected finished = false;
@@ -214,8 +216,10 @@ export class PlayScene extends Phaser.Scene {
         // 4. Fixed 60 Hz clock shared by runtime + player (game-core accumulator).
         installFixedMatterClock(this);
 
-        this.cameras.main.startFollow(this.playerSprite, true, 0.15, 0.15, 0, TILE);
+        this.cameraTarget = new PlayerCameraTarget(this.player.body.position.x, this.player.sensors.foot.position.y);
         this.fitZoom();
+        const cam = this.cameras.main;
+        cam.startFollow(this.cameraTarget, false, 0.15, 0.2, 0, cam.height / cam.zoom * 0.2);
         this.bindKeys();
         this.bindBus();
         this.trace.push(this.sample());
@@ -257,7 +261,15 @@ export class PlayScene extends Phaser.Scene {
         this.presentationMs += Math.min(delta, 50);
         this.effects?.update(delta);
         // Cinematics animate visual offsets only; no controller steps are fabricated.
-        if (this.player && this.sequence !== 'death' && this.sequence !== 'dead' && this.sequence !== 'goal') this.syncSprite();
+        if (this.player && this.sequence !== 'death' && this.sequence !== 'dead' && this.sequence !== 'goal') {
+            this.syncSprite();
+            const cam = this.cameras.main;
+            const mode = this.player.state.mode;
+            const grounded = [MovementState.idle, MovementState.walk, MovementState.run, MovementState.skid, MovementState.crouch].includes(mode);
+            this.cameraTarget.update(this.player.body.position.x, this.player.sensors.foot.position.y, grounded, cam.height / cam.zoom, this.player.body.velocity.y);
+            // Same response time at 60/120 Hz; no rounding feedback into the follow lerp.
+            cam.setLerp(1 - Math.pow(0.85, delta / STEP_MS), 1 - Math.pow(0.8, delta / STEP_MS));
+        }
     }
 
     private showIntro() {
@@ -288,7 +300,6 @@ export class PlayScene extends Phaser.Scene {
 
     private syncSprite() {
         const b = this.player.body;
-        const hull = b.parts[1] ?? b;
         // Tolerate a game-core checkout that has not received the form API yet.
         const form = typeof this.player.setForm === 'function' && this.player.form === 'big' ? 'big' : 'small';
         this.onPlayerFormChange(form);
@@ -298,7 +309,9 @@ export class PlayScene extends Phaser.Scene {
             this.playerSprite.setTexture(tex.key, tex.frame);
             this.anim = '';
         }
-        this.playerSprite.setPosition(Math.round(hull.position.x), Math.round(hull.bounds.max.y));
+        // Matter bounds are swept by velocity. Sensors mark the current physical hull.
+        const feet = this.player.sensors.foot.position.y;
+        this.playerSprite.setPosition(b.position.x, feet);
         this.playerSprite.setVisible(!this.player.invulnerable || Math.floor(this.frame / 5) % 2 === 0);
         const s = this.player.state;
         // Hold the old facing while braking; turn only when velocity changes direction.
@@ -328,7 +341,7 @@ export class PlayScene extends Phaser.Scene {
             else if (this.anims.exists(fallback)) this.playerSprite.play(fallback, true);
         }
         // Fixed atlas cells preserve pose proportions; the feet stay on the hull through size changes.
-        const hullHeight = hull.bounds.max.y - hull.bounds.min.y;
+        const hullHeight = feet - this.player.sensors.head.position.y;
         let height = hullHeight;
         const transition = this.formTransition;
         if (transition) {
@@ -338,7 +351,7 @@ export class PlayScene extends Phaser.Scene {
         }
         const display = characterDisplay(tex.key, this.playerSprite.frame.name, height, form === 'big' && s.mode === MovementState.crouch);
         height = display.height;
-        this.playerSprite.y += Math.round(display.feetOffset);
+        this.playerSprite.y += display.feetOffset;
         const ratio = tex.displaySize ? tex.displaySize.w / tex.displaySize.h : this.playerSprite.width / Math.max(1, this.playerSprite.height);
         const squash = this.squash * Math.max(0, 1 - (this.presentationMs - this.squashStart) / 180);
         const turn = Math.max(0, 1 - (this.presentationMs - this.turnStart) / 95);
@@ -363,7 +376,13 @@ export class PlayScene extends Phaser.Scene {
     private fitZoom() {
         const { width } = this.scale;
         const z = Math.round(Phaser.Math.Clamp((width || 1280) / (22 * TILE), 0.35, 1.5) * TILE) / TILE;
-        this.cameras.main.setZoom(z).setDeadzone(3 * TILE * z, 2 * TILE * z);
+        const cam = this.cameras.main;
+        // Deadzone dimensions are WORLD pixels in Phaser (do not multiply by zoom).
+        cam.setZoom(z).setDeadzone(3 * TILE, TILE);
+        cam.setFollowOffset(0, cam.height / z * 0.2);
+        // At fractional zoom Phaser disables renderRoundPixels but still floors scroll when
+        // roundPixels=true. Continuous camera + object coordinates share one render transform.
+        cam.setRoundPixels(false);
     }
 
     protected sfx(key: string) {

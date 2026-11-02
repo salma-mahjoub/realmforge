@@ -266,8 +266,11 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
         _checkSignature(hashRunResult(r), sig);
 
         ILevelNFT nft = _levelNFT();
-        (address owner,, uint96 playFee, bool active) = nft.levelInfo(r.levelId); // view call
+        (address owner, address creator, uint96 playFee, bool active) = nft.levelInfo(r.levelId); // view call
         if (!active) revert LevelInactive(r.levelId);
+        // The current owner and the original creator are paid the level fee, so letting them also earn mint
+        // rewards on it would be a self-farming loop. They may still play (and pay), but earn nothing.
+        bool selfPlay = r.player == owner || r.player == creator;
 
         // ---------------------------------------------------------------- effects
         runNonceUsed[r.player][r.nonce] = true;
@@ -283,9 +286,13 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
             emit FeeSplit(r.levelId, owner, ownerAmt, poolAmt, treasuryAmt);
         }
 
-        uint256 reward = _computeReward(r);
-        reward = _mintReward(r.player, reward);
-        _updateStats(r);
+        uint256 reward;
+        if (!selfPlay) {
+            reward = _mintReward(r.player, _computeReward(r));
+            // Self-plays also stay out of the reward statistics, otherwise an owner could consume the
+            // first-clear bonus or set an unbeatable record time on their own level.
+            _updateStats(r);
+        }
 
         // ---------------------------------------------------------------- interaction
         nft.recordRun(r.levelId, r.player, r.timeMs, r.cleared);
@@ -296,7 +303,6 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
     /// @notice Gross reward (before daily/supply caps) a run would earn given current level stats.
     /// @dev reward = min(BASE + 45 * (1 - clears/plays), 50) + first-clear bonus + record bonus. 0 if not cleared.
     ///      TODO(studentB): `r.coins` (in-game coins collected) is signed but unused — e.g. +0.1 FORGE per coin?
-    ///      TODO(studentB): owner/creator farming their own level (fee goes back to them) — exclude from rewards?
     function _computeReward(RunResult calldata r) internal view returns (uint256 reward) {
         if (!r.cleared) return 0;
         LevelStats memory st = levelStats[r.levelId];

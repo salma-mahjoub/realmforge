@@ -569,6 +569,54 @@ contract ForgeCoinTest is Test {
         assertEq(coin.balanceOf(player), 105e18);
     }
 
+    function test_SettleRun_OwnerEarnsNoReward() public {
+        _fundAndApprove(owner);
+        IForgeCoin.RunResult memory r = _run(owner, 1, true, 1000);
+        bytes memory sig = _signRun(signerPk, r);
+        vm.prank(owner);
+        coin.settleRun(r, sig);
+
+        // pays 10, gets 70% back (7), and nothing is minted for the clear
+        assertEq(coin.balanceOf(owner), 100e18 - 10e18 + 7e18);
+        assertEq(coin.mintedOnDay(owner, block.timestamp / 1 days), 0);
+        assertEq(coin.seasonPool(), 2e18); // the fee split still happens
+        assertEq(mock.recordRunCalls(), 1); // LevelNFT still records the run
+    }
+
+    function test_SettleRun_CreatorWhoSoldTheLevelEarnsNoReward() public {
+        address creator = makeAddr("creator");
+        mock.setLevel(LEVEL, owner, creator, FEE, true); // creator != current owner
+        _fundAndApprove(creator);
+        IForgeCoin.RunResult memory r = _run(creator, 1, true, 1000);
+        bytes memory sig = _signRun(signerPk, r);
+        vm.prank(creator);
+        coin.settleRun(r, sig);
+
+        assertEq(coin.balanceOf(creator), 100e18 - 10e18); // paid the fee, no reward
+        assertEq(coin.balanceOf(owner), 7e18);
+    }
+
+    function test_SettleRun_SelfPlayDoesNotConsumeFirstClearBonus() public {
+        mock.setLevel(LEVEL, owner, owner, 0, true);
+        _fundAndApprove(owner);
+        _fundAndApprove(player);
+        IForgeCoin.RunResult memory own = _run(owner, 1, true, 1000);
+        bytes memory ownSig = _signRun(signerPk, own);
+        vm.prank(owner);
+        coin.settleRun(own, ownSig);
+        (uint32 plays, uint32 clears, uint32 best) = coin.levelStats(LEVEL);
+        assertEq(plays, 0);
+        assertEq(clears, 0);
+        assertEq(best, 0);
+
+        IForgeCoin.RunResult memory other = _run(player, 1, true, 5000);
+        bytes memory otherSig = _signRun(signerPk, other);
+        vm.prank(player);
+        coin.settleRun(other, otherSig);
+        // still the first real clear: 5 base + 20 first clear + 10 record
+        assertEq(coin.balanceOf(player), 100e18 + 35e18);
+    }
+
     // ------------------------------------------------------------------ seasons (closeSeason)
 
     function _signSeason(uint256 season_, address[] memory ps, address[] memory cs, uint256[] memory shares)

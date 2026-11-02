@@ -879,7 +879,59 @@ contract ForgeCoinTest is Test {
         assertEq(coin.season(), 2);
     }
 
-    // TODO(studentB): settleRunWithPermit test (sign Permit with vm.sign), settleRace invalid ranking / outsider,
-    //                 race full, closeSeason happy path + bad shares + before seasonEnd, supply-cap clipping,
-    //                 invariant test "contract balance == seasonPool + treasury + open race escrow".
+    // ------------------------------------------------------------------ settleRunWithPermit (ERC-2612)
+
+    bytes32 internal constant PERMIT_TYPEHASH =
+        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+
+    function _signPermit(uint256 pk, address holder, uint256 value, uint256 deadline)
+        internal
+        view
+        returns (uint8 v, bytes32 r, bytes32 s)
+    {
+        bytes32 structHash =
+            keccak256(abi.encode(PERMIT_TYPEHASH, holder, address(coin), value, coin.nonces(holder), deadline));
+        (v, r, s) = vm.sign(pk, keccak256(abi.encodePacked("\x19\x01", coin.DOMAIN_SEPARATOR(), structHash)));
+    }
+
+    function test_SettleRunWithPermit_NoSeparateApprove() public {
+        (address holder, uint256 holderPk) = makeAddrAndKey("permitHolder");
+        vm.prank(holder);
+        coin.claimFaucet(); // note: no approve
+        uint256 permitDeadline = block.timestamp + 1 hours;
+        (uint8 v, bytes32 r, bytes32 s) = _signPermit(holderPk, holder, FEE, permitDeadline);
+        IForgeCoin.RunResult memory run = _run(holder, 1, false, 1000);
+        bytes memory sig = _signRun(signerPk, run);
+
+        vm.prank(holder);
+        coin.settleRunWithPermit(run, sig, v, r, s, permitDeadline);
+
+        assertEq(coin.balanceOf(holder), 90e18);
+        assertEq(coin.balanceOf(owner), 7e18);
+        assertEq(coin.allowance(holder, address(coin)), 0); // the permit was fully spent by the fee
+    }
+
+    /// A front-runner can submit the permit first and burn its nonce; the run must still settle.
+    function test_SettleRunWithPermit_SurvivesFrontRunPermit() public {
+        (address holder, uint256 holderPk) = makeAddrAndKey("permitHolder");
+        vm.prank(holder);
+        coin.claimFaucet();
+        uint256 permitDeadline = block.timestamp + 1 hours;
+        (uint8 v, bytes32 r, bytes32 s) = _signPermit(holderPk, holder, FEE, permitDeadline);
+        coin.permit(holder, address(coin), FEE, permitDeadline, v, r, s); // front-run by anyone
+        IForgeCoin.RunResult memory run = _run(holder, 1, false, 1000);
+        bytes memory sig = _signRun(signerPk, run);
+
+        vm.prank(holder);
+        coin.settleRunWithPermit(run, sig, v, r, s, permitDeadline);
+        assertEq(coin.balanceOf(holder), 90e18);
+    }
+
+    function test_SettleRunWithPermit_RevertsWhenLevelNFTNotSet() public {
+        ForgeCoin fresh = new ForgeCoin(signer);
+        IForgeCoin.RunResult memory run = _run(player, 1, false, 1000);
+        vm.prank(player);
+        vm.expectRevert(ForgeCoin.LevelNFTNotSet.selector);
+        fresh.settleRunWithPermit(run, "", 27, bytes32(0), bytes32(0), block.timestamp + 1 hours);
+    }
 }

@@ -34,7 +34,7 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [~] `it.todo` integration tests from §11: 5 of 9 done (setActive→LevelInactive, 4-player race, closeSeason ×2; token-cap clipping covered at unit level); left: remix-of-remix (A), reentrancy (A), gas, Slither
 - [ ] Slither static analysis report and discussion (`docs/security/`)
 - [ ] Gas report for `publish`, `settleRun`, `buy` and `settleRace`, comparing L1 and L2
-- [ ] Coverage ≥ 90% per contract
+- [x] Coverage ≥ 90% per contract (Solidity tests: ForgeCoin 99.5%, LevelNFT 90.6%; the only uncovered ForgeCoin line is a defensive cap that cannot be reached)
 - [ ] Sepolia deployment + Etherscan verification; addresses stored in `docs/DEPLOYMENTS.md`
 
 ### Student A — `LevelNFT.sol` (ERC-721 + ERC-2981)

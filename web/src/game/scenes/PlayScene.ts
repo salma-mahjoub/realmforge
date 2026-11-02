@@ -537,6 +537,9 @@ export class PlayScene extends Phaser.Scene {
         this.time.delayedCall(1800, () => {
             this.emitPlayState('cleared');
             EventBus.emit('play:finished', result);
+            // Test-play from the editor: the clear is recorded, so go back to the editor instead of leaving the
+            // screen faded to black (the Publish dialog needs the editor scene to take its thumbnail).
+            if (this.from === 'editor') this.time.delayedCall(500, () => this.backToEditor());
         });
     }
 

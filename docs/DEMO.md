@@ -67,6 +67,7 @@ in `server/.env.sepolia` is the one registered as signer on both contracts. Neve
 
 | Symptom | Likely cause |
 |---|---|
+| Publish dialog says "The editor did not return a snapshot" | fixed: after a clear the game returns to the editor by itself, and the thumbnail falls back to the game canvas if the editor does not answer |
 | Clicking **Test** shows a black screen | open the browser console (F12), copy the first red error; also note the browser, its version and the screen size. This is a known open issue and could not be reproduced in the Chromium embedded in the dev tools |
 | "Not found on this chain" for a new level | the indexer kept data from a previous chain: restart the server after `deploy:local` |
 | Settle fails with `InvalidSignature` | the server and the web app point to different contract addresses or chains |

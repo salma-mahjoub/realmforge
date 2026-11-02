@@ -569,6 +569,126 @@ contract ForgeCoinTest is Test {
         assertEq(coin.balanceOf(player), 105e18);
     }
 
+    // ------------------------------------------------------------------ seasons (closeSeason)
+
+    function _signSeason(uint256 season_, address[] memory ps, address[] memory cs, uint256[] memory shares)
+        internal
+        view
+        returns (bytes memory)
+    {
+        (uint8 v, bytes32 rr, bytes32 s) = vm.sign(signerPk, coin.hashSeasonResult(season_, ps, cs, shares));
+        return abi.encodePacked(rr, s, v);
+    }
+
+    /// Plays one paid run so the season pool holds 2 FORGE, then jumps to the end of the season.
+    function _seasonWithPool() internal {
+        _fundAndApprove(player);
+        IForgeCoin.RunResult memory r = _run(player, 1, false, 1000);
+        bytes memory sig = _signRun(signerPk, r);
+        vm.prank(player);
+        coin.settleRun(r, sig);
+        assertEq(coin.seasonPool(), 2e18);
+        vm.warp(coin.seasonEnd());
+    }
+
+    function _winners() internal view returns (address[] memory ps, address[] memory cs, uint256[] memory sh) {
+        ps = new address[](2);
+        ps[0] = player;
+        ps[1] = player2;
+        cs = new address[](1);
+        cs[0] = owner;
+        sh = new uint256[](3);
+        sh[0] = 5_000;
+        sh[1] = 3_000;
+        sh[2] = 2_000;
+    }
+
+    function test_CloseSeason_DistributesPoolAndStartsNextSeason() public {
+        _seasonWithPool();
+        (address[] memory ps, address[] memory cs, uint256[] memory sh) = _winners();
+        bytes memory sig = _signSeason(1, ps, cs, sh);
+        uint256 pBefore = coin.balanceOf(player);
+        uint256 ownerBefore = coin.balanceOf(owner);
+
+        coin.closeSeason(ps, cs, sh, sig);
+
+        assertEq(coin.balanceOf(player), pBefore + 1e18); // 50% of 2
+        assertEq(coin.balanceOf(player2), 0.6e18); // 30%
+        assertEq(coin.balanceOf(owner), ownerBefore + 0.4e18); // 20%
+        assertEq(coin.seasonPool(), 0);
+        assertEq(coin.season(), 2);
+        assertEq(coin.seasonEnd(), block.timestamp + 30 days);
+    }
+
+    function test_CloseSeason_RevertsBeforeSeasonEnd() public {
+        (address[] memory ps, address[] memory cs, uint256[] memory sh) = _winners();
+        bytes memory sig = _signSeason(1, ps, cs, sh);
+        vm.expectRevert(abi.encodeWithSelector(ForgeCoin.SeasonNotOver.selector, coin.seasonEnd()));
+        coin.closeSeason(ps, cs, sh, sig);
+    }
+
+    function test_CloseSeason_RevertsOnBadInput() public {
+        _seasonWithPool();
+        (address[] memory ps, address[] memory cs,) = _winners();
+
+        uint256[] memory badTotal = new uint256[](3);
+        badTotal[0] = 5_000;
+        badTotal[1] = 3_000;
+        badTotal[2] = 1_000; // sums to 9_000
+        bytes memory sigTotal = _signSeason(1, ps, cs, badTotal);
+        vm.expectRevert(ForgeCoin.InvalidSeasonInput.selector);
+        coin.closeSeason(ps, cs, badTotal, sigTotal);
+
+        uint256[] memory shortShares = new uint256[](2);
+        shortShares[0] = 6_000;
+        shortShares[1] = 4_000;
+        bytes memory sigShort = _signSeason(1, ps, cs, shortShares);
+        vm.expectRevert(ForgeCoin.InvalidSeasonInput.selector);
+        coin.closeSeason(ps, cs, shortShares, sigShort);
+
+        address[] memory many = new address[](11);
+        uint256[] memory manyShares = new uint256[](11);
+        for (uint256 i; i < 11; ++i) {
+            many[i] = address(uint160(0x2000 + i));
+        }
+        bytes memory sigMany = _signSeason(1, many, new address[](0), manyShares);
+        vm.expectRevert(ForgeCoin.InvalidSeasonInput.selector);
+        coin.closeSeason(many, new address[](0), manyShares, sigMany);
+    }
+
+    function test_CloseSeason_RevertsOnBadSignatureOrNonAdmin() public {
+        _seasonWithPool();
+        (address[] memory ps, address[] memory cs, uint256[] memory sh) = _winners();
+
+        (uint8 v, bytes32 rr, bytes32 s) = vm.sign(0xBAD, coin.hashSeasonResult(1, ps, cs, sh));
+        vm.expectPartialRevert(ForgeCoin.InvalidSignature.selector);
+        coin.closeSeason(ps, cs, sh, abi.encodePacked(rr, s, v));
+
+        bytes memory sig = _signSeason(1, ps, cs, sh);
+        vm.prank(player);
+        vm.expectPartialRevert(IAccessControl.AccessControlUnauthorizedAccount.selector);
+        coin.closeSeason(ps, cs, sh, sig);
+    }
+
+    function test_CloseSeason_RevertsOnZeroAddressWinner() public {
+        _seasonWithPool();
+        (address[] memory ps, address[] memory cs, uint256[] memory sh) = _winners();
+        ps[1] = address(0);
+        bytes memory sig = _signSeason(1, ps, cs, sh);
+        vm.expectRevert(ForgeCoin.ZeroAddress.selector);
+        coin.closeSeason(ps, cs, sh, sig);
+    }
+
+    function test_CloseSeason_WithoutWinnersKeepsPool() public {
+        _seasonWithPool();
+        address[] memory none = new address[](0);
+        uint256[] memory noShares = new uint256[](0);
+        bytes memory sig = _signSeason(1, none, none, noShares);
+        coin.closeSeason(none, none, noShares, sig);
+        assertEq(coin.seasonPool(), 2e18); // nothing paid, pool rolls over
+        assertEq(coin.season(), 2);
+    }
+
     // TODO(studentB): settleRunWithPermit test (sign Permit with vm.sign), settleRace invalid ranking / outsider,
     //                 race full, closeSeason happy path + bad shares + before seasonEnd, supply-cap clipping,
     //                 invariant test "contract balance == seasonPool + treasury + open race escrow".

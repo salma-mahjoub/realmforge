@@ -383,6 +383,5 @@ describe("RealmForge integration", async () => {
   // 100M FORGE through the public API is not realistic in an integration test.
   it.todo("[A] publish: remix of a remix → royalty split goes to the right ancestors");
   it.todo("[A] withdraw: reentrancy attack by a malicious receiver contract fails");
-  it.todo("[A+B] gas report: publish, settleRun, buy, settleRace (npx hardhat test --gas-stats)");
-  it.todo("[A+B] Slither static analysis report (docs/)");
+  // [A+B] gas report: docs/GAS.md · Slither report: docs/security/SLITHER.md
 });

@@ -9,6 +9,9 @@ import { DatabaseSync } from "node:sqlite";
  *  - runs         : indexed RunRecorded (LevelNFT) + RunSettled (ForgeCoin)
  *  - sales        : indexed Sold events
  *  - races        : indexed Race* events
+ *  - fee_splits   : indexed FeeSplit / FeeBurned (owner earnings, season pool, treasury, burn) + race payouts
+ *  - activity     : one row per notable event of a level (published, play, record, listed, sold) for the UI feed
+ *  - seasons      : indexed SeasonClosed
  *  - pinned_levels: level JSON pinned through this API (+ min time computed at publish)
  *  - signed_runs  : RunResults signed by this server (replay storage for ghost races)
  *  - processed_logs / indexer_state : idempotent, resumable indexing
@@ -68,6 +71,42 @@ CREATE TABLE IF NOT EXISTS races (
   players      TEXT NOT NULL DEFAULT '[]',
   ranking      TEXT,
   updated_block INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS fee_splits (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  level_id     INTEGER NOT NULL,
+  source       TEXT NOT NULL,
+  owner        TEXT NOT NULL,
+  owner_amt    TEXT NOT NULL,
+  pool_amt     TEXT NOT NULL,
+  treasury_amt TEXT NOT NULL,
+  burned_amt   TEXT NOT NULL DEFAULT '0',
+  block_number INTEGER NOT NULL,
+  tx_hash      TEXT NOT NULL,
+  log_index    INTEGER NOT NULL,
+  created_at   INTEGER NOT NULL,
+  UNIQUE (tx_hash, log_index)
+);
+CREATE INDEX IF NOT EXISTS fee_splits_level ON fee_splits(level_id);
+CREATE INDEX IF NOT EXISTS fee_splits_owner ON fee_splits(owner);
+CREATE TABLE IF NOT EXISTS activity (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  level_id     INTEGER NOT NULL,
+  kind         TEXT NOT NULL,
+  actor        TEXT,
+  block_number INTEGER NOT NULL,
+  tx_hash      TEXT NOT NULL,
+  log_index    INTEGER NOT NULL,
+  created_at   INTEGER NOT NULL,
+  UNIQUE (tx_hash, log_index)
+);
+CREATE INDEX IF NOT EXISTS activity_level ON activity(level_id, id DESC);
+CREATE TABLE IF NOT EXISTS seasons (
+  season       INTEGER PRIMARY KEY,
+  pool         TEXT NOT NULL,
+  block_number INTEGER NOT NULL,
+  tx_hash      TEXT NOT NULL,
+  closed_at    INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS pinned_levels (
   layout_hash  TEXT PRIMARY KEY,

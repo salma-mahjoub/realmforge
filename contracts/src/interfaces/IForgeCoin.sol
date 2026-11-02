@@ -25,6 +25,8 @@ interface IForgeCoin {
     event FeeSplit(
         uint256 indexed levelId, address indexed owner, uint256 ownerAmt, uint256 poolAmt, uint256 treasuryAmt
     );
+    /// @notice Part of the treasury cut destroyed by {settleRun} (`FeeSplit.treasuryAmt` is what was kept).
+    event FeeBurned(uint256 indexed levelId, uint256 amount);
     event RaceCreated(bytes32 indexed roomId, uint256 indexed levelId, address indexed creator, uint256 stake);
     event RaceJoined(bytes32 indexed roomId, address indexed player);
     event RaceSettled(bytes32 indexed roomId, address first, address second, uint256 pot);

@@ -129,7 +129,7 @@ describe("RealmForge integration", async () => {
     assert.equal(lvl[7], 12_000); // bestTimeMs
     assert.equal(await forgeCoin.read.balanceOf([creator.account.address]), parseEther("7")); // 70%
     assert.equal(await forgeCoin.read.seasonPool(), parseEther("2"));
-    assert.equal(await forgeCoin.read.treasuryBalance(), parseEther("1"));
+    assert.equal(await forgeCoin.read.treasuryBalance(), parseEther("0.5")); // other 0.5 burned
 
     // replaying the same signed run fails
     await assert.rejects(

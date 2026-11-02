@@ -132,8 +132,8 @@ contract ForgeCoinTest is Test {
 
         assertEq(coin.balanceOf(owner), 7e18); // 70%
         assertEq(coin.seasonPool(), 2e18); // 20%
-        assertEq(coin.treasuryBalance(), 1e18); // 10%
-        assertEq(coin.balanceOf(address(coin)), 3e18);
+        assertEq(coin.treasuryBalance(), 0.5e18); // 10% cut, half of it burned
+        assertEq(coin.balanceOf(address(coin)), 2.5e18); // pool + kept treasury
         // first ever clear: base 5 + first clear 20 + record 10 = 35
         assertEq(coin.balanceOf(player), 100e18 - 10e18 + 35e18);
         assertTrue(coin.runNonceUsed(player, 1));
@@ -245,8 +245,43 @@ contract ForgeCoinTest is Test {
         coin.settleRun(r, sig);
         address treasury = makeAddr("treasury");
         coin.withdrawTreasury(treasury);
-        assertEq(coin.balanceOf(treasury), 1e18);
+        assertEq(coin.balanceOf(treasury), 0.5e18);
         assertEq(coin.treasuryBalance(), 0);
+    }
+
+    // ------------------------------------------------------------------ treasury burn
+
+    function test_SettleRun_BurnsHalfOfTreasuryCut() public {
+        _fundAndApprove(player);
+        uint256 supplyBefore = coin.totalSupply();
+        IForgeCoin.RunResult memory r = _run(player, 1, false, 1000); // failed run: nothing minted
+        bytes memory sig = _signRun(signerPk, r);
+
+        vm.expectEmit(true, false, false, true);
+        emit IForgeCoin.FeeBurned(LEVEL, 0.5e18);
+        vm.prank(player);
+        coin.settleRun(r, sig);
+
+        assertEq(coin.totalSupply(), supplyBefore - 0.5e18); // 5% of the 10 FORGE fee destroyed
+        assertEq(coin.balanceOf(player), 90e18); // the player still pays exactly the fee
+        assertEq(coin.balanceOf(owner) + coin.seasonPool() + coin.treasuryBalance() + 0.5e18, 10e18);
+    }
+
+    /// Whatever the fee, owner + pool + kept treasury + burned always equals what the player paid.
+    function testFuzz_SettleRun_FeeIsFullyAccountedFor(uint96 fee) public {
+        fee = uint96(bound(fee, 1, 100e18)); // LevelNFT.MAX_PLAY_FEE
+        mock.setLevel(LEVEL, owner, owner, fee, true);
+        _fundAndApprove(player);
+        deal(address(coin), player, 1_000e18);
+        uint256 supplyBefore = coin.totalSupply();
+        IForgeCoin.RunResult memory r = _run(player, 1, false, 1000);
+        bytes memory sig = _signRun(signerPk, r);
+        vm.prank(player);
+        coin.settleRun(r, sig);
+
+        uint256 burned = supplyBefore - coin.totalSupply();
+        assertEq(coin.balanceOf(owner) + coin.seasonPool() + coin.treasuryBalance() + burned, fee);
+        assertEq(coin.balanceOf(address(coin)), coin.seasonPool() + coin.treasuryBalance());
     }
 
     // ------------------------------------------------------------------ fuzz (SPEC §11)

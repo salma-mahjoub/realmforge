@@ -52,7 +52,7 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] Race escrow: `createRaceRoom`, `joinRace`, `settleRace`, `refundRace` (1 h timeout)
 - [x] `closeSeason`, `setSigner`, `pause`/`unpause`, `withdrawTreasury`
 - [x] Fuzz: fee split sums correctly, supply never exceeds the cap
-- [~] Resolve 6× `TODO(studentB)` design decisions (2/6 done: self-play earns no reward; coins bonus 0.1/coin, capped at 5)
+- [~] Resolve 6× `TODO(studentB)` design decisions (3/6 done: self-play earns no reward; coins bonus 0.1/coin, capped at 5; half of the treasury cut is burned)
 - [ ] Owner-side defence for the oral: tokenomics, signatures, escrow, reentrancy
 
 ---

@@ -63,6 +63,8 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
     uint256 public constant OWNER_BPS = 7_000;
     uint256 public constant POOL_BPS = 2_000;
     uint256 public constant BPS = 10_000;
+    /// @notice Share of the treasury cut that is burned instead of kept (50% of 10% = 5% of every play fee).
+    uint256 public constant TREASURY_BURN_BPS = 5_000;
 
     /// @notice Clear reward = BASE_REWARD + difficultyBonus, the sum capped at MAX_CLEAR_REWARD.
     uint256 public constant BASE_REWARD = 5e18;
@@ -281,12 +283,16 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
         if (playFee > 0) {
             _spendAllowance(r.player, address(this), playFee);
             (uint256 ownerAmt, uint256 poolAmt, uint256 treasuryAmt) = splitFee(playFee);
+            // Half of the treasury cut is burned (deflationary sink); the rest stays in the contract.
+            uint256 burnAmt = (treasuryAmt * TREASURY_BURN_BPS) / BPS;
+            uint256 keptAmt = treasuryAmt - burnAmt;
             _transfer(r.player, owner, ownerAmt);
-            _transfer(r.player, address(this), poolAmt + treasuryAmt);
+            _transfer(r.player, address(this), poolAmt + keptAmt);
+            if (burnAmt > 0) _burn(r.player, burnAmt);
             seasonPool += poolAmt;
-            // TODO(studentB): SPEC allows burning part of the treasury share instead (`_burn`). Decide + test.
-            treasuryBalance += treasuryAmt;
-            emit FeeSplit(r.levelId, owner, ownerAmt, poolAmt, treasuryAmt);
+            treasuryBalance += keptAmt;
+            emit FeeSplit(r.levelId, owner, ownerAmt, poolAmt, keptAmt);
+            if (burnAmt > 0) emit FeeBurned(r.levelId, burnAmt);
         }
 
         uint256 reward;
@@ -507,6 +513,7 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
     // =====================================================================================================
 
     /// @notice Pure fee split helper (70/20/10). `ownerAmt + poolAmt + treasuryAmt == fee` always holds.
+    /// @dev `treasuryAmt` is the whole 10% cut: {settleRun} then burns {TREASURY_BURN_BPS} of it.
     /// @param fee Play fee in FORGE wei.
     function splitFee(uint256 fee) public pure returns (uint256 ownerAmt, uint256 poolAmt, uint256 treasuryAmt) {
         ownerAmt = (fee * OWNER_BPS) / BPS;

@@ -493,6 +493,25 @@ export const forgeCoinAbi = [
         "type": "uint256"
       },
       {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "FeeBurned",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "levelId",
+        "type": "uint256"
+      },
+      {
         "indexed": true,
         "internalType": "address",
         "name": "owner",
@@ -893,6 +912,19 @@ export const forgeCoinAbi = [
   },
   {
     "inputs": [],
+    "name": "COIN_BONUS",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "DAILY_MINT_CAP",
     "outputs": [
       {
@@ -959,6 +991,19 @@ export const forgeCoinAbi = [
   {
     "inputs": [],
     "name": "MAX_CLEAR_REWARD",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "MAX_COIN_BONUS",
     "outputs": [
       {
         "internalType": "uint256",
@@ -1146,6 +1191,19 @@ export const forgeCoinAbi = [
         "internalType": "bytes32",
         "name": "",
         "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "TREASURY_BURN_BPS",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",

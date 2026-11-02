@@ -345,6 +345,180 @@ contract ForgeCoinTest is Test {
         fresh.createRaceRoom(keccak256("room"), LEVEL, 1e18);
     }
 
+    // ------------------------------------------------------------------ races: revert paths and 4-player payout
+
+    function _funded(string memory label) internal returns (address p) {
+        p = makeAddr(label);
+        vm.prank(p);
+        coin.claimFaucet();
+    }
+
+    function _openRace(bytes32 room, address creator, uint256 stake) internal {
+        vm.prank(creator);
+        coin.createRaceRoom(room, LEVEL, stake);
+    }
+
+    function test_Race_Create_RevertsOnZeroStake() public {
+        vm.prank(_funded("a"));
+        vm.expectRevert(ForgeCoin.ZeroStake.selector);
+        coin.createRaceRoom(keccak256("r"), LEVEL, 0);
+    }
+
+    function test_Race_Create_RevertsWhenRoomExists() public {
+        address a = _funded("a");
+        bytes32 room = keccak256("r");
+        _openRace(room, a, 10e18);
+        vm.prank(a);
+        vm.expectRevert(abi.encodeWithSelector(ForgeCoin.RaceExists.selector, room));
+        coin.createRaceRoom(room, LEVEL, 10e18);
+    }
+
+    function test_Race_Create_RevertsOnInactiveLevel() public {
+        address a = _funded("a");
+        mock.setActive(LEVEL, false);
+        vm.prank(a);
+        vm.expectRevert(abi.encodeWithSelector(ForgeCoin.LevelInactive.selector, LEVEL));
+        coin.createRaceRoom(keccak256("r"), LEVEL, 10e18);
+    }
+
+    function test_Race_Join_RevertsOnUnknownRoom() public {
+        address b = _funded("b");
+        bytes32 room = keccak256("nope");
+        vm.prank(b);
+        vm.expectRevert(abi.encodeWithSelector(ForgeCoin.RaceNotOpen.selector, room));
+        coin.joinRace(room);
+    }
+
+    function test_Race_Join_RevertsAfterTimeout() public {
+        address a = _funded("a");
+        address b = _funded("b");
+        bytes32 room = keccak256("r");
+        _openRace(room, a, 10e18);
+        vm.warp(block.timestamp + 1 hours + 1);
+        vm.prank(b);
+        vm.expectRevert(abi.encodeWithSelector(ForgeCoin.RaceTimedOut.selector, room));
+        coin.joinRace(room);
+    }
+
+    function test_Race_Join_RevertsWhenAlreadyIn() public {
+        address a = _funded("a");
+        bytes32 room = keccak256("r");
+        _openRace(room, a, 10e18);
+        vm.prank(a);
+        vm.expectRevert(abi.encodeWithSelector(ForgeCoin.AlreadyInRace.selector, room, a));
+        coin.joinRace(room);
+    }
+
+    function test_Race_Join_RevertsWhenFull() public {
+        bytes32 room = keccak256("r");
+        _openRace(room, _funded("p0"), 10e18);
+        for (uint256 i = 1; i < coin.MAX_RACE_PLAYERS(); ++i) {
+            address p = _funded(string.concat("p", vm.toString(i)));
+            vm.prank(p);
+            coin.joinRace(room);
+        }
+        address extra = _funded("extra");
+        vm.prank(extra);
+        vm.expectRevert(abi.encodeWithSelector(ForgeCoin.RaceFull.selector, room));
+        coin.joinRace(room);
+    }
+
+    function test_Race_Settle_RevertsWithSingleEntrant() public {
+        address a = _funded("a");
+        bytes32 room = keccak256("r");
+        _openRace(room, a, 10e18);
+        address[] memory ranking = new address[](2);
+        ranking[0] = a;
+        ranking[1] = player;
+        bytes memory sig = _signRace(room, ranking);
+        vm.expectRevert(ForgeCoin.InvalidRanking.selector);
+        coin.settleRace(room, ranking, sig);
+    }
+
+    function test_Race_Settle_RevertsWithOutsider() public {
+        address a = _funded("a");
+        address b = _funded("b");
+        bytes32 room = keccak256("r");
+        _openRace(room, a, 10e18);
+        vm.prank(b);
+        coin.joinRace(room);
+        address[] memory ranking = new address[](2);
+        ranking[0] = a;
+        ranking[1] = makeAddr("outsider");
+        bytes memory sig = _signRace(room, ranking);
+        vm.expectRevert(ForgeCoin.InvalidRanking.selector);
+        coin.settleRace(room, ranking, sig);
+    }
+
+    function test_Race_Settle_RevertsWithDuplicateRank() public {
+        address a = _funded("a");
+        address b = _funded("b");
+        bytes32 room = keccak256("r");
+        _openRace(room, a, 10e18);
+        vm.prank(b);
+        coin.joinRace(room);
+        address[] memory ranking = new address[](2);
+        ranking[0] = a;
+        ranking[1] = a;
+        bytes memory sig = _signRace(room, ranking);
+        vm.expectRevert(ForgeCoin.InvalidRanking.selector);
+        coin.settleRace(room, ranking, sig);
+    }
+
+    function test_Race_Settle_RevertsWithBadSignatureOrTwice() public {
+        address a = _funded("a");
+        address b = _funded("b");
+        bytes32 room = keccak256("r");
+        _openRace(room, a, 10e18);
+        vm.prank(b);
+        coin.joinRace(room);
+        address[] memory ranking = new address[](2);
+        ranking[0] = b;
+        ranking[1] = a;
+
+        (uint8 v, bytes32 rr, bytes32 s) = vm.sign(0xBAD, coin.hashRaceResult(room, ranking));
+        vm.expectPartialRevert(ForgeCoin.InvalidSignature.selector);
+        coin.settleRace(room, ranking, abi.encodePacked(rr, s, v));
+
+        bytes memory good = _signRace(room, ranking);
+        coin.settleRace(room, ranking, good);
+        vm.expectRevert(abi.encodeWithSelector(ForgeCoin.RaceNotOpen.selector, room));
+        coin.settleRace(room, ranking, good);
+        vm.warp(block.timestamp + 1 hours + 1);
+        vm.expectRevert(abi.encodeWithSelector(ForgeCoin.RaceNotOpen.selector, room));
+        coin.refundRace(room); // a settled race can never be refunded
+    }
+
+    function test_Race_FourPlayers_StakeEqualsPayout() public {
+        bytes32 room = keccak256("r4");
+        address[] memory ps = new address[](4);
+        for (uint256 i; i < 4; ++i) {
+            ps[i] = _funded(string.concat("p", vm.toString(i)));
+        }
+        _openRace(room, ps[0], 10e18);
+        for (uint256 i = 1; i < 4; ++i) {
+            vm.prank(ps[i]);
+            coin.joinRace(room);
+        }
+        assertEq(coin.getRace(room).players.length, 4);
+
+        address[] memory ranking = new address[](4);
+        ranking[0] = ps[3];
+        ranking[1] = ps[2];
+        ranking[2] = ps[1];
+        ranking[3] = ps[0];
+        coin.settleRace(room, ranking, _signRace(room, ranking));
+
+        // pot = 40: 1st 24, 2nd 10, owner 4, pool 2. 3rd and 4th lose their stake.
+        assertEq(coin.balanceOf(ps[3]), 90e18 + 24e18);
+        assertEq(coin.balanceOf(ps[2]), 90e18 + 10e18);
+        assertEq(coin.balanceOf(ps[1]), 90e18);
+        assertEq(coin.balanceOf(ps[0]), 90e18);
+        assertEq(coin.balanceOf(owner), 4e18);
+        assertEq(coin.seasonPool(), 2e18);
+        assertEq(coin.balanceOf(address(coin)), coin.seasonPool() + coin.treasuryBalance());
+    }
+
     // TODO(studentB): settleRunWithPermit test (sign Permit with vm.sign), settleRace invalid ranking / outsider,
     //                 race full, closeSeason happy path + bad shares + before seasonEnd, supply-cap clipping,
     //                 invariant test "contract balance == seasonPool + treasury + open race escrow".

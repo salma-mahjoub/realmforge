@@ -519,6 +519,56 @@ contract ForgeCoinTest is Test {
         assertEq(coin.balanceOf(address(coin)), coin.seasonPool() + coin.treasuryBalance());
     }
 
+    // ------------------------------------------------------------------ rewards and caps
+
+    function test_SettleRun_DifficultyBonus_MaxOnFirstClearAfterFailure() public {
+        mock.setLevel(LEVEL, owner, owner, 0, true);
+        _fundAndApprove(player);
+        _fundAndApprove(player2);
+        IForgeCoin.RunResult memory fail = _run(player, 1, false, 1000);
+        bytes memory sigFail = _signRun(signerPk, fail);
+        vm.prank(player);
+        coin.settleRun(fail, sigFail);
+
+        IForgeCoin.RunResult memory win = _run(player2, 1, true, 5000);
+        bytes memory sigWin = _signRun(signerPk, win);
+        vm.prank(player2);
+        coin.settleRun(win, sigWin);
+        // 1 play, 0 clears: 5 + 45 = 50, + 20 first clear + 10 record = 80
+        assertEq(coin.balanceOf(player2), 100e18 + 80e18);
+    }
+
+    function test_SettleRun_DailyCap_ClipsPartialReward() public {
+        mock.setLevel(LEVEL, owner, owner, 0, true);
+        _fundAndApprove(player);
+        IForgeCoin.RunResult memory fail = _run(player, 1, false, 1000);
+        bytes memory sigFail = _signRun(signerPk, fail);
+        vm.prank(player);
+        coin.settleRun(fail, sigFail);
+        for (uint256 i = 2; i <= 10; ++i) {
+            IForgeCoin.RunResult memory r = _run(player, i, true, uint32(100_000 - i));
+            bytes memory sig = _signRun(signerPk, r);
+            vm.prank(player);
+            coin.settleRun(r, sig);
+        }
+        assertEq(coin.mintedOnDay(player, block.timestamp / 1 days), 200e18);
+        assertEq(coin.balanceOf(player), 100e18 + 200e18);
+    }
+
+    function test_SettleRun_ClipsRewardAtSupplyCap() public {
+        mock.setLevel(LEVEL, owner, owner, 0, true);
+        _fundAndApprove(player);
+        deal(address(coin), makeAddr("whale"), coin.cap() - 105e18, true);
+        assertEq(coin.totalSupply(), coin.cap() - 5e18);
+
+        IForgeCoin.RunResult memory r = _run(player, 1, true, 1000);
+        bytes memory sig = _signRun(signerPk, r);
+        vm.prank(player);
+        coin.settleRun(r, sig);
+        assertEq(coin.totalSupply(), coin.cap()); // 35 FORGE earned, only 5 left to mint
+        assertEq(coin.balanceOf(player), 105e18);
+    }
+
     // TODO(studentB): settleRunWithPermit test (sign Permit with vm.sign), settleRace invalid ranking / outsider,
     //                 race full, closeSeason happy path + bad shares + before seasonEnd, supply-cap clipping,
     //                 invariant test "contract balance == seasonPool + treasury + open race escrow".

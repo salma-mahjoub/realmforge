@@ -97,7 +97,7 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] PlayScene uses the game-core player + element runtime + fixed 60 Hz clock; replay bitmask + trace + checkpoints recorded (verified in browser)
 - [x] API and Colyseus client aligned with the server's real routes and rooms
 - [x] vitest added (10 tests)
-- [ ] Pages read real indexer/contract data instead of `data/mock.ts` (profile, market listings, activity and earnings still mock: these need server endpoints)
+- [x] Pages read real indexer data instead of `data/mock.ts`: profile, market listings, activity and earnings come from `server/` endpoints (the mock only remains as a dev fallback when the API is down and `VITE_USE_MOCKS` is not false)
 - [ ] Free Reown/WalletConnect project ID in `web/.env.local` (currently a 403 warning)
 - [ ] RaceScene waits for the server countdown/start; ghost replays rendered
 - [~] Race lobby on-chain (`useRace`): create with escrow, join with escrow, settle with the server-signed ranking (deadline included), refund after the timeout; wired in `Room.tsx`, type-checked and unit-tested, **not yet clicked with two wallets**
@@ -125,7 +125,7 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [ ] Join signatures / SIWE mandatory
 - [ ] Rate limiting on `/runs/validate`
 - [ ] Fetch level JSON from IPFS for levels not pinned through this server
-- [ ] Profile / market / activity / earnings endpoints
+- [x] Profile / market / activity / earnings endpoints (indexer now handles FeeSplit, FeeBurned, SeasonClosed)
 - [ ] Season-signing admin endpoint, persisting race results, reconnect handling
 
 ## 6. Integration and operations

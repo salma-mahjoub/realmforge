@@ -31,7 +31,7 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] `scripts/export-abi.ts`
 - [x] ABIs exported to web + server; `ignition/parameters/localhost.json` (account #1 signer)
 - [x] 42 tests passing (38 Solidity, 4 Node), 0 compiler warnings
-- [ ] 9 `it.todo` integration tests from §11
+- [~] `it.todo` integration tests from §11: 5 of 9 done (setActive→LevelInactive, 4-player race, closeSeason ×2; token-cap clipping covered at unit level); left: remix-of-remix (A), reentrancy (A), gas, Slither
 - [ ] Slither static analysis report and discussion (`docs/security/`)
 - [ ] Gas report for `publish`, `settleRun`, `buy` and `settleRace`, comparing L1 and L2
 - [ ] Coverage ≥ 90% per contract

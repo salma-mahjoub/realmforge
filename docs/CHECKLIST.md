@@ -126,7 +126,8 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [ ] Rate limiting on `/runs/validate`
 - [ ] Fetch level JSON from IPFS for levels not pinned through this server
 - [x] Profile / market / activity / earnings endpoints (indexer now handles FeeSplit, FeeBurned, SeasonClosed)
-- [ ] Season-signing admin endpoint, persisting race results, reconnect handling
+- [x] Season ranking + signing: `GET /season/current`, `POST /season/close-proof` (rules of `docs/SEASONS.md`), proven against the real `closeSeason` (`npm run e2e:season`)
+- [ ] Persisting race results, reconnect handling
 
 ## 6. Integration and operations
 - [x] Private GitHub repo: https://github.com/MedSlimane/realmforge

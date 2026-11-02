@@ -45,7 +45,7 @@ contract ForgeCoinTest is Test {
             levelId: LEVEL,
             timeMs: timeMs,
             cleared: cleared,
-            coins: 3,
+            coins: 0, // neutral by default so reward tests stay about one rule at a time
             nonce: nonce,
             deadline: block.timestamp + 10 minutes
         });
@@ -615,6 +615,50 @@ contract ForgeCoinTest is Test {
         coin.settleRun(other, otherSig);
         // still the first real clear: 5 base + 20 first clear + 10 record
         assertEq(coin.balanceOf(player), 100e18 + 35e18);
+    }
+
+    function _settleWithCoins(address p, uint256 nonce, uint16 coins) internal {
+        IForgeCoin.RunResult memory r = _run(p, nonce, true, 1000);
+        r.coins = coins;
+        bytes memory sig = _signRun(signerPk, r);
+        vm.prank(p);
+        coin.settleRun(r, sig);
+    }
+
+    function test_SettleRun_CoinBonus_PaysPerCoin() public {
+        mock.setLevel(LEVEL, owner, owner, 0, true);
+        _fundAndApprove(player);
+        _settleWithCoins(player, 1, 12);
+        // 5 base + 20 first clear + 10 record + 12 coins * 0.1
+        assertEq(coin.balanceOf(player), 100e18 + 35e18 + 1.2e18);
+    }
+
+    function test_SettleRun_CoinBonus_IsCapped() public {
+        mock.setLevel(LEVEL, owner, owner, 0, true);
+        _fundAndApprove(player);
+        _settleWithCoins(player, 1, type(uint16).max); // a hostile or buggy signer value
+        assertEq(coin.balanceOf(player), 100e18 + 35e18 + coin.MAX_COIN_BONUS());
+    }
+
+    function test_SettleRun_CoinBonus_NotPaidOnFailedRun() public {
+        mock.setLevel(LEVEL, owner, owner, 0, true);
+        _fundAndApprove(player);
+        IForgeCoin.RunResult memory r = _run(player, 1, false, 1000);
+        r.coins = 40;
+        bytes memory sig = _signRun(signerPk, r);
+        vm.prank(player);
+        coin.settleRun(r, sig);
+        assertEq(coin.balanceOf(player), 100e18); // dying with coins in hand earns nothing
+    }
+
+    /// The coin bonus can never push a reward above its own cap, whatever the signed value.
+    function testFuzz_CoinBonus_NeverExceedsCap(uint16 coins) public {
+        mock.setLevel(LEVEL, owner, owner, 0, true);
+        _fundAndApprove(player);
+        _settleWithCoins(player, 1, coins);
+        uint256 gained = coin.balanceOf(player) - 100e18;
+        assertLe(gained, 35e18 + coin.MAX_COIN_BONUS());
+        assertGe(gained, 35e18);
     }
 
     // ------------------------------------------------------------------ seasons (closeSeason)

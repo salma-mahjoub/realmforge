@@ -71,6 +71,9 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
     uint256 public constant FIRST_CLEAR_BONUS = 20e18;
     /// @notice Bonus for beating the level's best time.
     uint256 public constant RECORD_BONUS = 10e18;
+    /// @notice Bonus per in-game coin collected during a cleared run, and the cap of that bonus per run.
+    uint256 public constant COIN_BONUS = 0.1e18;
+    uint256 public constant MAX_COIN_BONUS = 5e18;
     /// @notice Max FORGE minted as rewards per player per UTC day (anti-farming).
     uint256 public constant DAILY_MINT_CAP = 200e18;
 
@@ -301,8 +304,10 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
     }
 
     /// @notice Gross reward (before daily/supply caps) a run would earn given current level stats.
-    /// @dev reward = min(BASE + 45 * (1 - clears/plays), 50) + first-clear bonus + record bonus. 0 if not cleared.
-    ///      TODO(studentB): `r.coins` (in-game coins collected) is signed but unused — e.g. +0.1 FORGE per coin?
+    /// @dev reward = min(BASE + 45 * (1 - clears/plays), 50) + first-clear bonus + record bonus
+    ///      + min(coins * COIN_BONUS, MAX_COIN_BONUS). 0 if not cleared.
+    ///      The coin bonus is capped on-chain on purpose: the server already checks `coins <= coins in the level`,
+    ///      but a creator could fill a level with coins, and a leaked signer key could sign any uint16.
     function _computeReward(RunResult calldata r) internal view returns (uint256 reward) {
         if (!r.cleared) return 0;
         LevelStats memory st = levelStats[r.levelId];
@@ -314,6 +319,8 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
         if (reward > MAX_CLEAR_REWARD) reward = MAX_CLEAR_REWARD;
         if (st.clears == 0) reward += FIRST_CLEAR_BONUS;
         if (st.bestTimeMs == 0 || r.timeMs < st.bestTimeMs) reward += RECORD_BONUS;
+        uint256 coinBonus = uint256(r.coins) * COIN_BONUS;
+        reward += coinBonus > MAX_COIN_BONUS ? MAX_COIN_BONUS : coinBonus;
     }
 
     /// @dev Mints `amount` clipped to the player's remaining daily cap and the remaining token cap.

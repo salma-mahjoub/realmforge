@@ -41,7 +41,7 @@ function CreateRoom() {
     const level = list.find((l) => l.id === levelId) ?? list[0];
     // The state starts on a demo level id (41); once the real list loads the <select> and the preview fall back
     // to its first entry, so what is sent on-chain must follow `level`, not the stale state (ERC721NonexistentToken(41)).
-    const selectedId = level.id;
+    const selectedId = level?.id ?? levelId; // `level` is undefined while no level is published
     const stakeN = Number(stake);
     const balance = bal.value !== undefined ? Number(bal.value / 10n ** 18n) : undefined;
     const stakeError = !stake || !Number.isFinite(stakeN) || stakeN <= 0 ? 'Enter a stake above 0' : balance !== undefined && stakeN > balance ? `You only have ${balance} FORGE` : null;
@@ -112,7 +112,7 @@ function CreateRoom() {
                             ))}
                         </dl>
                         <BlockerNotice compact />
-                        <Button variant="primary" size="lg" icon={<Swords size={18} aria-hidden />} loading={creating} disabled={!web3.address || !!stakeError} onClick={() => void create()}>
+                        <Button variant="primary" size="lg" icon={<Swords size={18} aria-hidden />} loading={creating} disabled={!web3.address || !!stakeError || !level} onClick={() => void create()}>
                             Create room
                         </Button>
                     </div>
@@ -179,6 +179,9 @@ function RaceRoom({ code }: { code: string }) {
     const staked = new Set((race.race?.players ?? []).map((a) => a.toLowerCase()));
     const players = online === 'live' && livePlayers ? livePlayers.map((p) => ({ ...p, stakePaid: staked.has(p.address.toLowerCase()) })) : demoPlayers;
     const mockFile = useMockData('/levels/1/file');
+    // The game reads its level once, at mount. In a live room the real level id only arrives with the room state,
+    // so wait for it (and for that level's file) instead of mounting on the demo level and keeping it.
+    const levelReady = online !== 'connecting' && (online !== 'live' || liveLevelId !== null) && !file.loading;
 
     useEffect(() => {
         let cancelled = false;
@@ -419,10 +422,22 @@ function RaceRoom({ code }: { code: string }) {
                     <div className="race-stage-head">
                         <h2 className="card-title">{level.name}</h2>
                         <span className="fine">{started ? 'Race in progress' : 'Lobby: warm up while players get ready'}</span>
+                        {racing && (
+                            <div className="race-actions">
+                                {fell && (
+                                    <Button size="sm" variant="primary" icon={<RotateCcw size={14} aria-hidden />} onClick={respawn}>
+                                        Respawn (R)
+                                    </Button>
+                                )}
+                                <Button size="sm" variant="secondary" icon={<LogOut size={14} aria-hidden />} onClick={giveUp}>
+                                    Give up
+                                </Button>
+                            </div>
+                        )}
                     </div>
                     <div className="play-stage race-stage">
-                        {file.data ? (
-                            <PhaserGame scene={SCENES.Race} data={{ level: mockFile ? { ...file.data, meta: { ...file.data.meta, theme: level.theme, name: level.name } } : file.data, levelId: String(level.id), roomCode: code }} />
+                        {file.data && levelReady ? (
+                            <PhaserGame key={level.id} scene={SCENES.Race} data={{ level: mockFile ? { ...file.data, meta: { ...file.data.meta, theme: level.theme, name: level.name } } : file.data, levelId: String(level.id), roomCode: code }} />
                         ) : (
                             <div className="stage-loading">
                                 <Skeleton w="100%" h="100%" r={0} />
@@ -450,18 +465,6 @@ function RaceRoom({ code }: { code: string }) {
                     </div>
                     <div className="race-foot">
                         <Flag size={15} aria-hidden /> {myRace.gaveUp ? 'You left the race: it ends when the others finish or leave' : 'First to the flag wins'}
-                        {racing && (
-                            <div className="race-actions">
-                                {fell && (
-                                    <Button size="sm" variant="primary" icon={<RotateCcw size={14} aria-hidden />} onClick={respawn}>
-                                        Respawn (R)
-                                    </Button>
-                                )}
-                                <Button size="sm" variant="ghost" icon={<LogOut size={14} aria-hidden />} onClick={giveUp}>
-                                    Give up
-                                </Button>
-                            </div>
-                        )}
                     </div>
                 </Card>
             </div>

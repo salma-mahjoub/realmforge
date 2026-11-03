@@ -77,6 +77,10 @@ function walk(e: unknown): ErrLike[] {
     return out;
 }
 
+const USER_REJECTED = 'You rejected the request in your wallet.';
+/** True when the message is the wallet-rejection one (the user clicked "Reject"), not a contract revert. */
+export const isUserRejection = (message: string) => message === USER_REJECTED;
+
 export function humanizeError(e: unknown): string {
     if (!e) return 'Something went wrong.';
     if (typeof e === 'string') return e;
@@ -84,7 +88,7 @@ export function humanizeError(e: unknown): string {
     const all = chain.map((c) => `${c.name ?? ''} ${c.shortMessage ?? ''} ${c.message ?? ''} ${c.details ?? ''}`).join(' | ');
 
     if (chain.some((c) => c.code === 4001 || c.name === 'UserRejectedRequestError') || /user (rejected|denied)|rejected the request|denied transaction/i.test(all)) {
-        return 'You rejected the request in your wallet.';
+        return USER_REJECTED;
     }
     if (/insufficient funds/i.test(all)) return 'Not enough ETH to pay for gas on this network.';
     if (/ChainMismatch|does not match the target chain|chain mismatch/i.test(all)) return 'Your wallet is on another network — switch networks and retry.';

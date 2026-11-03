@@ -1,6 +1,7 @@
 import type { Address, Hex } from "viem";
 import { toJsonSafe } from "../eip712.js";
 import { BaseMatchRoom } from "./BaseMatchRoom.js";
+import { completeRanking } from "./ranking.js";
 import { roomServices } from "./services.js";
 import { MatchState, type PlayerState } from "./state.js";
 
@@ -23,7 +24,8 @@ export class RaceRoom extends BaseMatchRoom<MatchState> {
   protected onPlayerFinished(_p: PlayerState) {}
 
   protected async settle() {
-    const ranking = [...this.state.finishOrder] as Address[];
+    // settleRace needs two ranked players: finishers first, then everyone else by progress.
+    const ranking = completeRanking([...this.state.finishOrder], this.state.players.values(), this.analysis?.goal) as Address[];
     const signed = await roomServices().signer.signRaceResult({ roomId: this.state.raceId as Hex, ranking });
     this.result = {
       kind: "race",

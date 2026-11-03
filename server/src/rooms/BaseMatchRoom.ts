@@ -1,4 +1,4 @@
-import { Room, ServerError, type Client } from "@colyseus/core";
+import { Room, ServerError, matchMaker, type Client } from "@colyseus/core";
 import { getAddress, isAddress, isHex, keccak256, toHex, verifyMessage, type Address, type Hex } from "viem";
 import { z } from "zod";
 import type { LevelAnalysis } from "../level/analysis.js";
@@ -11,6 +11,23 @@ export const PATCH_RATE_MS = 50; // 20 Hz state patches (SPEC §3.5)
 export const COUNTDOWN_MS = 3_000;
 export const MAX_STRIKES = 5;
 export const RECONNECT_SEC = 20;
+
+/** No 0/O or 1/I: a code is read aloud and typed by hand. 32^4 ≈ 1M combinations. */
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+export const ROOM_CODE = /^[A-Z2-9]{4}$/;
+
+/**
+ * Short, uppercase room code. Colyseus' default id is 9 random characters, mixed case with `_` and `-`:
+ * the web app uppercases what a player types (and derives the on-chain race id from it), so a default id never matched.
+ */
+async function freshRoomCode(): Promise<string> {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    let code = "";
+    for (let i = 0; i < 4; i++) code += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+    if (!(await matchMaker.getRoomById(code))) return code;
+  }
+  throw new ServerError(503, "no free room code, try again");
+}
 
 export const createOptionsSchema = z.object({
   levelId: z.union([z.string().regex(/^\d+$/), z.number().int().nonnegative()]).optional(),
@@ -62,7 +79,8 @@ export abstract class BaseMatchRoom<S extends MatchState> extends Room<S, unknow
   protected abstract settle(): Promise<void>;
   protected defaultMinPlayers = 2;
 
-  onCreate(rawOptions: unknown) {
+  async onCreate(rawOptions: unknown) {
+    this.roomId = await freshRoomCode(); // Colyseus allows replacing the id during onCreate()
     const options = createOptionsSchema.parse(rawOptions ?? {});
     const state = this.createState();
     this.setState(state);

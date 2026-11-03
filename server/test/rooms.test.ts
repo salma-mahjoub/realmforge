@@ -26,6 +26,7 @@ describe("RaceRoom (Colyseus)", () => {
   it("runs a 2-player race and broadcasts a signed RaceResult", async () => {
     const client = new Client(`ws://127.0.0.1:${PORT}`);
     const a = await client.create("race", { address: PLAYER, timeLimitSec: 30 });
+    expect(a.roomId).toMatch(/^[A-Z2-9]{4}$/); // short and uppercase: what a player can type
     const b = await client.joinById(a.roomId, { address: P2 });
 
     await expect(client.joinById(a.roomId, { address: "not-an-address" })).rejects.toBeTruthy();

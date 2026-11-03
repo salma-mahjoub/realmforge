@@ -31,6 +31,12 @@ export class RaceScene extends PlayScene {
         this.remotes.clear();
     }
 
+    /** A restart starts the frame counter again; tell the room first so it keeps accepting our positions. */
+    protected restart() {
+        EventBus.emit('race:respawn');
+        super.restart();
+    }
+
     protected bindBus() {
         super.bindBus();
         this.unsubs.push(EventBus.subscribe('race:remote-states', (players) => this.applyRemote(players)));

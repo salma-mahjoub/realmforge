@@ -43,7 +43,7 @@ for Sepolia.
 | 8 | Creator | **List** the NFT for a price in ETH | `Listed` |
 | 9 | Buyer | **Buy** it | `Sold`; the NFT moves to the buyer and the listing is cleared. The seller (and creator royalty) withdraw the ETH with `withdraw` |
 | 10 | Player | Play again | the **new owner** (buyer) now receives the 7 FORGE, not the creator |
-| 11 | Player + Buyer | **Race 1v1**: one creates a room with a 10 FORGE stake, the other joins with the code and escrows 10; both press ready; race to the goal | pot 20: **1st +12, 2nd +5**, level owner **+2**, season pool **+1**. The lobby shows the server-signed ranking and a **Settle on-chain** button |
+| 11 | Player + Buyer | **Race 1v1**: one creates a room with a 10 FORGE stake, the other joins with the code and escrows 10; both press ready; race to the goal | pot 20: **1st +12, 2nd +5**, level owner **+2**, season pool **+1**. The lobby shows the server-signed ranking and a **Settle on-chain** button. A fall does not end the race: press **R** or **Respawn** to retry from the last checkpoint; **Give up** leaves the race, which then ends once every other player finished or left. Players who did not finish are ranked by progress, so a race always settles |
 | 12 | anyone | If a race is never settled, wait one hour | **Refund** returns every stake |
 
 | 13 | admin | **Season** page: the ranking lists the player and the creator with their points and projected prize. After 30 days (on the local chain: `evm_increaseTime`), the admin presses **Close season** | `SeasonClosed`; the pool is paid 50% to the players and 50% to the creators in proportion to their points; `season` becomes 2 |

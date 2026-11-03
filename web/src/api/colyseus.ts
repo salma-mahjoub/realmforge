@@ -83,12 +83,18 @@ export class RaceConnection {
         });
         this.unsub.push(EventBus.subscribe('race:local-state', (s) => this.room.send('pos', s)));
         this.unsub.push(EventBus.subscribe('race:checkpoint', (c) => this.room.send('checkpoint', c)));
+        this.unsub.push(EventBus.subscribe('race:respawn', () => this.room.send('respawn')));
         this.unsub.push(EventBus.subscribe('race:coins', (count) => this.room.send('coin', { count })));
         this.unsub.push(EventBus.subscribe('play:finished', () => this.room.send('finish')));
     }
 
     ready() {
         this.room.send('ready');
+    }
+
+    /** Abandon the race: it stops waiting for this player, who is then ranked by progress. */
+    giveUp() {
+        this.room.send('giveup');
     }
 
     async leave() {

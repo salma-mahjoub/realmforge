@@ -503,6 +503,7 @@ a.level-card:hover .thumb img, .market-card:hover .thumb img { transform: scale(
 .countdown-n { font-family: var(--font-display); font-weight: 800; font-size: clamp(80px, 14vw, 180px); color: #fff; line-height: 1; animation: pop 700ms var(--ease-out); -webkit-text-stroke: 4px var(--violet); paint-order: stroke fill; }
 .race-foot { display: flex; align-items: center; gap: 8px; padding: var(--s-3) var(--s-5); color: var(--text-2); font-size: var(--fs-sm); }
 .race-foot svg { color: var(--violet-ink); }
+.race-actions { margin-left: auto; display: flex; gap: 8px; }
 
 /* ── editor ───────────────────────────────────────────────────────────── */
 .editor { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; flex: 1; min-height: 0; height: calc(100dvh - var(--nav-h)); }

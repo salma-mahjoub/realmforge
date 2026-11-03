@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Check, Copy, Flag, Hourglass, KeyRound, Plus, Radio, Swords, Users } from 'lucide-react';
+import { Check, Copy, Flag, Hourglass, KeyRound, LogOut, Plus, Radio, RotateCcw, Swords, Users } from 'lucide-react';
 import { api } from '../api/client';
 import { RaceConnection, colorFor, stashConnection, takeConnection } from '../api/colyseus';
 import type { RoomPlayer } from '../api/types';
+import { EventBus } from '../game/EventBus';
 import { PhaserGame } from '../game/PhaserGame';
 import { SCENES } from '../game/constants';
 import { Avatar, Badge, Button, Card, CardHeader, EmptyState, Field, ForgeCoin, Input, LevelThumb, Pill, Select, Skeleton, TokenAmount, cx, hex, shortAddr, toast } from '../components/ui';
@@ -165,6 +166,8 @@ function RaceRoom({ code }: { code: string }) {
     const [countdown, setCountdown] = useState<number | null>(null);
     const [started, setStarted] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [fell, setFell] = useState(false);
+    const [myRace, setMyRace] = useState<{ finished: boolean; gaveUp: boolean }>({ finished: false, gaveUp: false });
     const conn = useRef<RaceConnection | null>(null);
     const demoLevel = MOCK_LEVELS.find((l) => l.theme === 'desert') ?? MOCK_LEVELS[0];
     // live room: the level the creator picked (room state), otherwise the sample level of the demo lobby
@@ -196,6 +199,7 @@ function RaceRoom({ code }: { code: string }) {
                     if (Number.isFinite(lid) && st.levelId) setLiveLevelId(lid);
                     const list: RoomPlayer[] = [];
                     st.players?.forEach((p, sessionId) => {
+                        if (sessionId === c.room.sessionId) setMyRace({ finished: Boolean((p as { finished?: boolean }).finished), gaveUp: Boolean((p as { gaveUp?: boolean }).gaveUp) });
                         list.push({
                             sessionId,
                             address: (p.address ?? '0x') as RoomPlayer['address'],
@@ -222,6 +226,16 @@ function RaceRoom({ code }: { code: string }) {
             conn.current = null;
         };
     }, [code, web3.address, demoLevel.id]);
+
+    // Falling ends the attempt, not the race: offer a respawn (R) or leaving the race.
+    useEffect(() => {
+        const offDied = EventBus.subscribe('play:died', () => setFell(true));
+        const offState = EventBus.subscribe('play:state', (s) => s.state === 'playing' && setFell(false));
+        return () => {
+            offDied();
+            offState();
+        };
+    }, []);
 
     useEffect(() => {
         if (web3.address) setPlayers((ps) => ps.map((p) => (p.isYou ? { ...p, address: web3.address! } : p)));
@@ -272,6 +286,15 @@ function RaceRoom({ code }: { code: string }) {
         await tx.run('refund-race', { title: 'Refund stakes', success: 'Stakes refunded', successBody: 'Every player got their stake back.' }, () => race.refund(code));
         void race.refetch();
     };
+    const respawn = () => {
+        setFell(false);
+        EventBus.emit('play:restart');
+    };
+    const giveUp = () => {
+        conn.current?.giveUp();
+        setMyRace((r) => ({ ...r, gaveUp: true }));
+    };
+    const racing = live && started && !result && !myRace.finished && !myRace.gaveUp;
     const toggleReady = () => {
         if (online === 'live') conn.current?.ready();
         setPlayers((ps) => ps.map((p) => (p.isYou ? { ...p, ready: !p.ready } : p)));
@@ -375,7 +398,7 @@ function RaceRoom({ code }: { code: string }) {
                         <div className="notice notice-info" role="status">
                             <Flag size={16} aria-hidden />
                             <span>
-                                Race finished. 1st {shortAddr(result.ranking[0])}, 2nd {shortAddr(result.ranking[1])}. The server signed the ranking: anyone can submit it.
+                                Race finished. 1st {shortAddr(result.ranking[0])}, 2nd {shortAddr(result.ranking[1])} (players who did not finish are ranked by progress). The server signed the ranking: anyone can submit it.
                             </span>
                             <Button size="sm" variant="primary" disabled={raceStatus !== RACE_STATUS.open} loading={tx.isBusy('settle-race')} onClick={() => void settleRace()}>
                                 {raceStatus === RACE_STATUS.settled ? 'Paid out' : 'Settle on-chain'}
@@ -426,7 +449,19 @@ function RaceRoom({ code }: { code: string }) {
                         )}
                     </div>
                     <div className="race-foot">
-                        <Flag size={15} aria-hidden /> First to the flag wins
+                        <Flag size={15} aria-hidden /> {myRace.gaveUp ? 'You left the race: it ends when the others finish or leave' : 'First to the flag wins'}
+                        {racing && (
+                            <div className="race-actions">
+                                {fell && (
+                                    <Button size="sm" variant="primary" icon={<RotateCcw size={14} aria-hidden />} onClick={respawn}>
+                                        Respawn (R)
+                                    </Button>
+                                )}
+                                <Button size="sm" variant="ghost" icon={<LogOut size={14} aria-hidden />} onClick={giveUp}>
+                                    Give up
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 </Card>
             </div>

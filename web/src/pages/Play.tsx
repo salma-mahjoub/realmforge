@@ -70,6 +70,9 @@ function SettlePanel({ levelId, result, fee, onSettled }: { levelId: number; res
     const [error, setError] = useState<string | null>(null);
     const [running, setRunning] = useState(false);
     const [done, setDone] = useState(false);
+    // The server signs a given recording only once (409 afterwards), so a retry after a failed
+    // transaction must reuse the signature it already has until its deadline passes.
+    const signedRef = useRef<Awaited<ReturnType<typeof api.submitRun>> | null>(null);
     const mark = (i: number, s: StepState, note?: string) => {
         setSteps((p) => p.map((v, j) => (j === i ? s : v)));
         if (note) setNotes((p) => p.map((v, j) => (j === i ? note : v)));
@@ -82,7 +85,10 @@ function SettlePanel({ levelId, result, fee, onSettled }: { levelId: number; res
         let i = 0;
         try {
             mark(0, 'active');
-            const signed = await api.submitRun({ player: web3.address, levelId, run: result.run });
+            const cached = signedRef.current;
+            const stillValid = cached && cached.result.player.toLowerCase() === web3.address.toLowerCase() && Number(cached.result.deadline) > Date.now() / 1000 + 60;
+            const signed = stillValid ? cached : await api.submitRun({ player: web3.address, levelId, run: result.run });
+            signedRef.current = signed;
             const r = signed.result;
             const runResult = { player: r.player, levelId: BigInt(r.levelId), timeMs: r.timeMs, cleared: r.cleared, coins: r.coins, nonce: BigInt(r.nonce), deadline: BigInt(r.deadline) };
             mark(0, 'done', `Signed by ${signed.signer.slice(0, 8)}… · nonce ${r.nonce}`);

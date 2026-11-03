@@ -14,6 +14,7 @@ import { DatabaseSync } from "node:sqlite";
  *  - seasons      : indexed SeasonClosed
  *  - pinned_levels: level JSON pinned through this API (+ min time computed at publish)
  *  - signed_runs  : RunResults signed by this server (replay storage for ghost races)
+ *  - run_fingerprints : sha256 of every validated run, so the same recording is never signed twice
  *  - processed_logs / indexer_state : idempotent, resumable indexing
  */
 export type Db = DatabaseSync;
@@ -130,6 +131,13 @@ CREATE TABLE IF NOT EXISTS signed_runs (
   created_at   INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS signed_runs_level ON signed_runs(level_id, cleared, time_ms);
+CREATE TABLE IF NOT EXISTS run_fingerprints (
+  level_id    TEXT NOT NULL,
+  run_hash    TEXT NOT NULL,
+  player      TEXT NOT NULL,
+  created_at  INTEGER NOT NULL,
+  PRIMARY KEY (level_id, run_hash)
+);
 CREATE TABLE IF NOT EXISTS processed_logs (
   tx_hash   TEXT NOT NULL,
   log_index INTEGER NOT NULL,

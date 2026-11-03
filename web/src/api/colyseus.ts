@@ -47,6 +47,8 @@ export interface RaceStateLike {
 
 export class RaceConnection {
     private unsub: Array<() => void> = [];
+    /** The lobby registered its room listeners on this connection (they must be added only once). */
+    bound = false;
 
     private constructor(readonly room: Room<RaceStateLike>) {}
 
@@ -117,4 +119,39 @@ export function takeConnection(code: string): RaceConnection | null {
     const conn = handoff && handoff.code === code ? handoff : null;
     if (conn) handoff = null;
     return conn;
+}
+
+interface Session {
+    conn: Promise<RaceConnection>;
+    timer?: ReturnType<typeof setTimeout>;
+}
+const sessions = new Map<string, Session>();
+
+/**
+ * One connection per room and wallet, shared across React's double effect run (StrictMode mounts, cleans up and
+ * mounts again). Leaving the room on that first cleanup destroyed the host's freshly created room, and the second
+ * run then failed with `room "XXXX" not found`.
+ */
+export function openRoom(key: string, code: string, join: () => Promise<RaceConnection>): Promise<RaceConnection> {
+    const existing = sessions.get(key);
+    if (existing) {
+        clearTimeout(existing.timer);
+        existing.timer = undefined;
+        return existing.conn;
+    }
+    const handed = takeConnection(code);
+    const conn = handed ? Promise.resolve(handed) : join();
+    sessions.set(key, { conn });
+    conn.catch(() => sessions.delete(key));
+    return conn;
+}
+
+/** Leaves the room shortly after the page is closed, unless the page reopens it at once (the second effect run). */
+export function closeRoom(key: string) {
+    const session = sessions.get(key);
+    if (!session) return;
+    session.timer = setTimeout(() => {
+        sessions.delete(key);
+        void session.conn.then((c) => c.leave()).catch(() => undefined);
+    }, 400);
 }

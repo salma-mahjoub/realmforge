@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Check, Copy, Flag, Hourglass, KeyRound, LogOut, Plus, Radio, RotateCcw, Swords, Users } from 'lucide-react';
 import { api } from '../api/client';
-import { RaceConnection, colorFor, stashConnection, takeConnection } from '../api/colyseus';
+import { RaceConnection, closeRoom, colorFor, openRoom, stashConnection } from '../api/colyseus';
 import type { RoomPlayer } from '../api/types';
 import { EventBus } from '../game/EventBus';
 import { PhaserGame } from '../game/PhaserGame';
@@ -239,14 +239,12 @@ function RaceRoom({ code }: { code: string }) {
         }
         setOnline('connecting');
         setJoinError(null);
-        const handedOver = takeConnection(code);
-        (handedOver ? Promise.resolve(handedOver) : RaceConnection.joinByCode(code, { address: web3.address, levelId: demoLevel.id }))
+        const key = `${code}:${web3.address}`;
+        openRoom(key, code, () => RaceConnection.joinByCode(code, { address: web3.address!, levelId: demoLevel.id }))
             .then((c) => {
-                if (cancelled) return void c.leave();
+                if (cancelled) return;
                 conn.current = c;
-                c.attachToScene();
-                c.room.onMessage('result', (m: unknown) => setResult(parseRaceResult(m)));
-                c.room.onStateChange((st) => {
+                const applyState = (st: NonNullable<typeof c.room.state>) => {
                     const lid = Number(st.levelId);
                     if (Number.isFinite(lid) && st.levelId) setLiveLevelId(lid);
                     const list: RoomPlayer[] = [];
@@ -263,12 +261,20 @@ function RaceRoom({ code }: { code: string }) {
                         });
                     });
                     setLivePlayers(list);
-                });
-                c.room.onMessage('countdown', (m: unknown) => setCountdown(typeof m === 'number' ? m : Number((m as { seconds?: number })?.seconds ?? 3)));
-                c.room.onMessage('start', () => {
-                    setCountdown(0);
-                    setStarted(true);
-                });
+                };
+                // listeners go on once per connection; the state is also applied now, as its first sync may already be past
+                if (!c.bound) {
+                    c.bound = true;
+                    c.attachToScene();
+                    c.room.onMessage('result', (m: unknown) => setResult(parseRaceResult(m)));
+                    c.room.onStateChange(applyState);
+                    c.room.onMessage('countdown', (m: unknown) => setCountdown(typeof m === 'number' ? m : Number((m as { seconds?: number })?.seconds ?? 3)));
+                    c.room.onMessage('start', () => {
+                        setCountdown(0);
+                        setStarted(true);
+                    });
+                }
+                if (c.room.state) applyState(c.room.state);
                 setOnline('live');
             })
             .catch((e) => {
@@ -278,8 +284,8 @@ function RaceRoom({ code }: { code: string }) {
             });
         return () => {
             cancelled = true;
-            void conn.current?.leave();
             conn.current = null;
+            closeRoom(key);
         };
     }, [code, web3.address, demoLevel.id]);
 

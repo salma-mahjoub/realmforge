@@ -24,6 +24,8 @@ export const PAYOUT = [
     ['Owner', 10],
     ['Pool', 5],
 ] as const;
+const PAYOUT_LABELS: Record<string, string> = { '1st': '1st place', '2nd': '2nd place', Owner: 'Level owner', Pool: 'Season pool' };
+const fmt = (n: number) => (Number.isFinite(n) ? Number(n.toFixed(2)).toLocaleString() : '—');
 
 function CreateRoom() {
     const navigate = useNavigate();
@@ -37,6 +39,9 @@ function CreateRoom() {
     const [stake, setStake] = useState('20');
     const [code, setCode] = useState('');
     const [creating, setCreating] = useState(false);
+    const [players, setPlayers] = useState(2);
+    // what the entered code points to on-chain: the host's stake is shown before anyone pays it
+    const target = useRace(code.length >= 4 ? code : undefined);
     const list = levels ?? MOCK_LEVELS;
     const level = list.find((l) => l.id === levelId) ?? list[0];
     // The state starts on a demo level id (41); once the real list loads the <select> and the preview fall back
@@ -70,10 +75,16 @@ function CreateRoom() {
             <header className="page-head">
                 <div>
                     <h1 className="page-title">Versus race</h1>
-                    <p className="page-sub">2–4 players race the same level. Stakes are escrowed by ForgeCoin; first to the flag takes 60% of the pot.</p>
+                    <p className="page-sub">Race the same level against 1 to 3 other players. Everyone pays the same stake into escrow and the fastest takes most of the pot.</p>
                 </div>
                 {svc.api === 'offline' && <Pill tone="amber">Game server offline · demo lobby only</Pill>}
             </header>
+            <ol className="step-strip" aria-label="How it works">
+                <li><b>1</b><span>Choose the level and the stake</span></li>
+                <li><b>2</b><span>Confirm the stake in your wallet</span></li>
+                <li><b>3</b><span>Share the room code</span></li>
+                <li><b>4</b><span>Everyone presses ready and races</span></li>
+            </ol>
             <div className="room-new-grid">
                 <Card>
                     <CardHeader icon={<Plus size={18} />} title="Create a room" />
@@ -98,23 +109,35 @@ function CreateRoom() {
                                 </div>
                             </div>
                         )}
-                        <Field label="Stake per player" htmlFor="room-stake" error={stakeError} hint={balance !== undefined ? `Balance: ${balance} FORGE` : 'Escrowed on-chain by ForgeCoin.joinRace when the race starts.'}>
+                        <Field label="Stake per player" htmlFor="room-stake" error={stakeError} hint={`You set the stake for the whole room: every player pays this same amount. ForgeCoin holds it until the race is paid out, or refunds it after 1 hour.${balance !== undefined ? ` Your balance: ${balance} FORGE.` : ''}`}>
                             <Input id="room-stake" inputMode="numeric" value={stake} onChange={(e) => setStake(e.target.value.replace(/[^\d.]/g, ''))} suffix="FORGE" />
                         </Field>
-                        <dl className="payout-mini" aria-label="Payout for a full room">
+                        <div className="players-toggle" role="group" aria-label="Number of players">
+                            <span className="fine">If</span>
+                            {[2, 3, 4].map((n) => (
+                                <button key={n} type="button" aria-pressed={players === n} className={cx('seg', players === n && 'seg-on')} onClick={() => setPlayers(n)}>
+                                    {n}
+                                </button>
+                            ))}
+                            <span className="fine">
+                                players race, the pot is <b className="gold">{fmt(stakeN * players)} FORGE</b> and is paid out like this:
+                            </span>
+                        </div>
+                        <dl className="payout-mini" aria-label={`Payout for ${players} players`}>
                             {PAYOUT.map(([label, pct]) => (
                                 <div key={label}>
-                                    <dt>{label}</dt>
+                                    <dt>{PAYOUT_LABELS[label]}</dt>
                                     <dd>
-                                        {pct}% · <b>{Number.isFinite(stakeN) ? ((stakeN * 4 * pct) / 100).toLocaleString() : '—'}</b>
+                                        {pct}% · <b>{fmt((stakeN * players * pct) / 100)}</b>
                                     </dd>
                                 </div>
                             ))}
                         </dl>
                         <BlockerNotice compact />
                         <Button variant="primary" size="lg" icon={<Swords size={18} aria-hidden />} loading={creating} disabled={!web3.address || !!stakeError || !level} onClick={() => void create()}>
-                            Create room
+                            Create room and stake {fmt(stakeN)} FORGE
                         </Button>
+                        <p className="fine">One wallet confirmation. Then you get the room code to share with the other players.</p>
                     </div>
                 </Card>
                 <Card>
@@ -128,16 +151,17 @@ function CreateRoom() {
                     >
                         <Input aria-label="Room code" placeholder="K7Q2" value={code} maxLength={12} onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} className="code-input" />
                         <Button type="submit" disabled={!code}>
-                            Join
+                            Open room
                         </Button>
                     </form>
-                    <p className="fine">Ask the host for the 4-character code shown in their lobby.</p>
+                    <JoinInfo code={code} race={target.race} />
                     <div className="divider" />
-                    <h3 className="mini-title">How a race settles</h3>
+                    <h3 className="mini-title">How a race works</h3>
                     <ol className="plain-steps">
-                        <li>Everyone pays the stake into ForgeCoin escrow (createRaceRoom / joinRace).</li>
-                        <li>The Colyseus room times the race server-side and checks plausibility.</li>
-                        <li>The server signs the ranking (EIP-712 RaceResult) and anyone can submit it to pay out.</li>
+                        <li>The host picks the level and the stake. Joining players pay that same stake.</li>
+                        <li>Stakes sit in ForgeCoin escrow. The game server times the race and checks that nobody cheats.</li>
+                        <li>When it ends, the server signs the ranking and anyone can submit it to pay out. Players who did not finish are ranked by progress.</li>
+                        <li>If a race is never paid out, every stake can be refunded after 1 hour.</li>
                     </ol>
                     <Button variant="ghost" onClick={() => navigate('/room/DEMO')}>
                         Try the demo lobby
@@ -145,6 +169,29 @@ function CreateRoom() {
                 </Card>
             </div>
         </div>
+    );
+}
+
+type RaceView = ReturnType<typeof useRace>['race'];
+
+/** What the typed code points to on-chain, so a joining player sees the host's stake before paying it. */
+function JoinInfo({ code, race }: { code: string; race: RaceView }) {
+    if (code.length < 4) {
+        return <p className="fine">Ask the host for the room code. The host chooses the stake: you will see it here before you pay anything.</p>;
+    }
+    if (!race) return <p className="fine join-info">Looking for this room…</p>;
+    if (race.status === RACE_STATUS.none) {
+        return <p className="fine join-info join-info-warn">No race with this code on this network yet. Check the code, or wait until the host has confirmed the stake.</p>;
+    }
+    const stake = formatEther(race.stake);
+    if (race.status !== RACE_STATUS.open) {
+        return <p className="fine join-info join-info-warn">This race is already over ({race.status === RACE_STATUS.settled ? 'paid out' : 'refunded'}).</p>;
+    }
+    return (
+        <p className="join-info join-info-ok">
+            <b>Stake {stake} FORGE</b> · {race.players.length} / 4 players · level #{race.levelId.toString()}
+            <span className="fine">Open the room, then confirm {stake} FORGE once to take your seat. The host fixed this amount.</span>
+        </p>
     );
 }
 
@@ -165,7 +212,7 @@ function RaceRoom({ code }: { code: string }) {
     const [online, setOnline] = useState<Online>('connecting');
     const [countdown, setCountdown] = useState<number | null>(null);
     const [started, setStarted] = useState(false);
-    const [copied, setCopied] = useState(false);
+    const [copied, setCopied] = useState<'code' | 'link' | null>(null);
     const [fell, setFell] = useState(false);
     const [myRace, setMyRace] = useState<{ finished: boolean; gaveUp: boolean }>({ finished: false, gaveUp: false });
     const conn = useRef<RaceConnection | null>(null);
@@ -302,13 +349,13 @@ function RaceRoom({ code }: { code: string }) {
         if (online === 'live') conn.current?.ready();
         setPlayers((ps) => ps.map((p) => (p.isYou ? { ...p, ready: !p.ready } : p)));
     };
-    const copyCode = async () => {
+    const copyText = async (text: string, what: 'code' | 'link') => {
         try {
-            await navigator.clipboard.writeText(`${location.origin}/room/${code}`);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1500);
+            await navigator.clipboard.writeText(text);
+            setCopied(what);
+            setTimeout(() => setCopied(null), 1500);
         } catch {
-            toast.error('Could not copy the invite link');
+            toast.error('Could not copy to the clipboard');
         }
     };
 
@@ -341,17 +388,31 @@ function RaceRoom({ code }: { code: string }) {
 
             <div className="race-layout">
                 <Card className="lobby">
-                    <div className="lobby-head">
-                        <div>
-                            <h2 className="lobby-code">Room #{code}</h2>
-                            <span className="fine">
-                                <Users size={13} aria-hidden /> {players.length} / 4 players · {readyCount} ready
-                            </span>
+                    <div className="invite-card">
+                        <span className="invite-label">{online === 'demo' ? 'Demo room: sample players, nobody can join it' : 'Room code: share it with the other players'}</span>
+                        <div className="invite-code" aria-label={`Room code ${code.split('').join(' ')}`}>
+                            {code}
                         </div>
-                        <Button size="sm" variant="ghost" icon={copied ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />} onClick={() => void copyCode()} aria-label="Copy invite link">
-                            {copied ? 'Copied' : 'Invite'}
-                        </Button>
+                        <div className="invite-actions">
+                            <Button size="sm" variant="secondary" icon={copied === 'code' ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />} onClick={() => void copyText(code, 'code')}>
+                                {copied === 'code' ? 'Copied' : 'Copy code'}
+                            </Button>
+                            <Button size="sm" variant="ghost" icon={copied === 'link' ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />} onClick={() => void copyText(`${location.origin}/room/${code}`, 'link')}>
+                                {copied === 'link' ? 'Copied' : 'Copy invite link'}
+                            </Button>
+                        </div>
+                        <span className="fine">They open Race, type the code under “Join with a code”, then pay the same stake ({stake} FORGE).</span>
                     </div>
+                    {!started && (
+                        <ol className="lobby-steps" aria-label="Before the race">
+                            <li className={cx(me?.stakePaid && 'is-done')}>Pay your stake ({stake} FORGE)</li>
+                            <li className={cx(players.length >= 2 && 'is-done')}>Wait for at least one more player ({players.length} / 4 here)</li>
+                            <li className={cx(me?.ready && 'is-done')}>Press “I’m ready”: the race starts when everyone is ready</li>
+                        </ol>
+                    )}
+                    <span className="fine lobby-count">
+                        <Users size={13} aria-hidden /> {players.length} / 4 players · {readyCount} ready
+                    </span>
                     <ul className="player-list" aria-label="Players">
                         {players.map((p) => (
                             <li key={p.sessionId} className={cx('player-row', p.isYou && 'is-you')}>

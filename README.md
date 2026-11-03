@@ -4,8 +4,6 @@ A browser "Mario Maker"-style platformer: build levels with rich Matter.js physi
 ERC-721 NFTs, and earn the ERC-20 **FORGE** token when others play them. Gameplay runs off-chain;
 the chain handles ownership, the economy and settlement through server-signed EIP-712 results.
 
-- **Guide complet** (architecture, règles, contrats, réseaux, stockage): [docs/GUIDE.md](docs/GUIDE.md)
-- **Tester** (démarrage, scénarios, remise à zéro, dépannage): [docs/TESTING.md](docs/TESTING.md)
 - Spec: [docs/SPEC.md](docs/SPEC.md) (PDF: [docs/RealmForge_Spec.pdf](docs/RealmForge_Spec.pdf))
 - UI mockups: [docs/mockups/](docs/mockups/) (browse, editor, gameplay, race, publish, level/market)
 - Ownership: [OWNERSHIP.md](OWNERSHIP.md)

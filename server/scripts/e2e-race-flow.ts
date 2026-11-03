@@ -4,7 +4,7 @@
  * an expired result that must be refused, and the refund path after the timeout.
  *
  * Run: `npx tsx scripts/e2e-race-flow.ts` in server/. Uses Hardhat's unlocked accounts #4 and #5 as racers and #6
- * as the relayer (local chain only). Expects the race amounts of docs/TESTING.md (R2).
+ * as the relayer (local chain only). Checks the 60/25/10/5 payout of the pot.
  */
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";

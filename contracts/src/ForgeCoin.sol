@@ -58,11 +58,15 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
     uint256 public constant MAX_SUPPLY = 100_000_000e18;
     /// @notice One-time faucet amount per address.
     uint256 public constant FAUCET_AMOUNT = 100e18;
+    /// @notice Max FORGE the faucet may mint per UTC day across all addresses (100 claims): Sybil damage control.
+    uint256 public constant FAUCET_DAILY_BUDGET = 10_000e18;
 
     /// @notice Play fee split in basis points: 70% owner · 20% season pool · 10% treasury (remainder).
     uint256 public constant OWNER_BPS = 7_000;
     uint256 public constant POOL_BPS = 2_000;
     uint256 public constant BPS = 10_000;
+    /// @notice Share of the treasury cut that is burned instead of kept (50% of 10% = 5% of every play fee).
+    uint256 public constant TREASURY_BURN_BPS = 5_000;
 
     /// @notice Clear reward = BASE_REWARD + difficultyBonus, the sum capped at MAX_CLEAR_REWARD.
     uint256 public constant BASE_REWARD = 5e18;
@@ -71,6 +75,9 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
     uint256 public constant FIRST_CLEAR_BONUS = 20e18;
     /// @notice Bonus for beating the level's best time.
     uint256 public constant RECORD_BONUS = 10e18;
+    /// @notice Bonus per in-game coin collected during a cleared run, and the cap of that bonus per run.
+    uint256 public constant COIN_BONUS = 0.1e18;
+    uint256 public constant MAX_COIN_BONUS = 5e18;
     /// @notice Max FORGE minted as rewards per player per UTC day (anti-farming).
     uint256 public constant DAILY_MINT_CAP = 200e18;
 
@@ -91,7 +98,7 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
     bytes32 public constant RUN_RESULT_TYPEHASH = keccak256(
         "RunResult(address player,uint256 levelId,uint32 timeMs,bool cleared,uint16 coins,uint256 nonce,uint256 deadline)"
     );
-    bytes32 public constant RACE_RESULT_TYPEHASH = keccak256("RaceResult(bytes32 roomId,address[] ranking)");
+    bytes32 public constant RACE_RESULT_TYPEHASH = keccak256("RaceResult(bytes32 roomId,address[] ranking,uint256 deadline)");
     bytes32 public constant SEASON_RESULT_TYPEHASH = keccak256(
         "SeasonResult(uint256 season,address[] players,address[] creators,uint256[] shares)"
     );
@@ -107,6 +114,8 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
 
     /// @notice Faucet already claimed by this address.
     mapping(address => bool) public faucetClaimed;
+    /// @notice `faucetMintedOnDay[day]` — total minted by the faucet on a UTC day (`block.timestamp / 1 days`).
+    mapping(uint256 => uint256) public faucetMintedOnDay;
     /// @notice `runNonceUsed[player][nonce]` — unordered per-player nonces for RunResult (server picks them).
     /// @dev Named differently from ERC-2612 `nonces(owner)` on purpose.
     mapping(address => mapping(uint256 => bool)) public runNonceUsed;
@@ -135,6 +144,7 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
     error LevelNFTAlreadySet();
     error LevelNFTNotSet();
     error FaucetAlreadyClaimed(address user);
+    error FaucetBudgetExhausted(uint256 day);
     error NotRunPlayer(address caller, address player);
     error SignatureExpired(uint256 deadline);
     error NonceAlreadyUsed(address player, uint256 nonce);
@@ -219,10 +229,17 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
 
     /// @inheritdoc IForgeCoin
     /// @dev Mints {FAUCET_AMOUNT} once per address. ERC20Capped reverts if the cap would be exceeded.
-    /// TODO(studentB): one-per-address is Sybil-able (fresh wallets). Consider a server-signed claim or a captcha.
+    ///      One claim per address cannot stop a Sybil attack (anyone can create fresh wallets), so the faucet
+    ///      also has a global daily budget ({FAUCET_DAILY_BUDGET}): the damage of an attack is bounded per day.
+    ///      Real identity checks (captcha, server-signed claim) would need an off-chain service and a new
+    ///      EIP-712 type; they are left out because FORGE has no market value on a testnet.
     function claimFaucet() external whenNotPaused {
         if (faucetClaimed[msg.sender]) revert FaucetAlreadyClaimed(msg.sender);
+        uint256 day = block.timestamp / 1 days;
+        uint256 minted = faucetMintedOnDay[day] + FAUCET_AMOUNT;
+        if (minted > FAUCET_DAILY_BUDGET) revert FaucetBudgetExhausted(day);
         faucetClaimed[msg.sender] = true;
+        faucetMintedOnDay[day] = minted;
         _mint(msg.sender, FAUCET_AMOUNT);
         emit FaucetClaimed(msg.sender);
     }
@@ -266,8 +283,11 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
         _checkSignature(hashRunResult(r), sig);
 
         ILevelNFT nft = _levelNFT();
-        (address owner,, uint96 playFee, bool active) = nft.levelInfo(r.levelId); // view call
+        (address owner, address creator, uint96 playFee, bool active) = nft.levelInfo(r.levelId); // view call
         if (!active) revert LevelInactive(r.levelId);
+        // The current owner and the original creator are paid the level fee, so letting them also earn mint
+        // rewards on it would be a self-farming loop. They may still play (and pay), but earn nothing.
+        bool selfPlay = r.player == owner || r.player == creator;
 
         // ---------------------------------------------------------------- effects
         runNonceUsed[r.player][r.nonce] = true;
@@ -275,17 +295,25 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
         if (playFee > 0) {
             _spendAllowance(r.player, address(this), playFee);
             (uint256 ownerAmt, uint256 poolAmt, uint256 treasuryAmt) = splitFee(playFee);
+            // Half of the treasury cut is burned (deflationary sink); the rest stays in the contract.
+            uint256 burnAmt = (treasuryAmt * TREASURY_BURN_BPS) / BPS;
+            uint256 keptAmt = treasuryAmt - burnAmt;
             _transfer(r.player, owner, ownerAmt);
-            _transfer(r.player, address(this), poolAmt + treasuryAmt);
+            _transfer(r.player, address(this), poolAmt + keptAmt);
+            if (burnAmt > 0) _burn(r.player, burnAmt);
             seasonPool += poolAmt;
-            // TODO(studentB): SPEC allows burning part of the treasury share instead (`_burn`). Decide + test.
-            treasuryBalance += treasuryAmt;
-            emit FeeSplit(r.levelId, owner, ownerAmt, poolAmt, treasuryAmt);
+            treasuryBalance += keptAmt;
+            emit FeeSplit(r.levelId, owner, ownerAmt, poolAmt, keptAmt);
+            if (burnAmt > 0) emit FeeBurned(r.levelId, burnAmt);
         }
 
-        uint256 reward = _computeReward(r);
-        reward = _mintReward(r.player, reward);
-        _updateStats(r);
+        uint256 reward;
+        if (!selfPlay) {
+            reward = _mintReward(r.player, _computeReward(r));
+            // Self-plays also stay out of the reward statistics, otherwise an owner could consume the
+            // first-clear bonus or set an unbeatable record time on their own level.
+            _updateStats(r);
+        }
 
         // ---------------------------------------------------------------- interaction
         nft.recordRun(r.levelId, r.player, r.timeMs, r.cleared);
@@ -294,9 +322,10 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
     }
 
     /// @notice Gross reward (before daily/supply caps) a run would earn given current level stats.
-    /// @dev reward = min(BASE + 45 * (1 - clears/plays), 50) + first-clear bonus + record bonus. 0 if not cleared.
-    ///      TODO(studentB): `r.coins` (in-game coins collected) is signed but unused — e.g. +0.1 FORGE per coin?
-    ///      TODO(studentB): owner/creator farming their own level (fee goes back to them) — exclude from rewards?
+    /// @dev reward = min(BASE + 45 * (1 - clears/plays), 50) + first-clear bonus + record bonus
+    ///      + min(coins * COIN_BONUS, MAX_COIN_BONUS). 0 if not cleared.
+    ///      The coin bonus is capped on-chain on purpose: the server already checks `coins <= coins in the level`,
+    ///      but a creator could fill a level with coins, and a leaked signer key could sign any uint16.
     function _computeReward(RunResult calldata r) internal view returns (uint256 reward) {
         if (!r.cleared) return 0;
         LevelStats memory st = levelStats[r.levelId];
@@ -308,6 +337,8 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
         if (reward > MAX_CLEAR_REWARD) reward = MAX_CLEAR_REWARD;
         if (st.clears == 0) reward += FIRST_CLEAR_BONUS;
         if (st.bestTimeMs == 0 || r.timeMs < st.bestTimeMs) reward += RECORD_BONUS;
+        uint256 coinBonus = uint256(r.coins) * COIN_BONUS;
+        reward += coinBonus > MAX_COIN_BONUS ? MAX_COIN_BONUS : coinBonus;
     }
 
     /// @dev Mints `amount` clipped to the player's remaining daily cap and the remaining token cap.
@@ -385,21 +416,23 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
     ///      Only ranking[0] and ranking[1] are paid; both must be distinct room players. Pot = stake * players.
     ///      1st 60% · 2nd 25% · level owner 10% · season pool gets the remainder (5% + rounding dust),
     ///      so the sum of payouts always equals the sum of stakes.
-    ///      TODO(studentB): add a deadline/expiry to RaceResult if a settle window is required.
-    function settleRace(bytes32 roomId, address[] calldata ranking, bytes calldata sig)
+    ///      The signed result carries a `deadline`: a stale result (e.g. leaked or signed by mistake) stops being
+    ///      valid, after which the room can only be refunded. Replay is impossible anyway: a room settles once.
+    function settleRace(bytes32 roomId, address[] calldata ranking, uint256 deadline, bytes calldata sig)
         external
         nonReentrant
         whenNotPaused
     {
         Race storage race = _races[roomId];
         if (race.status != RaceStatus.Open) revert RaceNotOpen(roomId);
+        if (block.timestamp > deadline) revert SignatureExpired(deadline);
         if (race.players.length < 2 || ranking.length < 2 || ranking.length > race.players.length) {
             revert InvalidRanking();
         }
         if (ranking[0] == ranking[1] || !_inRace(race, ranking[0]) || !_inRace(race, ranking[1])) {
             revert InvalidRanking();
         }
-        _checkSignature(hashRaceResult(roomId, ranking), sig);
+        _checkSignature(hashRaceResult(roomId, ranking, deadline), sig);
 
         race.status = RaceStatus.Settled;
         uint256 pot = race.stake * race.players.length;
@@ -452,8 +485,8 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
     /// @dev Two-key: DEFAULT_ADMIN submits, the server signs `SeasonResult{season, players, creators, shares}`.
     ///      `shares` are basis points, one per winner (`players` first, then `creators`), and must sum to 10_000.
     ///      Rounding dust stays in the pool for the next season.
-    ///      TODO(studentB): ranking criteria (clears? records? plays on your levels?) are computed off-chain
-    ///                      by the indexer — document them for the oral exam.
+    ///      The ranking criteria (distinct levels cleared, records held, distinct players on a creator's levels,
+    ///      self-plays ignored) are computed off-chain by the indexer: see docs/SEASONS.md.
     function closeSeason(
         address[] calldata players,
         address[] calldata creators,
@@ -494,6 +527,7 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
     // =====================================================================================================
 
     /// @notice Pure fee split helper (70/20/10). `ownerAmt + poolAmt + treasuryAmt == fee` always holds.
+    /// @dev `treasuryAmt` is the whole 10% cut: {settleRun} then burns {TREASURY_BURN_BPS} of it.
     /// @param fee Play fee in FORGE wei.
     function splitFee(uint256 fee) public pure returns (uint256 ownerAmt, uint256 poolAmt, uint256 treasuryAmt) {
         ownerAmt = (fee * OWNER_BPS) / BPS;
@@ -513,9 +547,13 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
     }
 
     /// @notice EIP-712 digest of a RaceResult. Arrays are hashed as keccak256 of the 32-byte-padded elements.
-    function hashRaceResult(bytes32 roomId, address[] calldata ranking) public view returns (bytes32) {
+    function hashRaceResult(bytes32 roomId, address[] calldata ranking, uint256 deadline)
+        public
+        view
+        returns (bytes32)
+    {
         return _hashTypedDataV4(
-            keccak256(abi.encode(RACE_RESULT_TYPEHASH, roomId, keccak256(abi.encodePacked(ranking))))
+            keccak256(abi.encode(RACE_RESULT_TYPEHASH, roomId, keccak256(abi.encodePacked(ranking)), deadline))
         );
     }
 

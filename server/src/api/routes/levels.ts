@@ -7,6 +7,8 @@ import { toJsonSafe } from "../../eip712.js";
 import type { Services } from "../../services.js";
 import { badRequest, zodDetails } from "../errors.js";
 import { clearProofBodySchema, idParamSchema, listQuerySchema, pinBodySchema } from "../schemas.js";
+import { META_COLS } from "../queries.js";
+import { ownerEarnings } from "./stats.js";
 
 function decodeImage(input: string): { bytes: Uint8Array; type: string; ext: string } | null {
   const m = /^data:(image\/(png|jpeg|webp));base64,(.+)$/s.exec(input);
@@ -18,8 +20,6 @@ function decodeImage(input: string): { bytes: Uint8Array; type: string; ext: str
   return { bytes, type, ext: type.split("/")[1] };
 }
 
-/** Level name/theme from the pinned JSON (null when the level was not pinned through this server). */
-const META_COLS = "json_extract(p.json, '$.meta.name') AS name, json_extract(p.json, '$.meta.theme') AS theme";
 
 export function levelRoutes(app: FastifyInstance, svc: Services) {
   /**
@@ -157,7 +157,8 @@ export function levelRoutes(app: FastifyInstance, svc: Services) {
       )
       .get(p.data.id);
     if (!row) return reply.code(404).send({ error: "level not indexed" });
-    return row;
+    // Total the level owner has earned from play fees and races (wei), for the "creator earned" figure.
+    return { ...row, earned: ownerEarnings(svc, p.data.id).total };
   });
 
   /** Pinned level.v1 JSON (canonical bytes, keccak256 == layoutHash) of an on-chain level. */

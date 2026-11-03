@@ -6,6 +6,16 @@ import { useTx } from './useTx';
 import type { RunResult } from './types';
 
 /**
+ * ERC-2612 permits are verified against the contract's EIP-712 domain (`eip712Domain()`), which is
+ * "RealmForge ForgeCoin" — NOT the ERC-20 `name()` ("ForgeCoin"). Using `name()` makes the signature
+ * recover to a random address; the contract swallows that failure and the settle reverts on allowance.
+ */
+export function permitDomain(eip712: readonly [unknown, string, string, bigint, `0x${string}`, ...unknown[]], chainId: number, verifyingContract: `0x${string}`) {
+    const [, name, version] = eip712;
+    return { name, version, chainId, verifyingContract };
+}
+
+/**
  * `ForgeCoin.settleRun(RunResult, sig)` (SPEC §5.3) after an ERC-20 `approve`, or in one tx with
  * `settleRunWithPermit(RunResult, sig, uint8 v, bytes32 r, bytes32 s, permitDeadline)` (ERC-2612).
  */
@@ -36,10 +46,10 @@ export function useSettleRun() {
         if (!client) throw new Error('No RPC client');
         const fee = await playFee(result.levelId);
         const nonce = await client.readContract({ address: forgeCoin, abi: forgeCoinAbi, functionName: 'nonces', args: [result.player] });
-        const name = await client.readContract({ address: forgeCoin, abi: forgeCoinAbi, functionName: 'name' });
+        const eip712 = await client.readContract({ address: forgeCoin, abi: forgeCoinAbi, functionName: 'eip712Domain' });
         const permitDeadline = BigInt(Math.floor(Date.now() / 1000) + permitTtlSec);
         const permitSig = await typed.signTypedDataAsync({
-            domain: { name, version: '1', chainId, verifyingContract: forgeCoin },
+            domain: permitDomain(eip712, chainId, forgeCoin),
             types: {
                 Permit: [
                     { name: 'owner', type: 'address' },

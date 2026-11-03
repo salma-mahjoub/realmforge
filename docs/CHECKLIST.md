@@ -31,11 +31,11 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] `scripts/export-abi.ts`
 - [x] ABIs exported to web + server; `ignition/parameters/localhost.json` (account #1 signer)
 - [x] 42 tests passing (38 Solidity, 4 Node), 0 compiler warnings
-- [ ] 9 `it.todo` integration tests from §11
-- [ ] Slither static analysis report and discussion (`docs/security/`)
-- [ ] Gas report for `publish`, `settleRun`, `buy` and `settleRace`, comparing L1 and L2
-- [ ] Coverage ≥ 90% per contract
-- [ ] Sepolia deployment + Etherscan verification; addresses stored in `docs/DEPLOYMENTS.md`
+- [~] `it.todo` integration tests from §11: 5 of 9 done (setActive→LevelInactive, 4-player race, closeSeason ×2; token-cap clipping covered at unit level); left: remix-of-remix (A), reentrancy (A); gas and Slither reports are in docs/
+- [x] Slither static analysis report and discussion: `docs/security/SLITHER.md` (no high/medium finding; every result justified)
+- [x] Gas report for `publish`, `settleRun`, `buy` and `settleRace`, comparing L1 and L2: `docs/GAS.md`
+- [x] Coverage ≥ 90% per contract (Solidity tests: ForgeCoin 99.5%, LevelNFT 90.6%; the only uncovered ForgeCoin line is a defensive cap that cannot be reached)
+- [x] Sepolia deployment + Etherscan verification; addresses stored in `docs/DEPLOYMENTS.md` (links read back from the chain)
 
 ### Student A — `LevelNFT.sol` (ERC-721 + ERC-2981)
 - [x] `publish` with EIP-712 `ClearProof`, unique `layoutHash`, fee cap, parent check
@@ -52,7 +52,9 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] Race escrow: `createRaceRoom`, `joinRace`, `settleRace`, `refundRace` (1 h timeout)
 - [x] `closeSeason`, `setSigner`, `pause`/`unpause`, `withdrawTreasury`
 - [x] Fuzz: fee split sums correctly, supply never exceeds the cap
-- [ ] Resolve 6× `TODO(studentB)` design decisions
+- [x] Resolve 6× `TODO(studentB)` design decisions (6/6 done: self-play earns no reward; coins bonus 0.1/coin, capped at 5; half of the treasury cut is burned; faucet daily budget of 10,000 FORGE; season ranking rules in `docs/SEASONS.md`; RaceResult carries a deadline)
+- [ ] Later: replace the faucet daily budget by a server-signed claim (new EIP-712 type + per-IP limit), keeping the budget as a second layer
+- [ ] Implement the season scoring from `docs/SEASONS.md` in the indexer + a season-signing endpoint
 - [ ] Owner-side defence for the oral: tokenomics, signatures, escrow, reentrancy
 
 ---
@@ -95,9 +97,10 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] PlayScene uses the game-core player + element runtime + fixed 60 Hz clock; replay bitmask + trace + checkpoints recorded (verified in browser)
 - [x] API and Colyseus client aligned with the server's real routes and rooms
 - [x] vitest added (10 tests)
-- [ ] Pages read real indexer/contract data instead of `data/mock.ts` (profile, market listings, activity and earnings still mock: these need server endpoints)
+- [x] Pages read real indexer data instead of `data/mock.ts`: profile, market listings, activity and earnings come from `server/` endpoints (the mock only remains as a dev fallback when the API is down and `VITE_USE_MOCKS` is not false)
 - [ ] Free Reown/WalletConnect project ID in `web/.env.local` (currently a 403 warning)
 - [ ] RaceScene waits for the server countdown/start; ghost replays rendered
+- [~] Race lobby on-chain (`useRace`): create with escrow, join with escrow, settle with the server-signed ranking (deadline included), refund after the timeout; wired in `Room.tsx`, type-checked and unit-tested, **not yet clicked with two wallets**. Server completes the ranking (finishers, then progress), `giveup` and `respawn` messages, Give up / Respawn buttons in the lobby
 - [ ] Wallet connect + transactions tested in a browser with MetaMask
 - [ ] Read the minted token ID from the publish receipt
 
@@ -122,8 +125,9 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [ ] Join signatures / SIWE mandatory
 - [ ] Rate limiting on `/runs/validate`
 - [ ] Fetch level JSON from IPFS for levels not pinned through this server
-- [ ] Profile / market / activity / earnings endpoints
-- [ ] Season-signing admin endpoint, persisting race results, reconnect handling
+- [x] Profile / market / activity / earnings endpoints (indexer now handles FeeSplit, FeeBurned, SeasonClosed)
+- [x] Season ranking + signing: `GET /season/current`, `POST /season/close-proof` (rules of `docs/SEASONS.md`), proven against the real `closeSeason` (`npm run e2e:season`)
+- [ ] Persisting race results, reconnect handling
 
 ## 6. Integration and operations
 - [x] Private GitHub repo: https://github.com/MedSlimane/realmforge
@@ -133,14 +137,14 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] Root `README.md` + root scripts: `dev:chain`, `deploy:local`, `dev:server`, `dev:web`, `test`, `build`, `e2e:chain`
 - [x] Scripted local end-to-end run (`npm run e2e:chain`): faucet → pin → clear-proof → publish → validate → settleRun + settleRunWithPermit → plays=2, creator +7, player +30, pool 2, treasury 1
 - [ ] Browser end-to-end run: build a level → publish → second wallet plays and pays → creator earns → sell the NFT
-- [ ] Race 1v1 end to end with stake escrow
+- [~] Race 1v1 end to end with stake escrow: scripted and passing on the local chain with the real server signer (`npm run e2e:race`: escrow, signed ranking, 60/25/10/5 payout, expired result refused, refund); not yet played in the browser with two wallets
 
 ## 7. Module deliverables (BK-01)
 - [ ] **S6 intermediate version:** publish end to end + solo play + `settleRun` + browse page
 - [ ] Architecture diagram (`docs/architecture.*`)
-- [ ] Threat model, including the server-signer centralisation point and its mitigations
+- [x] Threat model, including the server-signer centralisation point and its mitigations: `docs/security/THREAT_MODEL.md`
 - [ ] Slither + gas report (see §1)
-- [ ] **S7 final demo script**: editor → publish → friend plays → creator earns → race → sell NFT
+- [~] **S7 final demo script**: `docs/DEMO.md` written (editor → publish → friend plays → creator earns → race → sell NFT); not yet rehearsed with wallets
 - [ ] Slides + each student's oral notes (AA4/AA5/AA6)
 
 ### Cut order if behind schedule

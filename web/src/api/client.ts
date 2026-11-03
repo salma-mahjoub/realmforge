@@ -4,6 +4,7 @@ import { SAMPLE_LEVEL } from '../game/level';
 import { markLive, markMock } from './dataSource';
 import type { LevelFileV1, Theme } from '../game/level/types';
 import { THEMES } from '../game/level/types';
+import { timeAgo } from '../components/ui/format';
 import type {
     ClearProofRequest,
     ClearProofResponse,
@@ -16,6 +17,7 @@ import type {
     PinRequest,
     PinResponse,
     ProfileSummary,
+    SeasonRankingResponse,
     RecentTx,
     RunRejected,
     SubmitRunRequest,
@@ -66,12 +68,6 @@ async function read<T>(path: string, mock: () => T, map?: (raw: never) => T): Pr
     }
 }
 
-/** Endpoints the server does not expose yet: always sample data, flagged as such. */
-function sample<T>(path: string, value: T): Promise<T> {
-    markMock(path);
-    return Promise.resolve(value);
-}
-
 const addr = (a: string | null | undefined): Address => (a && isAddress(a) ? getAddress(a) : ('0x0000000000000000000000000000000000000000' as Address));
 
 export function rowToSummary(r: LevelRow): LevelSummary {
@@ -100,7 +96,7 @@ export function rowToDetail(r: LevelRow): LevelDetail {
         layoutHash: r.layout_hash as Hex,
         parentId: r.parent_id,
         clears: r.clears,
-        creatorEarned: '0',
+        creatorEarned: r.earned ? formatUnits(BigInt(r.earned), 18) : '0',
     };
 }
 
@@ -152,11 +148,42 @@ export const api = {
             raw.replays.map((r) => ({ ...r, player: addr(r.player) })),
         ),
 
-    // Not implemented by server/ yet → mock data only (TODO(server): activity, earnings, profiles, listings).
-    getLevelActivity: (_id: number) => sample<RecentTx[]>('/levels/:id/activity', USE_MOCKS ? MOCK_RECENT_TX : []),
-    getCreatorEarnings: (_id: number) => sample<{ day: string; forge: number }[]>('/levels/:id/earnings', USE_MOCKS ? MOCK_EARNINGS : []),
-    getProfile: (address: Address) => sample<ProfileSummary>('/profiles/:address', mockProfile(address)),
-    listListings: () => sample<Listing[]>('/market/listings', USE_MOCKS ? MOCK_LISTINGS : []),
+    // Indexed from the chain by server/ (GET /levels/:id/activity, /levels/:id/earnings, /profiles/:address, /market/listings).
+    getLevelActivity: (id: number) =>
+        read<RecentTx[]>(`/levels/${id}/activity`, () => (USE_MOCKS ? MOCK_RECENT_TX : []), (raw: { items: { kind: string; hash: string; at: number }[] }) =>
+            raw.items.map((i) => ({ kind: i.kind as RecentTx['kind'], hash: i.hash, status: 'Confirmed' as const, ago: timeAgo(i.at) })),
+        ),
+    getCreatorEarnings: (id: number) =>
+        read<{ day: string; forge: number }[]>(`/levels/${id}/earnings`, () => (USE_MOCKS ? MOCK_EARNINGS : []), (raw: { days: { day: string; forge: number }[] }) => raw.days),
+    getProfile: (address: Address) =>
+        read<ProfileSummary>(
+            `/profiles/${address}`,
+            () => mockProfile(address),
+            (raw: { plays: number; clears: number; bestRank: number | null; created: LevelRow[]; owned: LevelRow[]; recentClears: { level: LevelRow; timeMs: number; reward: string; at: number | null }[] }) => ({
+                address,
+                forgeBalance: '0', // the page reads the live balance from the chain
+                plays: raw.plays,
+                clears: raw.clears,
+                bestRank: raw.bestRank,
+                created: raw.created.map(rowToSummary),
+                owned: raw.owned.map(rowToSummary),
+                recentClears: raw.recentClears.map((r) => ({ level: rowToSummary(r.level), timeMs: r.timeMs, reward: formatUnits(BigInt(r.reward || '0'), 18), ago: r.at ? timeAgo(r.at) : '' })),
+            }),
+        ),
+    listListings: () =>
+        read<Listing[]>('/market/listings', () => (USE_MOCKS ? MOCK_LISTINGS : []), (raw: { items: LevelRow[] }) =>
+            raw.items.map((r) => ({
+                level: rowToSummary(r),
+                seller: addr(r.owner),
+                priceEth: formatEther(BigInt(r.listing_price ?? '0')),
+                royaltyBps: 500,
+                listedAgo: r.listed_at ? timeAgo(r.listed_at) : '',
+            })),
+        ),
+
+    // seasons (docs/SEASONS.md): live ranking, and the server-signed ranking the admin submits to closeSeason
+    getSeason: () => request<SeasonRankingResponse>('/season/current'),
+    requestSeasonProof: () => request<unknown>('/season/close-proof', { method: 'POST' }),
 
     // publish flow (SPEC §3.3): pin first, then the clear proof references the pinned layoutHash
     pinLevel: (body: PinRequest) => request<PinResponse>('/levels/pin', { method: 'POST', json: body }),

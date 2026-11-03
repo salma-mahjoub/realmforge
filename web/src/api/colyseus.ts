@@ -33,7 +33,7 @@ export interface JoinOptions {
 }
 
 const PALETTE = [0x22d3ee, 0xf472b6, 0xa3e635, 0xfbbf24];
-const colorFor = (sessionId: string) => PALETTE[[...sessionId].reduce((a, c) => a + c.charCodeAt(0), 0) % PALETTE.length];
+export const colorFor = (sessionId: string) => PALETTE[[...sessionId].reduce((a, c) => a + c.charCodeAt(0), 0) % PALETTE.length];
 
 /** Shape the client expects from the server's room state (schema classes on the server). */
 export interface RaceStateLike {
@@ -83,6 +83,7 @@ export class RaceConnection {
         });
         this.unsub.push(EventBus.subscribe('race:local-state', (s) => this.room.send('pos', s)));
         this.unsub.push(EventBus.subscribe('race:checkpoint', (c) => this.room.send('checkpoint', c)));
+        this.unsub.push(EventBus.subscribe('race:respawn', () => this.room.send('respawn')));
         this.unsub.push(EventBus.subscribe('race:coins', (count) => this.room.send('coin', { count })));
         this.unsub.push(EventBus.subscribe('play:finished', () => this.room.send('finish')));
     }
@@ -91,9 +92,29 @@ export class RaceConnection {
         this.room.send('ready');
     }
 
+    /** Abandon the race: it stops waiting for this player, who is then ranked by progress. */
+    giveUp() {
+        this.room.send('giveup');
+    }
+
     async leave() {
         this.unsub.forEach((u) => u());
         this.unsub = [];
         await this.room.leave(true);
     }
+}
+
+/**
+ * A room created on the "new race" page must stay alive while the player moves to the lobby page (Colyseus
+ * disposes an empty room), so the connection is handed over instead of being closed and re-opened.
+ */
+let handoff: RaceConnection | null = null;
+export function stashConnection(conn: RaceConnection) {
+    void handoff?.leave();
+    handoff = conn;
+}
+export function takeConnection(code: string): RaceConnection | null {
+    const conn = handoff && handoff.code === code ? handoff : null;
+    if (conn) handoff = null;
+    return conn;
 }

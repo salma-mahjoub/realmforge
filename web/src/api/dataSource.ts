@@ -8,7 +8,7 @@ const mocked = new Set<string>();
 const listeners = new Set<() => void>();
 let version = 0;
 
-const norm = (path: string) => path.split('?')[0].replace(/\/\d+(?=\/|$)/g, '/:id');
+const norm = (path: string) => path.split('?')[0].replace(/\/0x[0-9a-fA-F]{40}(?=\/|$)/g, '/:address').replace(/\/\d+(?=\/|$)/g, '/:id');
 
 export function markMock(path: string) {
     const key = norm(path);

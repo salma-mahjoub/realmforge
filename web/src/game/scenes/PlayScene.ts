@@ -84,6 +84,7 @@ export class PlayScene extends Phaser.Scene {
     protected currentInput: InputState = EMPTY_INPUT;
     private spawnTile!: Waypoint;
     private goalReached = false;
+    private lastMissingWarning = -1000;
     private creator?: string;
     private sequence: 'intro' | 'death' | 'dead' | 'goal' | null = null;
     private effects!: PlayEffects;
@@ -139,6 +140,7 @@ export class PlayScene extends Phaser.Scene {
         this.finished = false;
         this.paused = false;
         this.goalReached = false;
+        this.lastMissingWarning = -1000;
         this.checkpointName = null;
         this.replay = createReplay();
         this.trace = [];
@@ -471,9 +473,20 @@ export class PlayScene extends Phaser.Scene {
                 }
                 break;
             }
-            case 'goal':
+            case 'goal': {
+                // The server only accepts a clear that touched every checkpoint, so the flag does not count
+                // until they have all been reached (otherwise the run would be rejected at publish/settle time).
+                const missing = this.doc.entities.filter((e) => e.type === 'checkpoint' && !this.checkpointHits.some((c) => c.id === e.id)).length;
+                if (missing > 0) {
+                    if (this.frame - this.lastMissingWarning > 120) {
+                        this.lastMissingWarning = this.frame;
+                        this.effects.score(this.playerSprite.x, this.playerSprite.y - TILE * 1.5, missing === 1 ? 'TOUCH THE CHECKPOINT FIRST' : `TOUCH ${missing} CHECKPOINTS FIRST`);
+                    }
+                    break;
+                }
                 this.goalReached = true;
                 break;
+            }
             default:
                 break;
         }
@@ -537,6 +550,9 @@ export class PlayScene extends Phaser.Scene {
         this.time.delayedCall(1800, () => {
             this.emitPlayState('cleared');
             EventBus.emit('play:finished', result);
+            // Test-play from the editor: the clear is recorded, so go back to the editor instead of leaving the
+            // screen faded to black (the Publish dialog needs the editor scene to take its thumbnail).
+            if (this.from === 'editor') this.time.delayedCall(500, () => this.backToEditor());
         });
     }
 

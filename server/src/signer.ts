@@ -122,8 +122,12 @@ export class GameSigner {
     return { message, signature, signer: this.address };
   }
 
-  async signRaceResult(input: { roomId: Hex; ranking: Address[] }): Promise<Signed<RaceResult>> {
-    const message: RaceResult = { roomId: input.roomId, ranking: input.ranking };
+  async signRaceResult(input: { roomId: Hex; ranking: Address[]; deadline?: bigint }): Promise<Signed<RaceResult>> {
+    const message: RaceResult = {
+      roomId: input.roomId,
+      ranking: input.ranking,
+      deadline: input.deadline ?? deadlineFromNow(this.ttlSec),
+    };
     const signature = await this.account.signTypedData({
       domain: this.coinDomain(),
       types: raceResultTypes,

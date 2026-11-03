@@ -109,6 +109,8 @@ export interface BusEvents {
     'race:local-state': [state: LocalRacerState];
     'race:checkpoint': [hit: { id: number }];
     'race:coins': [count: number];
+    /** The race scene restarted after a fall: the server must reset this player's frame counter. */
+    'race:respawn': [];
 }
 
 type Handler<K extends keyof BusEvents> = (...args: BusEvents[K]) => void;

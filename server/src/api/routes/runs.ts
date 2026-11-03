@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { toJsonSafe } from "../../eip712.js";
 import { ContractNotConfiguredError } from "../../signer.js";
@@ -21,6 +22,16 @@ export function runRoutes(app: FastifyInstance, svc: Services) {
     }
     const result = await svc.validator.validate(pinned.level, run, pinned.analysis);
     if (!result.ok) return reply.code(422).send({ error: "run rejected", issues: result.issues });
+
+    // The signed nonce is random, so the chain cannot tell two submissions of the same recording apart:
+    // the server must. A fingerprint is claimed *before* signing (insert-first keeps it atomic) and
+    // released if signing fails so the player can retry. Keyed per level, so copying another player's
+    // recording is refused too. A bot that perturbs its trace still gets through (THREAT_MODEL T6).
+    const runHash = createHash("sha256").update(JSON.stringify(run)).digest("hex");
+    const claimed = svc.db
+      .prepare("INSERT OR IGNORE INTO run_fingerprints (level_id, run_hash, player, created_at) VALUES (?, ?, ?, ?)")
+      .run(levelId.toString(), runHash, player.toLowerCase(), Date.now());
+    if (claimed.changes === 0) return reply.code(409).send({ error: "run already submitted: play the level again" });
 
     try {
       const signed = await svc.signer.signRunResult({
@@ -48,6 +59,7 @@ export function runRoutes(app: FastifyInstance, svc: Services) {
         );
       return { result: toJsonSafe(signed.message), signature: signed.signature, signer: signed.signer };
     } catch (err) {
+      svc.db.prepare("DELETE FROM run_fingerprints WHERE level_id = ? AND run_hash = ?").run(levelId.toString(), runHash);
       if (err instanceof ContractNotConfiguredError) return reply.code(503).send({ error: err.message });
       throw err;
     }

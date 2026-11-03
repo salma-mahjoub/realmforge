@@ -140,6 +140,16 @@ describe("API", () => {
     expect(replays.json().replays).toHaveLength(1);
   });
 
+  it("POST /runs/validate refuses the same recording twice (409) but accepts a different run", async () => {
+    const post = (run: ReturnType<typeof makeRun>) => app.inject({ method: "POST", url: "/runs/validate", payload: { player: PLAYER, levelId: "1", run } });
+    const run = makeRun({ speed: 0.13 });
+    expect((await post(run)).statusCode).toBe(200);
+    const again = await post(run);
+    expect(again.statusCode).toBe(409);
+    expect(again.json().error).toMatch(/already submitted/);
+    expect((await post(makeRun({ speed: 0.14 }))).statusCode).toBe(200);
+  });
+
   it("POST /runs/validate returns 404 for unknown levels", async () => {
     const res = await app.inject({ method: "POST", url: "/runs/validate", payload: { player: PLAYER, levelId: 999, run: makeRun() } });
     expect(res.statusCode).toBe(404);

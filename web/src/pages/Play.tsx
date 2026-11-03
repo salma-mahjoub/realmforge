@@ -11,7 +11,7 @@ import { AddressChip, Badge, Button, EmptyState, ForgeCoin, Kbd, Modal, Skeleton
 import { useAsync } from '../components/useAsync';
 import { useSettleRun } from '../contracts/hooks';
 import { BlockerNotice } from '../components/BlockerNotice';
-import { humanizeError } from '../web3/errors';
+import { humanizeError, isUserRejection } from '../web3/errors';
 import { useServiceStatus, useTxFlow, useWeb3Status } from '../web3/tx';
 import { toast } from '../components/ui';
 
@@ -70,6 +70,9 @@ function SettlePanel({ levelId, result, fee, onSettled }: { levelId: number; res
     const [error, setError] = useState<string | null>(null);
     const [running, setRunning] = useState(false);
     const [done, setDone] = useState(false);
+    // The server signs a given recording only once (409 afterwards), so a retry after a failed
+    // transaction must reuse the signature it already has until its deadline passes.
+    const signedRef = useRef<Awaited<ReturnType<typeof api.submitRun>> | null>(null);
     const mark = (i: number, s: StepState, note?: string) => {
         setSteps((p) => p.map((v, j) => (j === i ? s : v)));
         if (note) setNotes((p) => p.map((v, j) => (j === i ? note : v)));
@@ -82,7 +85,10 @@ function SettlePanel({ levelId, result, fee, onSettled }: { levelId: number; res
         let i = 0;
         try {
             mark(0, 'active');
-            const signed = await api.submitRun({ player: web3.address, levelId, run: result.run });
+            const cached = signedRef.current;
+            const stillValid = cached && cached.result.player.toLowerCase() === web3.address.toLowerCase() && Number(cached.result.deadline) > Date.now() / 1000 + 60;
+            const signed = stillValid ? cached : await api.submitRun({ player: web3.address, levelId, run: result.run });
+            signedRef.current = signed;
             const r = signed.result;
             const runResult = { player: r.player, levelId: BigInt(r.levelId), timeMs: r.timeMs, cleared: r.cleared, coins: r.coins, nonce: BigInt(r.nonce), deadline: BigInt(r.deadline) };
             mark(0, 'done', `Signed by ${signed.signer.slice(0, 8)}… · nonce ${r.nonce}`);
@@ -91,8 +97,8 @@ function SettlePanel({ levelId, result, fee, onSettled }: { levelId: number; res
             mark(1, 'active', 'Sign the permit in your wallet');
             let fallback = false;
             let out = await tx.run('settle', { title: 'Settle run', success: 'Run settled on-chain', successBody: 'Fee paid to the level owner and reward minted to you.' }, () => settle.settleWithPermit(runResult, signed.signature as Hex));
-            if (!out.ok && out.error && !/rejected/i.test(out.error)) {
-                // Wallets without eth_signTypedData_v4 support: classic approve + settleRun (two transactions).
+            if (!out.ok && out.error && !isUserRejection(out.error)) {
+                // Permit failed for any reason except the user clicking Reject (e.g. a wallet without eth_signTypedData_v4): classic approve + settleRun (two transactions).
                 fallback = true;
                 mark(1, 'active', 'Permit unavailable — approving the fee instead (transaction 1 of 2)');
                 const ap = await tx.run('approve', { title: `Approve ${fee} FORGE` }, () => settle.approveFee(runResult.levelId));

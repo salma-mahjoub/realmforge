@@ -43,6 +43,37 @@ function Check({ ok, children, action }: { ok: boolean; children: ReactNode; act
 }
 
 /** Publish flow (SPEC §3.3) with a pre-flight checklist, a 4-step progress rail and readable errors. */
+/**
+ * Asks the editor scene for a snapshot of the level. The editor only answers while it is the active scene;
+ * if nobody answers (for example the game is still on the test-play screen), fall back to the game canvas, which
+ * is created with `preserveDrawingBuffer` so it can be read at any time.
+ */
+function requestThumbnail(timeoutMs = 1500): Promise<string> {
+    return new Promise((resolve, reject) => {
+        let settled = false;
+        const off = EventBus.subscribe('editor:snapshot', (img) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            off();
+            resolve(img);
+        });
+        const timer = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            off();
+            const canvas = document.querySelector<HTMLCanvasElement>('.game-container canvas');
+            try {
+                if (!canvas) throw new Error('no game canvas');
+                resolve(canvas.toDataURL('image/png'));
+            } catch {
+                reject(new Error('Could not capture a thumbnail of the level. Go back to the editor and try again.'));
+            }
+        }, timeoutMs);
+        EventBus.emit('editor:request-snapshot');
+    });
+}
+
 export function PublishModal({ level, clear, onClose, onTestPlay }: { level: LevelFileV1; clear: CreatorClear | null; onClose: () => void; onTestPlay: () => void }) {
     const web3 = useWeb3Status();
     const svc = useServiceStatus();
@@ -69,9 +100,13 @@ export function PublishModal({ level, clear, onClose, onTestPlay }: { level: Lev
     const started = states.some((s) => s !== 'todo');
 
     useEffect(() => {
-        const off = EventBus.subscribe('editor:snapshot', setThumb);
-        EventBus.emit('editor:request-snapshot');
-        return off;
+        let alive = true;
+        requestThumbnail()
+            .then((img) => alive && setThumb(img))
+            .catch(() => undefined); // the publish step retries and shows the reason
+        return () => {
+            alive = false;
+        };
     }, []);
 
     const mark = (i: number, s: StepState, note?: string) => {
@@ -90,17 +125,7 @@ export function PublishModal({ level, clear, onClose, onTestPlay }: { level: Lev
             const file: LevelFileV1 = { ...level, meta: { ...level.meta, name: name.trim(), parentId: parentId || undefined } };
 
             mark(0, 'active');
-            const image =
-                thumb ??
-                (await new Promise<string>((res, rej) => {
-                    const t = setTimeout(() => rej(new Error('The editor did not return a snapshot.')), 5000);
-                    const off = EventBus.subscribe('editor:snapshot', (d) => {
-                        clearTimeout(t);
-                        off();
-                        res(d);
-                    });
-                    EventBus.emit('editor:request-snapshot');
-                }));
+            const image = thumb ?? (await requestThumbnail());
             setThumb(image);
             mark(0, 'done', 'Captured from the canvas');
 
@@ -137,7 +162,10 @@ export function PublishModal({ level, clear, onClose, onTestPlay }: { level: Lev
                     /* other contract's log */
                 }
             }
-            mark(3, 'done', id !== undefined ? `Minted level #${id}` : 'Minted');
+            // A mined transaction is not a minted level: a call to an address without code (wrong network or
+            // contract address) also succeeds, but emits nothing.
+            if (id === undefined) throw new Error('The transaction was mined but no level was minted. Check that your wallet is on the network this app targets and that the contract address is right.');
+            mark(3, 'done', `Minted level #${id}`);
             setMinted({ id, hash: out.hash });
         } catch (e) {
             mark(i, 'error', humanizeError(e));

@@ -239,6 +239,17 @@ export const forgeCoinAbi = [
   {
     "inputs": [
       {
+        "internalType": "uint256",
+        "name": "day",
+        "type": "uint256"
+      }
+    ],
+    "name": "FaucetBudgetExhausted",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "address",
         "name": "account",
         "type": "address"
@@ -481,6 +492,25 @@ export const forgeCoinAbi = [
       }
     ],
     "name": "FaucetClaimed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "levelId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "FeeBurned",
     "type": "event"
   },
   {
@@ -893,6 +923,19 @@ export const forgeCoinAbi = [
   },
   {
     "inputs": [],
+    "name": "COIN_BONUS",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "DAILY_MINT_CAP",
     "outputs": [
       {
@@ -945,6 +988,19 @@ export const forgeCoinAbi = [
   },
   {
     "inputs": [],
+    "name": "FAUCET_DAILY_BUDGET",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "FIRST_CLEAR_BONUS",
     "outputs": [
       {
@@ -959,6 +1015,19 @@ export const forgeCoinAbi = [
   {
     "inputs": [],
     "name": "MAX_CLEAR_REWARD",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "MAX_COIN_BONUS",
     "outputs": [
       {
         "internalType": "uint256",
@@ -1146,6 +1215,19 @@ export const forgeCoinAbi = [
         "internalType": "bytes32",
         "name": "",
         "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "TREASURY_BURN_BPS",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -1367,6 +1449,25 @@ export const forgeCoinAbi = [
   {
     "inputs": [
       {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "faucetMintedOnDay",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "bytes32",
         "name": "roomId",
         "type": "bytes32"
@@ -1482,6 +1583,11 @@ export const forgeCoinAbi = [
         "internalType": "address[]",
         "name": "ranking",
         "type": "address[]"
+      },
+      {
+        "internalType": "uint256",
+        "name": "deadline",
+        "type": "uint256"
       }
     ],
     "name": "hashRaceResult",
@@ -1908,6 +2014,11 @@ export const forgeCoinAbi = [
         "internalType": "address[]",
         "name": "ranking",
         "type": "address[]"
+      },
+      {
+        "internalType": "uint256",
+        "name": "deadline",
+        "type": "uint256"
       },
       {
         "internalType": "bytes",

@@ -131,6 +131,16 @@ export interface RunRejected {
 }
 
 /** Row of GET /levels and GET /levels/:id (SQLite indexer, snake_case). */
+/** GET /season/current: the live ranking of the running season and the closed ones. */
+export interface SeasonRankingResponse {
+    season: number;
+    players: { address: Address; score: number }[];
+    creators: { address: Address; score: number }[];
+    /** basis points, players first then creators */
+    shares: number[];
+    closed: { season: number; pool: string; hash: string }[];
+}
+
 export interface LevelRow {
     id: number;
     creator: string;
@@ -153,4 +163,8 @@ export interface LevelRow {
     min_time_ms: number | null;
     name: string | null;
     theme: string | null;
+    /** FORGE (wei) the level owner has earned: GET /levels/:id only. */
+    earned?: string;
+    /** ms epoch of the latest listing: GET /market/listings only. */
+    listed_at?: number | null;
 }

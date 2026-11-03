@@ -53,6 +53,8 @@ export abstract class BaseMatchRoom<S extends MatchState> extends Room<S, unknow
   maxClients = 4;
   protected analysis: LevelAnalysis | null = null;
   protected ended = false;
+  /** Players who asked to restart: their frame counter starts again, so their next position must be a respawn point. */
+  private awaitingRespawn = new Set<string>();
 
   protected abstract createState(): S;
   protected abstract onPlayerFinished(player: PlayerState): void;
@@ -94,6 +96,8 @@ export abstract class BaseMatchRoom<S extends MatchState> extends Room<S, unknow
       if (p && m.success && this.state.phase === "running") p.coins = Math.min(m.data.count, this.analysis?.maxCoins ?? 255);
     });
     this.onMessage("finish", (client) => this.handleFinish(client));
+    this.onMessage("giveup", (client) => this.handleGiveUp(client));
+    this.onMessage("respawn", (client) => this.handleRespawn(client));
   }
 
   onAuth(_client: Client, rawOptions: unknown) {
@@ -190,8 +194,15 @@ export abstract class BaseMatchRoom<S extends MatchState> extends Room<S, unknow
   private handlePos(client: Client, raw: unknown) {
     const p = this.player(client);
     const m = posSchema.safeParse(raw);
-    if (!p || !m.success || this.state.phase !== "running" || p.finished || p.disqualified) return;
+    if (!p || !m.success || this.state.phase !== "running" || p.finished || p.disqualified || p.gaveUp) return;
     const msg = m.data;
+    if (this.awaitingRespawn.has(client.sessionId)) {
+      const spots = this.analysis ? [this.analysis.spawn, ...this.respawnPoints()] : [];
+      if (this.analysis && !spots.some((r) => Math.hypot(r.x - msg.x, r.y - msg.y) <= 1.5)) {
+        return this.strike(client, p, "respawn away from spawn or checkpoint");
+      }
+      this.awaitingRespawn.delete(client.sessionId);
+    }
     if (msg.f <= p.frame && p.frame !== 0) return; // stale/out-of-order packet
     // Client frames may not run ahead of server time (+ 1 s jitter slack).
     const serverFrames = ((this.now() - this.state.startAt + 1000) * PHYSICS.tickHz) / 1000;
@@ -222,7 +233,7 @@ export abstract class BaseMatchRoom<S extends MatchState> extends Room<S, unknow
   private handleCheckpoint(client: Client, raw: unknown) {
     const p = this.player(client);
     const m = checkpointSchema.safeParse(raw);
-    if (!p || !m.success || this.state.phase !== "running" || p.finished || p.disqualified) return;
+    if (!p || !m.success || this.state.phase !== "running" || p.finished || p.disqualified || p.gaveUp) return;
     if (!this.analysis) {
       p.checkpoint += 1; // unknown level: accept in order of arrival
       return this.onCheckpoint(p, p.checkpoint);
@@ -244,7 +255,7 @@ export abstract class BaseMatchRoom<S extends MatchState> extends Room<S, unknow
 
   private handleFinish(client: Client) {
     const p = this.player(client);
-    if (!p || this.state.phase !== "running" || p.finished || p.disqualified) return;
+    if (!p || this.state.phase !== "running" || p.finished || p.disqualified || p.gaveUp) return;
     const elapsed = this.now() - this.state.startAt;
     if (this.analysis) {
       if (p.checkpoint + 1 < this.analysis.checkpoints.length && !this.allowCheckpointSkip(this.analysis.checkpoints.length)) {
@@ -263,9 +274,29 @@ export abstract class BaseMatchRoom<S extends MatchState> extends Room<S, unknow
     this.checkAllDone();
   }
 
+  /** The player leaves the race but stays in the room: it stops holding the race open and is ranked by progress. */
+  private handleGiveUp(client: Client) {
+    const p = this.player(client);
+    if (!p || this.state.phase !== "running" || p.finished || p.disqualified || p.gaveUp) return;
+    p.gaveUp = true;
+    this.broadcast("gaveUp", { address: p.address });
+    this.checkAllDone();
+  }
+
+  /**
+   * The client scene restarted (after a fall): its frame counter is back at 0, so the stale-packet filter
+   * would drop every position. Reset the counter; the next position must be at the spawn or a checkpoint.
+   */
+  private handleRespawn(client: Client) {
+    const p = this.player(client);
+    if (!p || this.state.phase !== "running" || p.finished || p.disqualified || p.gaveUp) return;
+    p.frame = 0;
+    this.awaitingRespawn.add(client.sessionId);
+  }
+
   protected checkAllDone() {
     if (this.state.phase !== "running") return;
-    const active = [...this.state.players.values()].filter((p) => p.connected && !p.disqualified);
+    const active = [...this.state.players.values()].filter((p) => p.connected && !p.disqualified && !p.gaveUp);
     if (active.every((p) => p.finished)) void this.end();
   }
 

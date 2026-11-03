@@ -26,9 +26,18 @@ const byChain: Partial<Record<number, ContractAddresses>> = Object.fromEntries(
         .map(([chain, a]) => [Number(chain), { levelNFT: getAddress(a.LevelNFT!), forgeCoin: getAddress(a.ForgeCoin!) }]),
 );
 
+/** Chain the env addresses were deployed on (`npm run deploy:local` writes 31337; a Sepolia build sets 11155111). */
+const ENV_CHAIN_ID = Number(import.meta.env.VITE_DEFAULT_CHAIN_ID) || 31337;
+const envConfigured = LEVEL_NFT_ADDRESS !== zeroAddress && FORGE_COIN_ADDRESS !== zeroAddress;
+
+/**
+ * Addresses for the chain the wallet is on. The env addresses only apply to the chain they were deployed on:
+ * using them on another chain sends transactions to an empty address, which "succeeds" without doing anything.
+ * An unknown chain gets zero addresses, so the UI shows "contracts are not deployed on this network".
+ */
 export function getAddresses(chainId?: number): ContractAddresses {
-    if (LEVEL_NFT_ADDRESS !== zeroAddress && FORGE_COIN_ADDRESS !== zeroAddress) return { levelNFT: LEVEL_NFT_ADDRESS, forgeCoin: FORGE_COIN_ADDRESS };
-    return (chainId !== undefined && byChain[chainId]) || { levelNFT: LEVEL_NFT_ADDRESS, forgeCoin: FORGE_COIN_ADDRESS };
+    if (envConfigured && (chainId === undefined || chainId === ENV_CHAIN_ID)) return { levelNFT: LEVEL_NFT_ADDRESS, forgeCoin: FORGE_COIN_ADDRESS };
+    return (chainId !== undefined && byChain[chainId]) || { levelNFT: zeroAddress, forgeCoin: zeroAddress };
 }
 
 export const contractsConfigured =

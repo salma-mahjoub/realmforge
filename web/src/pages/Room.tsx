@@ -1,17 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Check, Copy, Flag, Hourglass, KeyRound, Plus, Radio, Swords, Users } from 'lucide-react';
+import { Check, Copy, Flag, Hourglass, KeyRound, LogOut, Plus, Radio, RotateCcw, Swords, Users } from 'lucide-react';
 import { api } from '../api/client';
-import { RaceConnection } from '../api/colyseus';
+import { RaceConnection, colorFor, stashConnection, takeConnection } from '../api/colyseus';
 import type { RoomPlayer } from '../api/types';
+import { EventBus } from '../game/EventBus';
 import { PhaserGame } from '../game/PhaserGame';
 import { SCENES } from '../game/constants';
 import { Avatar, Badge, Button, Card, CardHeader, EmptyState, Field, ForgeCoin, Input, LevelThumb, Pill, Select, Skeleton, TokenAmount, cx, hex, shortAddr, toast } from '../components/ui';
 import { useAsync } from '../components/useAsync';
 import { useMockData } from '../api/dataSource';
 import { MOCK_LEVELS, MOCK_ROOM_PLAYERS } from '../data/mock';
-import { useForgeBalance } from '../contracts/hooks';
-import { useServiceStatus, useWeb3Status } from '../web3/tx';
+import { formatEther, parseEther } from 'viem';
+import { RACE_STATUS, RACE_TIMEOUT_SEC, parseRaceResult, useForgeBalance, useRace, type SignedRaceResult } from '../contracts/hooks';
+import { useServiceStatus, useTxFlow, useWeb3Status } from '../web3/tx';
 import { BlockerNotice } from '../components/BlockerNotice';
 import { humanizeError } from '../web3/errors';
 
@@ -28,6 +30,8 @@ function CreateRoom() {
     const web3 = useWeb3Status();
     const svc = useServiceStatus();
     const bal = useForgeBalance();
+    const race = useRace();
+    const tx = useTxFlow();
     const { data: levels, loading } = useAsync(() => api.listLevels({ sort: 'popular' }), []);
     const [levelId, setLevelId] = useState<number>(MOCK_LEVELS[0].id);
     const [stake, setStake] = useState('20');
@@ -35,6 +39,9 @@ function CreateRoom() {
     const [creating, setCreating] = useState(false);
     const list = levels ?? MOCK_LEVELS;
     const level = list.find((l) => l.id === levelId) ?? list[0];
+    // The state starts on a demo level id (41); once the real list loads the <select> and the preview fall back
+    // to its first entry, so what is sent on-chain must follow `level`, not the stale state (ERC721NonexistentToken(41)).
+    const selectedId = level.id;
     const stakeN = Number(stake);
     const balance = bal.value !== undefined ? Number(bal.value / 10n ** 18n) : undefined;
     const stakeError = !stake || !Number.isFinite(stakeN) || stakeN <= 0 ? 'Enter a stake above 0' : balance !== undefined && stakeN > balance ? `You only have ${balance} FORGE` : null;
@@ -43,9 +50,12 @@ function CreateRoom() {
         if (!web3.address) return;
         setCreating(true);
         try {
-            const conn = await RaceConnection.create('race', { address: web3.address, levelId, stake });
+            const conn = await RaceConnection.create('race', { address: web3.address, levelId: selectedId, stake });
             const c = conn.code;
-            await conn.leave();
+            // Escrow the creator's stake on-chain (ForgeCoin.createRaceRoom); the room code is the on-chain id.
+            const out = await tx.run('create-race', { title: `Escrow ${stake} FORGE`, success: 'Race created', successBody: 'Your stake is in escrow. Share the room code.' }, () => race.createRoom(c, BigInt(selectedId), parseEther(stake)));
+            if (!out.ok) return void (await conn.leave());
+            stashConnection(conn); // keep the room alive while the lobby page opens
             navigate(`/room/${c}`);
         } catch (e) {
             toast.show({ tone: 'warning', title: 'Game server unreachable', body: `${humanizeError(e)} Opening a demo lobby instead.` });
@@ -69,7 +79,7 @@ function CreateRoom() {
                     <CardHeader icon={<Plus size={18} />} title="Create a room" />
                     <div className="form-stack">
                         <Field label="Level" htmlFor="room-level">
-                            <Select id="room-level" value={levelId} onChange={(e) => setLevelId(Number(e.target.value))} disabled={loading && !levels}>
+                            <Select id="room-level" value={selectedId} onChange={(e) => setLevelId(Number(e.target.value))} disabled={loading && !levels}>
                                 {list.map((l) => (
                                     <option key={l.id} value={l.id}>
                                         #{l.id} {l.name} · {l.theme}
@@ -148,14 +158,26 @@ type Online = 'connecting' | 'live' | 'demo';
 
 function RaceRoom({ code }: { code: string }) {
     const web3 = useWeb3Status();
-    const [players, setPlayers] = useState<RoomPlayer[]>(MOCK_ROOM_PLAYERS.map((p) => (p.isYou ? { ...p, ready: false } : p)));
+    const [demoPlayers, setPlayers] = useState<RoomPlayer[]>(MOCK_ROOM_PLAYERS.map((p) => (p.isYou ? { ...p, ready: false } : p)));
+    const [livePlayers, setLivePlayers] = useState<RoomPlayer[] | null>(null);
+    const [liveLevelId, setLiveLevelId] = useState<number | null>(null);
+    const [result, setResult] = useState<SignedRaceResult | null>(null);
     const [online, setOnline] = useState<Online>('connecting');
     const [countdown, setCountdown] = useState<number | null>(null);
     const [started, setStarted] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [fell, setFell] = useState(false);
+    const [myRace, setMyRace] = useState<{ finished: boolean; gaveUp: boolean }>({ finished: false, gaveUp: false });
     const conn = useRef<RaceConnection | null>(null);
-    const level = MOCK_LEVELS.find((l) => l.theme === 'desert') ?? MOCK_LEVELS[0];
+    const demoLevel = MOCK_LEVELS.find((l) => l.theme === 'desert') ?? MOCK_LEVELS[0];
+    // live room: the level the creator picked (room state), otherwise the sample level of the demo lobby
+    const level = liveLevelId !== null ? { ...demoLevel, id: liveLevelId, name: `Level #${liveLevelId}` } : demoLevel;
     const file = useAsync(() => api.getLevelFile(level.id), [level.id]);
+    const race = useRace(online === 'live' ? code : undefined);
+    const tx = useTxFlow();
+    // on-chain stake status decides who has really paid, whatever the lobby says
+    const staked = new Set((race.race?.players ?? []).map((a) => a.toLowerCase()));
+    const players = online === 'live' && livePlayers ? livePlayers.map((p) => ({ ...p, stakePaid: staked.has(p.address.toLowerCase()) })) : demoPlayers;
     const mockFile = useMockData('/levels/1/file');
 
     useEffect(() => {
@@ -165,11 +187,31 @@ function RaceRoom({ code }: { code: string }) {
             return;
         }
         setOnline('connecting');
-        RaceConnection.joinByCode(code, { address: web3.address, levelId: level.id })
+        const handedOver = takeConnection(code);
+        (handedOver ? Promise.resolve(handedOver) : RaceConnection.joinByCode(code, { address: web3.address, levelId: demoLevel.id }))
             .then((c) => {
                 if (cancelled) return void c.leave();
                 conn.current = c;
                 c.attachToScene();
+                c.room.onMessage('result', (m: unknown) => setResult(parseRaceResult(m)));
+                c.room.onStateChange((st) => {
+                    const lid = Number(st.levelId);
+                    if (Number.isFinite(lid) && st.levelId) setLiveLevelId(lid);
+                    const list: RoomPlayer[] = [];
+                    st.players?.forEach((p, sessionId) => {
+                        if (sessionId === c.room.sessionId) setMyRace({ finished: Boolean((p as { finished?: boolean }).finished), gaveUp: Boolean((p as { gaveUp?: boolean }).gaveUp) });
+                        list.push({
+                            sessionId,
+                            address: (p.address ?? '0x') as RoomPlayer['address'],
+                            color: colorFor(sessionId),
+                            stakePaid: false,
+                            ready: Boolean((p as { ready?: boolean }).ready),
+                            isYou: sessionId === c.room.sessionId,
+                            finishedMs: (p as { finishTimeMs?: number }).finishTimeMs || undefined,
+                        });
+                    });
+                    setLivePlayers(list);
+                });
                 c.room.onMessage('countdown', (m: unknown) => setCountdown(typeof m === 'number' ? m : Number((m as { seconds?: number })?.seconds ?? 3)));
                 c.room.onMessage('start', () => {
                     setCountdown(0);
@@ -183,7 +225,17 @@ function RaceRoom({ code }: { code: string }) {
             void conn.current?.leave();
             conn.current = null;
         };
-    }, [code, web3.address, level.id]);
+    }, [code, web3.address, demoLevel.id]);
+
+    // Falling ends the attempt, not the race: offer a respawn (R) or leaving the race.
+    useEffect(() => {
+        const offDied = EventBus.subscribe('play:died', () => setFell(true));
+        const offState = EventBus.subscribe('play:state', (s) => s.state === 'playing' && setFell(false));
+        return () => {
+            offDied();
+            offState();
+        };
+    }, []);
 
     useEffect(() => {
         if (web3.address) setPlayers((ps) => ps.map((p) => (p.isYou ? { ...p, address: web3.address! } : p)));
@@ -216,6 +268,33 @@ function RaceRoom({ code }: { code: string }) {
     }, [players, online]);
 
     const me = players.find((p) => p.isYou);
+    const live = online === 'live';
+    const raceStatus = race.race?.status;
+    const createdAt = race.race ? Number(race.race.createdAt) : 0;
+    const canRefund = live && raceStatus === RACE_STATUS.open && Date.now() / 1000 > createdAt + RACE_TIMEOUT_SEC;
+    const needsStake = live && raceStatus === RACE_STATUS.open && !!web3.address && !staked.has(web3.address.toLowerCase());
+    const joinStake = async () => {
+        await tx.run('join-race', { title: `Escrow ${stake} FORGE`, success: 'You are in the race', successBody: 'Your stake is in escrow. Press ready when you are.' }, () => race.join(code));
+        void race.refetch();
+    };
+    const settleRace = async () => {
+        if (!result) return;
+        await tx.run('settle-race', { title: 'Settle race', success: 'Race paid out', successBody: '1st gets 60%, 2nd 25%, the level owner 10%, the season pool 5%.' }, () => race.settle(result));
+        void race.refetch();
+    };
+    const refundRace = async () => {
+        await tx.run('refund-race', { title: 'Refund stakes', success: 'Stakes refunded', successBody: 'Every player got their stake back.' }, () => race.refund(code));
+        void race.refetch();
+    };
+    const respawn = () => {
+        setFell(false);
+        EventBus.emit('play:restart');
+    };
+    const giveUp = () => {
+        conn.current?.giveUp();
+        setMyRace((r) => ({ ...r, gaveUp: true }));
+    };
+    const racing = live && started && !result && !myRace.finished && !myRace.gaveUp;
     const toggleReady = () => {
         if (online === 'live') conn.current?.ready();
         setPlayers((ps) => ps.map((p) => (p.isYou ? { ...p, ready: !p.ready } : p)));
@@ -230,7 +309,7 @@ function RaceRoom({ code }: { code: string }) {
         }
     };
 
-    const stake = 20;
+    const stake = race.race && race.race.stake > 0n ? Number(formatEther(race.race.stake)) : 20;
     const pot = stake * players.filter((p) => p.stakePaid).length;
     const readyCount = players.filter((p) => p.ready).length;
     const ranking = started ? [players[3], players[0], players[1], players[2]].filter(Boolean) : players;
@@ -310,7 +389,28 @@ function RaceRoom({ code }: { code: string }) {
                         ))}
                     </dl>
                     {online === 'live' && web3.blocker && <BlockerNotice compact />}
-                    <Button variant={me?.ready ? 'secondary' : 'primary'} size="lg" block onClick={toggleReady} disabled={started || countdown !== null} icon={me?.ready ? <Check size={18} aria-hidden /> : undefined}>
+                    {needsStake && (
+                        <Button variant="primary" size="lg" block loading={tx.isBusy('join-race')} onClick={() => void joinStake()} icon={<ForgeCoin size={18} />}>
+                            Join and escrow {stake} FORGE
+                        </Button>
+                    )}
+                    {result && (
+                        <div className="notice notice-info" role="status">
+                            <Flag size={16} aria-hidden />
+                            <span>
+                                Race finished. 1st {shortAddr(result.ranking[0])}, 2nd {shortAddr(result.ranking[1])} (players who did not finish are ranked by progress). The server signed the ranking: anyone can submit it.
+                            </span>
+                            <Button size="sm" variant="primary" disabled={raceStatus !== RACE_STATUS.open} loading={tx.isBusy('settle-race')} onClick={() => void settleRace()}>
+                                {raceStatus === RACE_STATUS.settled ? 'Paid out' : 'Settle on-chain'}
+                            </Button>
+                        </div>
+                    )}
+                    {canRefund && (
+                        <Button variant="ghost" block loading={tx.isBusy('refund-race')} onClick={() => void refundRace()}>
+                            Refund all stakes (race expired)
+                        </Button>
+                    )}
+                    <Button variant={me?.ready ? 'secondary' : 'primary'} size="lg" block onClick={toggleReady} disabled={started || countdown !== null || (live && !me?.stakePaid)} icon={me?.ready ? <Check size={18} aria-hidden /> : undefined}>
                         {started ? 'Race in progress' : countdown !== null ? 'Starting…' : me?.ready ? 'Ready — waiting for others' : 'I’m ready'}
                     </Button>
                 </Card>
@@ -349,7 +449,19 @@ function RaceRoom({ code }: { code: string }) {
                         )}
                     </div>
                     <div className="race-foot">
-                        <Flag size={15} aria-hidden /> First to the flag wins
+                        <Flag size={15} aria-hidden /> {myRace.gaveUp ? 'You left the race: it ends when the others finish or leave' : 'First to the flag wins'}
+                        {racing && (
+                            <div className="race-actions">
+                                {fell && (
+                                    <Button size="sm" variant="primary" icon={<RotateCcw size={14} aria-hidden />} onClick={respawn}>
+                                        Respawn (R)
+                                    </Button>
+                                )}
+                                <Button size="sm" variant="ghost" icon={<LogOut size={14} aria-hidden />} onClick={giveUp}>
+                                    Give up
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 </Card>
             </div>

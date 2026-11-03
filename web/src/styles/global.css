@@ -344,7 +344,7 @@ a.level-card:hover .thumb img, .market-card:hover .thumb img { transform: scale(
 .split-card { margin: 0; background: var(--bg-sunken); border-radius: var(--r-md); padding: var(--s-6); display: flex; flex-direction: column; gap: var(--s-5); }
 .split-head { display: flex; justify-content: space-between; align-items: center; gap: var(--s-3); color: var(--text-2); font-weight: 600; flex-wrap: wrap; }
 .split-bar { display: flex; height: 18px; border-radius: var(--r-pill); overflow: hidden; gap: 3px; }
-.split-owner { background: var(--gold); } .split-pool { background: var(--violet); } .split-treasury { background: var(--cyan); }
+.split-owner { background: var(--gold); } .split-pool { background: var(--violet); } .split-treasury { background: var(--cyan); } .split-burn { background: var(--red); }
 .split-legend { margin: 0; display: flex; flex-direction: column; gap: var(--s-2); }
 .split-legend > div { display: flex; justify-content: space-between; font-size: var(--fs-md); }
 .split-legend dt { display: inline-flex; align-items: center; gap: 8px; color: var(--text-2); }
@@ -503,6 +503,7 @@ a.level-card:hover .thumb img, .market-card:hover .thumb img { transform: scale(
 .countdown-n { font-family: var(--font-display); font-weight: 800; font-size: clamp(80px, 14vw, 180px); color: #fff; line-height: 1; animation: pop 700ms var(--ease-out); -webkit-text-stroke: 4px var(--violet); paint-order: stroke fill; }
 .race-foot { display: flex; align-items: center; gap: 8px; padding: var(--s-3) var(--s-5); color: var(--text-2); font-size: var(--fs-sm); }
 .race-foot svg { color: var(--violet-ink); }
+.race-actions { margin-left: auto; display: flex; gap: 8px; }
 
 /* ── editor ───────────────────────────────────────────────────────────── */
 .editor { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; flex: 1; min-height: 0; height: calc(100dvh - var(--nav-h)); }

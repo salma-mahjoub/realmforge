@@ -21,6 +21,8 @@ export class PlayerState extends Schema {
   /** Plausibility violations (speed, checkpoint order). */
   @type("uint8") strikes = 0;
   @type("boolean") disqualified = false;
+  /** The player abandoned the race: it no longer holds it open and is ranked by progress. */
+  @type("boolean") gaveUp = false;
 }
 
 export type Phase = "waiting" | "countdown" | "running" | "finished";

@@ -25,6 +25,8 @@ interface IForgeCoin {
     event FeeSplit(
         uint256 indexed levelId, address indexed owner, uint256 ownerAmt, uint256 poolAmt, uint256 treasuryAmt
     );
+    /// @notice Part of the treasury cut destroyed by {settleRun} (`FeeSplit.treasuryAmt` is what was kept).
+    event FeeBurned(uint256 indexed levelId, uint256 amount);
     event RaceCreated(bytes32 indexed roomId, uint256 indexed levelId, address indexed creator, uint256 stake);
     event RaceJoined(bytes32 indexed roomId, address indexed player);
     event RaceSettled(bytes32 indexed roomId, address first, address second, uint256 pot);
@@ -47,7 +49,7 @@ interface IForgeCoin {
     ) external;
     function createRaceRoom(bytes32 roomId, uint256 levelId, uint256 stake) external;
     function joinRace(bytes32 roomId) external;
-    function settleRace(bytes32 roomId, address[] calldata ranking, bytes calldata sig) external;
+    function settleRace(bytes32 roomId, address[] calldata ranking, uint256 deadline, bytes calldata sig) external;
     function refundRace(bytes32 roomId) external;
     function closeSeason(
         address[] calldata players,

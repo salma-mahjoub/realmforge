@@ -15,7 +15,7 @@ function encodeType(types: Record<string, readonly { name: string; type: string 
 const EXPECTED = {
   ClearProof: "ClearProof(address creator,bytes32 layoutHash,uint256 deadline)",
   RunResult: "RunResult(address player,uint256 levelId,uint32 timeMs,bool cleared,uint16 coins,uint256 nonce,uint256 deadline)",
-  RaceResult: "RaceResult(bytes32 roomId,address[] ranking)",
+  RaceResult: "RaceResult(bytes32 roomId,address[] ranking,uint256 deadline)",
   SeasonResult: "SeasonResult(uint256 season,address[] players,address[] creators,uint256[] shares)",
 };
 

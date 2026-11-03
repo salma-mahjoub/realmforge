@@ -25,11 +25,14 @@ const CUSTOM_ERRORS: Record<string, string> = {
     CannotBuyOwnLevel: 'You already own this level.',
     EthTransferFailed: 'The ETH transfer failed.',
     FaucetAlreadyClaimed: 'You already claimed the faucet with this address.',
+    FaucetBudgetExhausted: "Today's faucet budget is used up — try again tomorrow (UTC).",
     InvalidRanking: 'The race ranking is invalid.',
+    InvalidSeasonInput: 'The season ranking is invalid (shares must total 100%).',
     InvalidSignature: 'The game server signature was rejected.',
     InvalidSigner: 'The result was not signed by the RealmForge server.',
     LayoutAlreadyUsed: 'This exact layout is already published.',
     LevelInactive: 'This level is inactive.',
+    LevelNFTAlreadySet: 'ForgeCoin is already linked to a LevelNFT contract.',
     LevelNFTNotSet: 'ForgeCoin is not linked to LevelNFT yet (deployment step missing).',
     NonceAlreadyUsed: 'This run was already settled.',
     NothingToWithdraw: 'Nothing to withdraw yet.',
@@ -43,7 +46,9 @@ const CUSTOM_ERRORS: Record<string, string> = {
     RaceExists: 'A race with this room id already exists.',
     RaceFull: 'This race is full.',
     RaceNotOpen: 'This race is not open.',
+    RaceNotTimedOut: 'Too early to refund: a race can be refunded one hour after it was created.',
     RaceTimedOut: 'This race timed out.',
+    SeasonNotOver: 'The current season is not over yet.',
     SignatureExpired: 'The server signature expired — validate the run again.',
     WrongPayment: 'The price changed — refresh and try again.',
     ZeroAddress: 'Invalid zero address.',
@@ -72,6 +77,10 @@ function walk(e: unknown): ErrLike[] {
     return out;
 }
 
+const USER_REJECTED = 'You rejected the request in your wallet.';
+/** True when the message is the wallet-rejection one (the user clicked "Reject"), not a contract revert. */
+export const isUserRejection = (message: string) => message === USER_REJECTED;
+
 export function humanizeError(e: unknown): string {
     if (!e) return 'Something went wrong.';
     if (typeof e === 'string') return e;
@@ -79,7 +88,7 @@ export function humanizeError(e: unknown): string {
     const all = chain.map((c) => `${c.name ?? ''} ${c.shortMessage ?? ''} ${c.message ?? ''} ${c.details ?? ''}`).join(' | ');
 
     if (chain.some((c) => c.code === 4001 || c.name === 'UserRejectedRequestError') || /user (rejected|denied)|rejected the request|denied transaction/i.test(all)) {
-        return 'You rejected the request in your wallet.';
+        return USER_REJECTED;
     }
     if (/insufficient funds/i.test(all)) return 'Not enough ETH to pay for gas on this network.';
     if (/ChainMismatch|does not match the target chain|chain mismatch/i.test(all)) return 'Your wallet is on another network — switch networks and retry.';

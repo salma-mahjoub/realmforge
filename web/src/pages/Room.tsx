@@ -210,6 +210,7 @@ function RaceRoom({ code }: { code: string }) {
     const [liveLevelId, setLiveLevelId] = useState<number | null>(null);
     const [result, setResult] = useState<SignedRaceResult | null>(null);
     const [online, setOnline] = useState<Online>('connecting');
+    const [joinError, setJoinError] = useState<string | null>(null);
     const [countdown, setCountdown] = useState<number | null>(null);
     const [started, setStarted] = useState(false);
     const [copied, setCopied] = useState<'code' | 'link' | null>(null);
@@ -237,6 +238,7 @@ function RaceRoom({ code }: { code: string }) {
             return;
         }
         setOnline('connecting');
+        setJoinError(null);
         const handedOver = takeConnection(code);
         (handedOver ? Promise.resolve(handedOver) : RaceConnection.joinByCode(code, { address: web3.address, levelId: demoLevel.id }))
             .then((c) => {
@@ -269,7 +271,11 @@ function RaceRoom({ code }: { code: string }) {
                 });
                 setOnline('live');
             })
-            .catch(() => !cancelled && setOnline('demo'));
+            .catch((e) => {
+                if (cancelled) return;
+                setJoinError(humanizeError(e));
+                setOnline('demo');
+            });
         return () => {
             cancelled = true;
             void conn.current?.leave();
@@ -452,6 +458,11 @@ function RaceRoom({ code }: { code: string }) {
                             </div>
                         ))}
                     </dl>
+                    {joinError && web3.address && (
+                        <div className="notice notice-error" role="alert">
+                            <span>Could not join the live room ({joinError}). What you see is a demo lobby with sample players and a sample level, not your race.</span>
+                        </div>
+                    )}
                     {online === 'live' && web3.blocker && <BlockerNotice compact />}
                     {needsStake && (
                         <Button variant="primary" size="lg" block loading={tx.isBusy('join-race')} onClick={() => void joinStake()} icon={<ForgeCoin size={18} />}>

@@ -725,3 +725,5 @@ a.level-card:hover .thumb img, .market-card:hover .thumb img { transform: scale(
 .lobby-steps li.is-done::before { content: '✓'; background: var(--green-soft); border-color: var(--green); color: var(--green); }
 .lobby-count { display: inline-flex; align-items: center; gap: 5px; }
 @media (max-width: 760px) { .step-strip { grid-template-columns: repeat(2, 1fr); } }
+/* the lobby column is long: keep the game and its buttons in view while the page scrolls */
+@media (min-width: 1101px) { .race-stage-card { position: sticky; top: calc(var(--nav-h) + var(--s-3)); } }

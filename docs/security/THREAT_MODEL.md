@@ -1,7 +1,7 @@
 # Threat model: ForgeCoin and the signing trust boundary
 
 Scope: `ForgeCoin.sol` (FORGE token, run settlement, races, seasons, faucet) and the server key that feeds it.
-`LevelNFT` is covered only where it touches ForgeCoin. Deployed on Sepolia (`docs/DEPLOYMENTS.md`). FORGE has no
+`LevelNFT` is covered only where it touches ForgeCoin. Deployed on Sepolia (`docs/GUIDE.md` §6). FORGE has no
 market value on a testnet, so the "impact" column describes what would matter on a real network.
 
 ## 1. What we protect

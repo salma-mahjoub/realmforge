@@ -38,6 +38,9 @@ function CreateRoom() {
     const [creating, setCreating] = useState(false);
     const list = levels ?? MOCK_LEVELS;
     const level = list.find((l) => l.id === levelId) ?? list[0];
+    // The state starts on a demo level id (41); once the real list loads the <select> and the preview fall back
+    // to its first entry, so what is sent on-chain must follow `level`, not the stale state (ERC721NonexistentToken(41)).
+    const selectedId = level.id;
     const stakeN = Number(stake);
     const balance = bal.value !== undefined ? Number(bal.value / 10n ** 18n) : undefined;
     const stakeError = !stake || !Number.isFinite(stakeN) || stakeN <= 0 ? 'Enter a stake above 0' : balance !== undefined && stakeN > balance ? `You only have ${balance} FORGE` : null;
@@ -46,10 +49,10 @@ function CreateRoom() {
         if (!web3.address) return;
         setCreating(true);
         try {
-            const conn = await RaceConnection.create('race', { address: web3.address, levelId, stake });
+            const conn = await RaceConnection.create('race', { address: web3.address, levelId: selectedId, stake });
             const c = conn.code;
             // Escrow the creator's stake on-chain (ForgeCoin.createRaceRoom); the room code is the on-chain id.
-            const out = await tx.run('create-race', { title: `Escrow ${stake} FORGE`, success: 'Race created', successBody: 'Your stake is in escrow. Share the room code.' }, () => race.createRoom(c, BigInt(levelId), parseEther(stake)));
+            const out = await tx.run('create-race', { title: `Escrow ${stake} FORGE`, success: 'Race created', successBody: 'Your stake is in escrow. Share the room code.' }, () => race.createRoom(c, BigInt(selectedId), parseEther(stake)));
             if (!out.ok) return void (await conn.leave());
             stashConnection(conn); // keep the room alive while the lobby page opens
             navigate(`/room/${c}`);
@@ -75,7 +78,7 @@ function CreateRoom() {
                     <CardHeader icon={<Plus size={18} />} title="Create a room" />
                     <div className="form-stack">
                         <Field label="Level" htmlFor="room-level">
-                            <Select id="room-level" value={levelId} onChange={(e) => setLevelId(Number(e.target.value))} disabled={loading && !levels}>
+                            <Select id="room-level" value={selectedId} onChange={(e) => setLevelId(Number(e.target.value))} disabled={loading && !levels}>
                                 {list.map((l) => (
                                     <option key={l.id} value={l.id}>
                                         #{l.id} {l.name} · {l.theme}

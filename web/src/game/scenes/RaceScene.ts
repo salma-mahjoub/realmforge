@@ -34,8 +34,8 @@ export class RaceScene extends PlayScene {
     private remotes = new Map<string, { sprite: Phaser.GameObjects.Sprite; label: Phaser.GameObjects.Text; target: RemotePlayerState }>();
     roomCode?: string;
 
-    constructor() {
-        super(SCENES.Race);
+    constructor(key: string = SCENES.Race) {
+        super(key);
     }
 
     init(data: RaceSceneData) {
@@ -107,7 +107,7 @@ export class RaceScene extends PlayScene {
         if (!this.finishNote) this.showNote('FINISHED  ·  WAITING FOR THE OTHERS');
     }
 
-    private showNote(text: string) {
+    protected showNote(text: string) {
         this.finishNote?.destroy();
         const cam = this.cameras.main;
         const note = this.add

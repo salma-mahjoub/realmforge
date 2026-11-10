@@ -491,7 +491,7 @@ export class PlayScene extends Phaser.Scene {
             case 'goal': {
                 // The server only accepts a clear that touched every checkpoint, so the flag does not count
                 // until they have all been reached (otherwise the run would be rejected at publish/settle time).
-                const missing = this.doc.entities.filter((e) => e.type === 'checkpoint' && !this.checkpointHits.some((c) => c.id === e.id)).length;
+                const missing = this.missingCheckpoints();
                 if (missing > 0) {
                     if (this.frame - this.lastMissingWarning > 120) {
                         this.lastMissingWarning = this.frame;
@@ -506,6 +506,11 @@ export class PlayScene extends Phaser.Scene {
                 break;
         }
         this.emitHud();
+    }
+
+    /** Checkpoints still to touch before the flag counts (co-op also counts the ones a teammate reached). */
+    protected missingCheckpoints(): number {
+        return this.doc.entities.filter((e) => e.type === 'checkpoint' && !this.checkpointHits.some((c) => c.id === e.id)).length;
     }
 
     protected die() {

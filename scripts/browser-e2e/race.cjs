@@ -1,15 +1,17 @@
 // Browser E2E, 1v1 race: host creates a staked room, guest joins + escrows, both ready, both race, payout on-chain.
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
-const { walletScript } = require('./wallet.cjs');
+const { walletScript, WEB, RPC } = require('./wallet.cjs');
 const EXE = process.env.CHROME_PATH || undefined; // default: Playwright's bundled Chromium
 const HOST = '0x90F79bf6EB2c4f870365E785982E1f101E93b906'; // #3 (has FORGE)
 const GUEST = '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc'; // #5 (fresh)
 const LEVEL = process.argv[2] || '2';
+// Rooms require a SIWE sign-in: the test wallet forwards personal_sign to the Hardhat node, so it signs silently.
+const signs = (p) => p.evaluate(() => (window.__walletLog || []).filter((m) => m === 'personal_sign').length);
 const shot = (p, n) => p.screenshot({ path: `${__dirname}/shots/${n}.png` }).then(() => console.log('shot', n));
 const env = Object.fromEntries(require('fs').readFileSync(require('path').resolve(__dirname, '../../web/.env.local'), 'utf8').split('\n').filter((l) => l.includes('=')).map((l) => l.split('=')));
 async function forge(addr) {
   const data = '0x70a08231' + addr.slice(2).toLowerCase().padStart(64, '0');
-  const r = await fetch('http://127.0.0.1:8545', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: env.VITE_FORGE_COIN_ADDRESS, data }, 'latest'] }) });
+  const r = await fetch(RPC, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: env.VITE_FORGE_COIN_ADDRESS, data }, 'latest'] }) });
   return Number(BigInt((await r.json()).result) / 10n ** 15n) / 1000;
 }
 async function session(browser, addr, path) {
@@ -19,7 +21,7 @@ async function session(browser, addr, path) {
   page.on('response', (r) => r.status() >= 400 && !/walletconnect|reown|web3modal/.test(r.url()) && console.log(addr.slice(0, 6), 'HTTP', r.status(), r.url().slice(0, 140)));
   page.on('console', (m) => (m.type() === 'error' && !/Failed to load resource|Reown|Lit is/.test(m.text())) && console.log(addr.slice(0, 6), m.type(), m.text().slice(0, 240)));
   await page.addInitScript({ content: walletScript(addr) });
-  await page.goto('http://localhost:8080' + path, { waitUntil: 'networkidle' });
+  await page.goto(WEB + path, { waitUntil: 'networkidle' });
   await page.getByRole('button', { name: /connect wallet/i }).first().click();
   await page.getByText('RealmForge Test Wallet').first().click();
   await page.waitForTimeout(1500);
@@ -42,15 +44,17 @@ const run = async (page, ms) => {
   await host.getByRole('button', { name: /create room and stake/i }).click();
   await host.waitForURL(/\/room\/(?!new)[A-Z0-9]+/, { timeout: 60000 });
   const code = host.url().split('/room/')[1];
-  console.log('room', code);
+  console.log('room', code, '| host SIWE signatures:', await signs(host));
   await host.waitForTimeout(2000);
 
   const guest = await session(browser, GUEST, '/');
   const faucet = guest.getByRole('button', { name: /get 100 forge/i });
   if (await faucet.isVisible().catch(() => false)) { await faucet.click(); await guest.getByText(/100 FORGE/).first().waitFor(); await guest.waitForTimeout(3000); }
-  await guest.goto(`http://localhost:8080/room/${code}`, { waitUntil: 'load' });
+  await guest.goto(`${WEB}/room/${code}`, { waitUntil: 'load' });
   await guest.waitForTimeout(2500);
   await shot(guest, '31-guest-lobby');
+  console.log('guest SIWE signatures:', await signs(guest));
+  if (await guest.getByText(/wallet signature required/i).isVisible().catch(() => false)) throw new Error('guest join refused: no SIWE session');
   await guest.getByRole('button', { name: /join and escrow/i }).click();
   await guest.getByRole('button', { name: /i.m ready/i }).waitFor({ timeout: 60000 });
   await guest.waitForFunction(() => ![...document.querySelectorAll('button')].some((b) => /join and escrow/i.test(b.innerText)), null, { timeout: 60000 });

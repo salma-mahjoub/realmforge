@@ -2,6 +2,7 @@ import { formatEther, formatUnits, getAddress, isAddress, type Address, type Hex
 import { MOCK_EARNINGS, MOCK_LEADERBOARD, MOCK_LEVELS, MOCK_LISTINGS, MOCK_RECENT_TX, mockProfile } from '../data/mock';
 import { SAMPLE_LEVEL } from '../game/level';
 import { markLive, markMock } from './dataSource';
+import { emptyLineage, mapLineage, type RemixLineage, type RemixLineageResponse } from './remix';
 import type { LevelFileV1, Theme } from '../game/level/types';
 import { THEMES } from '../game/level/types';
 import { timeAgo } from '../components/ui/format';
@@ -139,6 +140,10 @@ export const api = {
         read<LevelDetail>(`/levels/${id}`, () => detailFromSummary(MOCK_LEVELS.find((l) => l.id === id) ?? { ...MOCK_LEVELS[1], id }), rowToDetail),
     /** Pinned level.v1 JSON of an on-chain level (server: GET /levels/:id/file). */
     getLevelFile: (id: number) => read<LevelFileV1>(`/levels/${id}/file`, () => SAMPLE_LEVEL),
+    /** Same file, but never falls back to the bundled sample: a remix must copy the real parent. */
+    getLevelFileLive: (id: number) => request<LevelFileV1>(`/levels/${id}/file`),
+    /** Remix lineage: ancestors chain + direct remixes (server: GET /levels/:id/remixes, indexed parentId). */
+    getRemixes: (id: number) => read<RemixLineage>(`/levels/${id}/remixes`, () => emptyLineage(id), (raw: RemixLineageResponse) => mapLineage(raw)),
     getLeaderboard: (id: number, top = 5) =>
         read<LeaderboardEntry[]>(`/levels/${id}/leaderboard?limit=${top}`, () => MOCK_LEADERBOARD.slice(0, top), (raw: { entries: { rank: number; player: string; timeMs: number }[] }) =>
             raw.entries.map((e) => ({ rank: e.rank, player: addr(e.player), timeMs: e.timeMs })),

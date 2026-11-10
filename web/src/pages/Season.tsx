@@ -10,6 +10,8 @@ import { useTxFlow, useWeb3Status } from '../web3/tx';
 import { ClosedSeasonsList, PayoutsTable, StandingsTable, bpsToPct } from './season/SeasonTables';
 import './season/season.css';
 
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
 interface FetchedProof {
     season: number;
     signer: string;
@@ -25,8 +27,14 @@ export default function Season() {
     const web3 = useWeb3Status();
     const season = useSeason();
     const tx = useTxFlow();
-    const standingsQ = useQuery({ queryKey: ['season', 'standings'], queryFn: () => api.getSeasonStandings(), refetchInterval: 10_000 });
+    const standingsQ = useQuery({
+        queryKey: ['season', 'standings'],
+        queryFn: () => api.getSeasonStandings(),
+        // poll fast while the indexer has not caught up with the on-chain season yet (right after a close)
+        refetchInterval: (q) => (q.state.data && season.season !== undefined && BigInt(q.state.data.season) !== season.season ? 2_000 : 10_000),
+    });
     const data = standingsQ.data;
+    const indexing = data !== undefined && season.season !== undefined && BigInt(data.season) !== season.season;
 
     const [nowMs, setNowMs] = useState(() => Date.now());
     useEffect(() => {
@@ -118,6 +126,12 @@ export default function Season() {
                 </EmptyState>
             )}
 
+            {indexing && (
+                <p className="season-warn" role="status">
+                    The standings below are still those of season {data.season}: the indexer is catching up with the chain…
+                </p>
+            )}
+
             <div className="season-grid">
                 <Card>
                     <CardHeader icon={<Trophy size={18} />} title="Players" aside={<Badge tone="neutral">{Math.min(data?.players.length ?? 0, maxWinners)} / {maxWinners} paid</Badge>} />
@@ -207,7 +221,7 @@ export default function Season() {
                     </ul>
                     {data && (
                         <p className="fine">
-                            This season: {data.totals.runs} paid runs, {data.totals.clears} clears, {data.totals.activePlayers} players on {data.totals.activeLevels} levels.
+                            This season: {plural(data.totals.runs, 'paid run')}, {plural(data.totals.clears, 'clear')}, {plural(data.totals.activePlayers, 'player')} on {plural(data.totals.activeLevels, 'level')}.
                         </p>
                     )}
                 </Card>

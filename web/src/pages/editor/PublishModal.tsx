@@ -6,6 +6,7 @@ import { api, ipfsToHttp } from '../../api/client';
 import { EventBus } from '../../game/EventBus';
 import { layoutHash } from '../../game/level/serialize';
 import type { LevelFileV1 } from '../../game/level/types';
+import { remixStatus, type RemixSource } from '../../game/level/remix';
 import { usePublishLevel } from '../../contracts/hooks';
 import { levelNftAbi } from '../../contracts/generated';
 import type { RunSubmission } from '../../game/run';
@@ -74,7 +75,7 @@ function requestThumbnail(timeoutMs = 1500): Promise<string> {
     });
 }
 
-export function PublishModal({ level, clear, onClose, onTestPlay }: { level: LevelFileV1; clear: CreatorClear | null; onClose: () => void; onTestPlay: () => void }) {
+export function PublishModal({ level, remixSource, clear, onClose, onTestPlay }: { level: LevelFileV1; remixSource?: RemixSource | null; clear: CreatorClear | null; onClose: () => void; onTestPlay: () => void }) {
     const web3 = useWeb3Status();
     const svc = useServiceStatus();
     const pub = usePublishLevel();
@@ -96,7 +97,9 @@ export function PublishModal({ level, clear, onClose, onTestPlay }: { level: Lev
     const nameError = name.trim() ? null : 'Give your level a name';
     const remixError = remixOf && !/^#?\d+$/.test(remixOf.trim()) ? 'Use a level id, e.g. #12' : null;
     const parentId = Number(remixOf.replace('#', '')) || 0;
-    const ready = cleared && !web3.blocker && svc.api !== 'offline' && !feeError && !nameError && !remixError;
+    // A remix must change the layout itself: LevelNFT refuses a layoutHash it has already minted (hashUsed).
+    const remix = remixStatus({ ...level, meta: { ...level.meta, parentId: parentId || undefined } }, remixSource);
+    const ready = cleared && !web3.blocker && svc.api !== 'offline' && !feeError && !nameError && !remixError && !remix.unchanged;
     const started = states.some((s) => s !== 'todo');
 
     useEffect(() => {
@@ -217,7 +220,7 @@ export function PublishModal({ level, clear, onClose, onTestPlay }: { level: Lev
                     <Field label="Play fee" htmlFor="pub-fee" error={feeError} hint="70% goes to the owner on every settled run (max 100).">
                         <Input id="pub-fee" inputMode="decimal" value={fee} onChange={(e) => setFee(e.target.value.replace(',', '.'))} icon={<ForgeCoin size={16} />} suffix="FORGE" disabled={running} />
                     </Field>
-                    <Field label="Remix of" htmlFor="pub-remix" error={remixError} hint="Optional parent level id; its creator shares your resale royalty.">
+                    <Field label="Remix of" htmlFor="pub-remix" error={remixError} hint={parentId ? `Publishes a child of #${parentId}. Its layout must differ from the parent's: each layout can only be minted once.` : 'Optional parent level id; its creator shares your resale royalty.'}>
                         <Input id="pub-remix" placeholder="#12" value={remixOf} onChange={(e) => setRemixOf(e.target.value)} disabled={running} />
                     </Field>
                 </div>
@@ -237,6 +240,11 @@ export function PublishModal({ level, clear, onClose, onTestPlay }: { level: Lev
                                 >
                                     {cleared ? `Cleared this layout from spawn in ${formatMs(clear!.timeMs)}` : 'Clear the current layout in test play, starting from spawn'}
                                 </Check>
+                                {remix.known && (
+                                    <Check ok={!remix.unchanged}>
+                                        {remix.unchanged ? `Change something first: the layout is identical to #${remix.parentId} ${remixSource!.name}` : `Layout differs from #${remix.parentId}, the level you remix`}
+                                    </Check>
+                                )}
                                 <Check ok={web3.isConnected} action={undefined}>
                                     Wallet connected
                                 </Check>

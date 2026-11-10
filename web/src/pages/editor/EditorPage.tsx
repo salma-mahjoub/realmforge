@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Castle, Check, CheckCircle2, Info, Download, Eraser, Grid3x3, Keyboard, Link2, MousePointer2, Pencil, Play, Plus, Redo2, Rocket, Snowflake, Square, Sun, TreePine, Undo2, Upload, ZoomIn, ZoomOut } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { AlertTriangle, Castle, Check, CheckCircle2, GitFork, Info, Download, Eraser, Grid3x3, Keyboard, Link2, MousePointer2, Pencil, Play, Plus, Redo2, Rocket, Snowflake, Square, Sun, TreePine, Undo2, Upload, ZoomIn, ZoomOut } from 'lucide-react';
 import { PhaserGame } from '../../game/PhaserGame';
 import { EventBus, type EditorStatus, type EditorTool } from '../../game/EventBus';
 import { SCENES } from '../../game/constants';
-import { SAMPLE_LEVEL, loadAutosave } from '../../game/level';
+import { SAMPLE_LEVEL, loadAutosave, saveAutosave } from '../../game/level';
+import { gameplayHash, loadRemixSource, makeRemix, parseRemixParam, remixSourceOf, remixStatus, saveRemixSource, type RemixSource } from '../../game/level/remix';
+import { api } from '../../api/client';
 import { layoutHash } from '../../game/level/serialize';
 import { THEMES, type LevelEntity, type LevelFileV1, type Theme } from '../../game/level/types';
 import { Palette, PropertiesPanel } from './Panels';
 import { PublishModal, type CreatorClear } from './PublishModal';
-import { Badge, Button, Kbd, Modal, Select, Tooltip, capitalize, cx, formatMs, timeAgo, toast } from '../../components/ui';
+import { Badge, Button, EmptyState, Kbd, Modal, Select, Spinner, Tooltip, capitalize, cx, formatMs, timeAgo, toast } from '../../components/ui';
 
 const TOOLS: { id: EditorTool; label: string; icon: ReactNode; key: string; hint: string }[] = [
     { id: 'place', label: 'Place', icon: <Plus size={16} aria-hidden />, key: '1', hint: 'Place the selected element' },
@@ -44,12 +47,21 @@ const INITIAL_STATUS: EditorStatus = { tool: 'place', element: 'ground', mode: '
 
 /** One sticky id so a re-clear replaces the nudge instead of stacking copies. */
 const CLEARED_TOAST = 'editor-cleared';
+const REMIX_TOAST = 'editor-remix';
+
+/** `/editor?remix=<id>`: fetching the parent JSON, asking before replacing a draft, or a fetch error. */
+type RemixLoad = { id: number; stage: 'loading' } | { id: number; stage: 'confirm'; file: LevelFileV1; source: RemixSource } | { id: number; stage: 'error'; error: string };
 
 export default function EditorPage() {
     const [status, setStatus] = useState<EditorStatus>(INITIAL_STATUS);
     const [mode, setMode] = useState<'edit' | 'test'>('edit');
     const [selection, setSelection] = useState<LevelEntity | null>(null);
     const [level, setLevel] = useState<LevelFileV1>(() => loadAutosave() ?? SAMPLE_LEVEL);
+    const [params, setParams] = useSearchParams();
+    const remixParam = parseRemixParam(params.get('remix'));
+    // The Phaser scene reads its level once at mount, so the canvas waits until the remix copy is ready.
+    const [remixLoad, setRemixLoad] = useState<RemixLoad | null>(() => (remixParam ? { id: remixParam, stage: 'loading' } : null));
+    const [remixSource, setRemixSource] = useState<RemixSource | null>(loadRemixSource);
     const [savedAt, setSavedAt] = useState<Date | null>(null);
     const [, tick] = useState(0);
     const [clear, setClear] = useState<CreatorClear | null>(null);
@@ -103,6 +115,59 @@ export default function EditorPage() {
         return () => window.removeEventListener('keydown', onKey);
     }, []);
 
+    useEffect(() => {
+        if (!remixParam) return;
+        let alive = true;
+        setRemixLoad({ id: remixParam, stage: 'loading' });
+        api.getLevelFileLive(remixParam)
+            .then((parent) => {
+                if (!alive) return;
+                const file = makeRemix(parent, remixParam);
+                const source = remixSourceOf(parent, remixParam);
+                const draft = loadAutosave();
+                // Ask before replacing real work: any draft other than the bundled sample or an untouched copy of this parent.
+                const keep = draft && layoutHash(draft) !== layoutHash(SAMPLE_LEVEL) && gameplayHash(draft) !== source.gameplayHash;
+                if (keep) setRemixLoad({ id: remixParam, stage: 'confirm', file, source });
+                else startRemix(file, source);
+            })
+            .catch((err: unknown) => alive && setRemixLoad({ id: remixParam, stage: 'error', error: err instanceof Error ? err.message : String(err) }));
+        return () => {
+            alive = false;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [remixParam]);
+
+    const dropRemixParam = () => {
+        const next = new URLSearchParams(params);
+        next.delete('remix');
+        setParams(next, { replace: true });
+    };
+
+    function startRemix(file: LevelFileV1, source: RemixSource) {
+        saveAutosave(file);
+        saveRemixSource(source);
+        setRemixSource(source);
+        setLevel(file);
+        setClear(null);
+        setRemixLoad(null);
+        dropRemixParam();
+        toast.show({ id: REMIX_TOAST, tone: 'info', title: `Remixing #${source.id} ${source.name}`, body: 'Change something in the layout, clear it from spawn, then publish it as a child LevelNFT.' });
+    }
+
+    const cancelRemix = () => {
+        setRemixLoad(null);
+        dropRemixParam();
+    };
+
+    /** Turn the remix into an original level (parentId 0). */
+    const detachRemix = () => {
+        saveRemixSource(null);
+        setRemixSource(null);
+        const { parentId: _p, ...meta } = level.meta;
+        void _p;
+        loadLevel({ ...level, meta });
+    };
+
     const loadLevel = (l: LevelFileV1) => {
         setLevel(l);
         EventBus.emit('editor:load-level', l);
@@ -131,6 +196,7 @@ export default function EditorPage() {
     };
 
     const testing = mode === 'test';
+    const remix = remixStatus(level, remixSource);
     const cleared = clear?.hash === layoutHash(level);
     const toggleTest = () => EventBus.emit('editor:toggle-test');
 
@@ -196,6 +262,27 @@ export default function EditorPage() {
                     </Button>
                 </div>
             </div>
+
+            {remix.parentId > 0 && (
+                <div className={cx('remix-banner', remix.unchanged && 'is-unchanged')} role="status">
+                    {remix.unchanged ? <AlertTriangle size={15} aria-hidden /> : <GitFork size={15} aria-hidden />}
+                    <span>
+                        Remix of{' '}
+                        <Link to={`/level/${remix.parentId}`}>
+                            #{remix.parentId}
+                            {remix.known ? ` ${remixSource!.name}` : ''}
+                        </Link>
+                        {remix.unchanged
+                            ? '. Change something before publishing: the layout is still identical to the original, and each layout can only be minted once.'
+                            : remix.known
+                              ? '. Layout changed: clear it from spawn, then publish it as a child LevelNFT.'
+                              : '. Publishing mints a child LevelNFT; its layout must differ from the original.'}
+                    </span>
+                    <Button size="sm" variant="ghost" onClick={detachRemix} disabled={testing} title="Publish as an original level instead (parentId 0)">
+                        Make it an original
+                    </Button>
+                </div>
+            )}
 
             <div className="toolbar" role="toolbar" aria-label="Editor tools">
                 <div className="tool-group" role="group" aria-label="Tools">
@@ -266,7 +353,19 @@ export default function EditorPage() {
                             </>
                         )}
                     </span>
-                    <PhaserGame scene={SCENES.Editor} data={{ level }} />
+                    {remixLoad?.stage === 'error' ? (
+                        <div className="remix-loading">
+                            <EmptyState tone="error" title={`Level #${remixLoad.id} could not be copied`} action={<><Button to={`/level/${remixLoad.id}`}>Back to the level</Button><Button variant="primary" onClick={cancelRemix}>Open my draft</Button></>}>
+                                {remixLoad.error}
+                            </EmptyState>
+                        </div>
+                    ) : remixLoad ? (
+                        <div className="remix-loading">
+                            <Spinner size={24} label={`Copying level #${remixLoad.id}`} />
+                        </div>
+                    ) : (
+                        <PhaserGame scene={SCENES.Editor} data={{ level }} />
+                    )}
                 </div>
                 <PropertiesPanel entity={testing ? null : selection} testing={testing} />
             </div>
@@ -301,9 +400,30 @@ export default function EditorPage() {
                 </ul>
             </Modal>
 
+            <Modal
+                open={remixLoad?.stage === 'confirm'}
+                onClose={cancelRemix}
+                title={`Remix level #${remixLoad?.id ?? ''}?`}
+                icon={<GitFork size={20} />}
+                size="sm"
+                footer={
+                    <>
+                        <Button onClick={cancelRemix}>Keep my draft</Button>
+                        <Button variant="primary" onClick={() => remixLoad?.stage === 'confirm' && startRemix(remixLoad.file, remixLoad.source)}>
+                            Replace and remix
+                        </Button>
+                    </>
+                }
+            >
+                <p>
+                    The remix replaces your current draft “{level.meta.name}”. Keep your draft and export it first (download icon) if you want to come back to it.
+                </p>
+            </Modal>
+
             {publishing && (
                 <PublishModal
                     level={level}
+                    remixSource={remixSource}
                     clear={clear}
                     onClose={() => setPublishing(false)}
                     onTestPlay={() => {

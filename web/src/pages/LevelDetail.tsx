@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { formatEther, parseEther, zeroAddress } from 'viem';
-import { ArrowUpRight, ChevronRight, Clock, Flag, Gamepad2, Heart, Pencil, Percent, Play, Receipt, RefreshCw, Tag, Trophy, UserRound } from 'lucide-react';
+import { ArrowUpRight, ChevronRight, Clock, Flag, Gamepad2, GitFork, Heart, Pencil, Percent, Play, Receipt, RefreshCw, Tag, Trophy, UserRound } from 'lucide-react';
 import { api } from '../api/client';
 import { useMockData } from '../api/dataSource';
 import { AddressChip, Badge, Button, Card, CardHeader, EmptyState, ExternalLink, ForgeCoin, LevelThumb, Pill, Skeleton, Stat, Tooltip, formatMs, shortAddr } from '../components/ui';
@@ -11,6 +11,7 @@ import { formatForge } from '../contracts/hooks/useForgeBalance';
 import { explorerTxUrl } from '../web3/config';
 import { chainName, useTxFlow, useWeb3Status } from '../web3/tx';
 import { BuyModal, ListModal } from '../components/MarketModals';
+import { RemixLineage } from '../components/RemixLineage';
 
 /** Single-series area chart: no legend, three faint gridlines, violet on the data. */
 function EarningsChart({ points }: { points: { day: string; forge: number }[] }) {
@@ -104,6 +105,8 @@ export default function LevelDetail() {
     const listedEth = listingWei !== undefined ? formatEther(listingWei) : null;
     const isOwner = Boolean(web3.address && owner && web3.address.toLowerCase() === owner.toLowerCase());
     const sample = mockDetail && !onChain;
+    // LevelNFT.publish reverts with ParentNotFound for a token that does not exist, and the copy needs the pinned JSON.
+    const canRemix = !sample && !missingOnChain && Boolean(lvl.cid);
 
     const like = () => void tx.run('like', { title: `Like level #${id}`, success: 'Liked! Thanks for the support.' }, () => market.like(BigInt(id)));
 
@@ -132,6 +135,18 @@ export default function LevelDetail() {
                 ) : sample ? (
                     <Badge tone="neutral">Sample data</Badge>
                 ) : null}
+                {lvl.parentId > 0 && (
+                    <Link to={`/level/${lvl.parentId}`} className="fine-link">
+                        Remix of #{lvl.parentId}
+                    </Link>
+                )}
+                <Tooltip content={canRemix ? 'Open a copy in the editor. Change something, clear it and publish it as a child LevelNFT: the original creator shares its resale royalty.' : 'Remixing needs this level on-chain and its JSON on the game server.'}>
+                    <span className="title-row-end">
+                        <Button to={canRemix ? `/editor?remix=${id}` : undefined} icon={<GitFork size={16} aria-hidden />} disabled={!canRemix}>
+                            Remix
+                        </Button>
+                    </span>
+                </Tooltip>
             </div>
 
             <div className="detail-grid">
@@ -303,6 +318,8 @@ export default function LevelDetail() {
                     </div>
                 </Card>
             </div>
+
+            <RemixLineage id={id} name={lvl.name} creator={creator} canRemix={canRemix} />
 
             <BuyModal open={buying} onClose={() => setBuying(false)} levelId={id} levelName={lvl.name} priceWei={listingWei} seller={owner} creator={creator} onDone={() => void chain.refetch()} />
             <ListModal open={listing} onClose={() => setListing(false)} levelId={id} levelName={lvl.name} currentWei={listingWei} onDone={() => void chain.refetch()} />

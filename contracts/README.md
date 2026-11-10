@@ -19,6 +19,7 @@ npx hardhat test --gas-stats      # gas report (publish, settleRun, buy, settleR
 ## Deploy (SPEC §6 order, Hardhat Ignition)
 
 `ignition/modules/RealmForge.ts`: 1. `ForgeCoin(signer)` → 2. `LevelNFT(signer)` → 3. link and grant the existing GAME_ROLE → 4. `RealmBadges(signer)` for server-signed, soulbound achievement claims. `RealmBadges` does not change either economic contract.
+`ignition/modules/RealmForge.ts` deploys `ForgeCoin(signer)`, `LevelNFT(signer)`, then `LevelBounty(forgeCoin, levelNFT, signer)`. It also links `ForgeCoin` to `LevelNFT` and grants ForgeCoin `GAME_ROLE` on the NFT.
 
 ```bash
 # in-process simulated chain (smoke test, nothing persisted)
@@ -36,7 +37,7 @@ npx hardhat keystore set ETHERSCAN_API_KEY
 npm run deploy:sepolia
 ```
 
-The `signer` parameter defaults to account #0 locally. Both constructors revert on `address(0)`, so the placeholder in `sepolia.json` must be replaced.
+The `signer` parameter defaults to account #0 locally. All three constructors reject zero addresses, so the placeholder in `sepolia.json` must be replaced.
 
 ### Exporting ABIs for web/ and server/
 
@@ -45,6 +46,7 @@ npm run export-abi                                    # → ../web/src/contracts
 npm run export-abi -- --out ../server/src/generated   # or EXPORT_ABI_OUT=<dir>
 ```
 Writes the `LevelNFT`, `ForgeCoin` and `RealmBadges` ABIs (`as const`, typed for viem/wagmi), `*.json`, and `addresses.json` (`{ chainId: { LevelNFT, ForgeCoin, RealmBadges } }` read from `ignition/deployments/`). Only run it when the owner of the target dir asks for it.
+Writes `LevelNFT.abi.ts` / `ForgeCoin.abi.ts` / `LevelBounty.abi.ts` (`as const`, typed for viem/wagmi), `*.json`, and `addresses.json` (`{ chainId: { LevelNFT, ForgeCoin, LevelBounty } }` read from `ignition/deployments/`). Only run it when the owner of the target dir asks for it.
 
 ## Layout
 
@@ -54,6 +56,7 @@ contracts/
 │  ├─ LevelNFT.sol              Student A — ERC-721 levels, market, royalties, ClearProof
 │  ├─ ForgeCoin.sol             Student B — ERC-20 FORGE, runs, races, seasons
 │  ├─ RealmBadges.sol           EIP-712 claimed, soulbound ERC-1155 achievement badges
+│  ├─ LevelBounty.sol           supporting FORGE bounty escrow + BountyClaim
 │  ├─ interfaces/ILevelNFT.sol  frozen A↔B interface (SPEC §6)
 │  ├─ interfaces/IForgeCoin.sol RunResult struct, events, game functions
 │  └─ mocks/MockLevelNFT.sol    lets Student B test without LevelNFT
@@ -61,6 +64,7 @@ contracts/
 │  ├─ LevelNFT.t.sol            Solidity unit + fuzz (A)
 │  ├─ ForgeCoin.t.sol           Solidity unit + fuzz, uses MockLevelNFT (B)
 │  ├─ RealmBadges.t.sol         Solidity unit tests for signatures, replay and soulbound rules
+│  ├─ LevelBounty.t.sol         escrow, claims, role/signature and refund tests
 │  └─ Integration.ts            Ignition deploy, publish → settleRun → recordRun → buy, permit, it.todo backlog
 ├─ ignition/modules/RealmForge.ts   deploy module · ignition/parameters/sepolia.json
 ├─ scripts/export-abi.ts
@@ -74,7 +78,7 @@ contracts/
 | Contract | `src/LevelNFT.sol` | `src/ForgeCoin.sol` |
 | Tests | `test/LevelNFT.t.sol` | `test/ForgeCoin.t.sol` |
 | EIP-712 | `ClearProof` | `RunResult`, `RaceResult`, `SeasonResult` (+ ERC-2612 `Permit`) |
-| Shared | `src/interfaces/ILevelNFT.sol` (A owns, B consumes — change only together), `test/Integration.ts`, Ignition module | |
+| Shared | `LevelBounty.sol` (`BountyClaim`), `src/interfaces/ILevelNFT.sol` (A owns, B consumes — change only together), `test/Integration.ts`, Ignition module | |
 
 `// TODO(studentA)` / `// TODO(studentB)` comments mark the design decisions left to each student (remix royalty split, `_safeMint`, burn share of the fee, `coins` bonus, self-play farming, race deadline, season ranking criteria). The `it.todo` entries in `test/Integration.ts` list the remaining SPEC §11 tests.
 
@@ -86,6 +90,7 @@ Both domains: `{ name, version: "1", chainId, verifyingContract }` (no salt). Re
 |---|---|---|---|
 | LevelNFT | `RealmForge LevelNFT` | `1` | LevelNFT address |
 | ForgeCoin | `RealmForge ForgeCoin` | `1` | ForgeCoin address (same domain for ERC-2612 `Permit`) |
+| LevelBounty | `RealmForge LevelBounty` | `1` | LevelBounty address |
 
 Type strings (hashed on-chain as `*_TYPEHASH` constants):
 
@@ -94,6 +99,7 @@ ClearProof(address creator,bytes32 layoutHash,uint256 deadline)
 RunResult(address player,uint256 levelId,uint32 timeMs,bool cleared,uint16 coins,uint256 nonce,uint256 deadline)
 RaceResult(bytes32 roomId,address[] ranking,uint256 deadline)
 SeasonResult(uint256 season,address[] players,address[] creators,uint256[] shares)
+BountyClaim(uint256 bountyId,uint256 levelId,address player,uint32 timeMs,uint256 nonce,uint256 deadline)
 Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)   // OpenZeppelin ERC20Permit
 ```
 

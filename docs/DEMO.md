@@ -7,7 +7,7 @@ About 8 minutes, live in the browser on a local Hardhat chain. Every step is a r
 
 ```bash
 npm run dev:chain        # terminal 1: Hardhat node, chain 31337
-npm run deploy:local     # deploys LevelNFT + ForgeCoin, writes web/.env.local and server/.env
+npm run deploy:local     # deploys LevelNFT + ForgeCoin + LevelBounty, writes web/.env.local and server/.env
 npm run dev:server       # terminal 2: API :8787 + Colyseus :2567 + indexer
 npm run dev:web          # terminal 3: http://localhost:8080
 ```

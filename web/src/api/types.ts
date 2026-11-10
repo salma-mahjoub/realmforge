@@ -23,6 +23,7 @@ export interface LevelSummary {
     /** IPFS CID of level.v1.json */
     cid: string;
     thumbnailUrl?: string;
+    activeBounties?: number;
 }
 
 export interface LevelDetail extends LevelSummary {
@@ -126,6 +127,8 @@ export interface SubmitRunResponse {
     signer: Address;
 }
 export interface RelayStatus { enabled: boolean; dailyQuota: number; gasLimit: number }
+export interface BountySummary { bountyId: number; levelId: number; sponsor: Address; sponsors?: Address[]; targetTimeMs: number; expiry: number; amount: string; status: 'open' | 'claimed'; winner: Address | null; timeMs: number | null; txHash: Hex }
+export interface BountyClaimProof { claim: { bountyId: string; levelId: string; player: Address; timeMs: number; nonce: string; deadline: string }; signature: Hex; signer: Address }
 
 /** 422 body of clear-proof / runs/validate. */
 export interface RunRejected {
@@ -202,6 +205,7 @@ export interface LevelRow {
     metadata_cid: string | null;
     thumbnail_cid: string | null;
     min_time_ms: number | null;
+    bounty_count?: number;
     name: string | null;
     theme: string | null;
     /** FORGE (wei) the level owner has earned: GET /levels/:id only. */

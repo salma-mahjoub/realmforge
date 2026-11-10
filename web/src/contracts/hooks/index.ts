@@ -9,4 +9,5 @@ export type { SignedSeason, SeasonPayout } from './useSeason';
 export { useMarket } from './useMarket';
 export { useAuction } from './useAuction';
 export { useRace, raceIdFor, parseRaceResult, RACE_STATUS, RACE_TIMEOUT_SEC } from './useRace';
+export { useBounty } from './useBounty';
 export type { SignedRaceResult } from './useRace';

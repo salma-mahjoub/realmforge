@@ -7,13 +7,15 @@ import {
   raceResultTypes,
   runResultTypes,
   seasonResultTypes,
+  bountyClaimTypes,
+  levelBountyDomain,
 } from "../src/eip712.js";
 import { GameSigner, generateNonce, ContractNotConfiguredError, badgeClaimTypes } from "../src/signer.js";
-import { FORGE_COIN, LEVEL_NFT, PLAYER, TEST_KEY, TEST_SIGNER } from "./helpers.js";
+import { FORGE_COIN, LEVEL_NFT, LEVEL_BOUNTY, PLAYER, TEST_KEY, TEST_SIGNER } from "./helpers.js";
 
-const signer = new GameSigner({ privateKey: TEST_KEY, chainId: 31337, levelNftAddress: LEVEL_NFT, forgeCoinAddress: FORGE_COIN });
 const BADGES = "0x0000000000000000000000000000000000001234" as const;
 const badgeSigner = new GameSigner({ privateKey: TEST_KEY, chainId: 31337, realmBadgesAddress: BADGES });
+const signer = new GameSigner({ privateKey: TEST_KEY, chainId: 31337, levelNftAddress: LEVEL_NFT, forgeCoinAddress: FORGE_COIN, levelBountyAddress: LEVEL_BOUNTY });
 
 describe("GameSigner (EIP-712)", () => {
   it("derives the expected signer address", () => {
@@ -98,6 +100,11 @@ describe("GameSigner (EIP-712)", () => {
     expect(await verifyTypedData({ address: TEST_SIGNER, domain, types: badgeClaimTypes, primaryType: "BadgeClaim", message, signature })).toBe(true);
     expect(await verifyTypedData({ address: TEST_SIGNER, domain: { ...domain, chainId: 1 }, types: badgeClaimTypes, primaryType: "BadgeClaim", message, signature })).toBe(false);
     expect(await verifyTypedData({ address: TEST_SIGNER, domain: { ...domain, verifyingContract: FORGE_COIN }, types: badgeClaimTypes, primaryType: "BadgeClaim", message, signature })).toBe(false);
+  });
+
+  it("BountyClaim signature verifies against its own EIP-712 domain", async () => {
+    const signed = await signer.signBountyClaim({ bountyId: 3n, levelId: 7n, player: PLAYER, timeMs: 12_000 });
+    expect(await verifyTypedData({ address: TEST_SIGNER, domain: levelBountyDomain(31337, LEVEL_BOUNTY), types: bountyClaimTypes, primaryType: "BountyClaim", message: signed.message, signature: signed.signature })).toBe(true);
   });
 
   it("rejects out-of-range uint32/uint16 fields and missing contract addresses", async () => {

@@ -96,6 +96,11 @@ describe('UI components (static render)', () => {
         expect(out).toContain(`href="/level/${lvl.id}"`);
         expect(out).toContain('12% clear');
     });
+
+    it('LevelCard badges active bounties', () => {
+        const lvl = { ...MOCK_LEVELS[0], activeBounties: 2 };
+        expect(html(<LevelCard level={lvl} />)).toContain('Bounty');
+    });
 });
 
 describe('toast store', () => {

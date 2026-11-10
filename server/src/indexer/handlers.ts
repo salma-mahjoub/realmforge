@@ -139,6 +139,34 @@ export function applyLog(db: Db, log: DecodedLog): boolean {
         ).run(n(a.season), txHash);
         db.prepare("DELETE FROM forge_outflows WHERE tx_hash = ?").run(txHash);
         break;
+      case "BountyCreated":
+        db.prepare(`INSERT OR REPLACE INTO bounties (bounty_id, level_id, sponsor, target_time_ms, expiry, amount, status, tx_hash, block_number)
+          VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?)`).run(n(a.bountyId), n(a.levelId), lc(a.sponsor), n(a.targetTimeMs), n(a.expiry), s(a.amount), txHash, block);
+        db.prepare("INSERT INTO bounty_contributions (bounty_id, sponsor, amount) VALUES (?, ?, ?) ON CONFLICT(bounty_id, sponsor) DO UPDATE SET amount = excluded.amount")
+          .run(n(a.bountyId), lc(a.sponsor), s(a.amount));
+        feed(a.levelId, "Bounty created", a.sponsor);
+        break;
+      case "BountyFunded":
+        db.prepare("UPDATE bounties SET amount = ? WHERE bounty_id = ? AND status = 'open'").run(s(a.total), n(a.bountyId));
+        {
+          const row = db.prepare("SELECT amount FROM bounty_contributions WHERE bounty_id = ? AND sponsor = ?").get(n(a.bountyId), lc(a.sponsor)) as { amount: string } | undefined;
+          db.prepare("INSERT INTO bounty_contributions (bounty_id, sponsor, amount) VALUES (?, ?, ?) ON CONFLICT(bounty_id, sponsor) DO UPDATE SET amount = excluded.amount")
+            .run(n(a.bountyId), lc(a.sponsor), (BigInt(row?.amount ?? "0") + BigInt(s(a.amount))).toString());
+        }
+        break;
+      case "BountyClaimed":
+        db.prepare("UPDATE bounties SET amount = '0', status = 'claimed', winner = ?, time_ms = ? WHERE bounty_id = ?")
+          .run(lc(a.player), n(a.timeMs), n(a.bountyId));
+        feed(a.levelId, "Bounty claimed", a.player);
+        break;
+      case "BountyRefunded":
+        {
+          const row = db.prepare("SELECT amount FROM bounties WHERE bounty_id = ?").get(n(a.bountyId)) as { amount: string } | undefined;
+          if (row) db.prepare("UPDATE bounties SET amount = ? WHERE bounty_id = ?").run((BigInt(row.amount) - BigInt(s(a.amount))).toString(), n(a.bountyId));
+          const contribution = db.prepare("SELECT amount FROM bounty_contributions WHERE bounty_id = ? AND sponsor = ?").get(n(a.bountyId), lc(a.sponsor)) as { amount: string } | undefined;
+          if (contribution) db.prepare("UPDATE bounty_contributions SET amount = ? WHERE bounty_id = ? AND sponsor = ?").run((BigInt(contribution.amount) - BigInt(s(a.amount))).toString(), n(a.bountyId), lc(a.sponsor));
+        }
+        break;
       case "RaceCreated":
         db.prepare(
           `INSERT INTO races (room_id, level_id, stake, status, players, updated_block) VALUES (?, ?, ?, 'open', ?, ?)

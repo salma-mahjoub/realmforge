@@ -65,6 +65,12 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] Implement the season scoring from `docs/SEASONS.md` in the indexer + a season-signing endpoint (+ full standings `GET /season/standings`, indexed payouts, Season page admin close flow, `npm run season:ff` for the local demo)
 - [ ] Owner-side defence for the oral: tokenomics, signatures, escrow, reentrancy
 
+### Level bounties — `LevelBounty.sol`
+- [x] Separate FORGE escrow contract: sponsor top-ups, target-time qualification, first signed claim, sponsor pull refunds after expiry; LevelNFT owner/creator and sponsors cannot claim
+- [x] Server `BountyClaim` EIP-712 signer/domain, validated-clear proof endpoint, indexed bounty lifecycle, and `GET /levels/:id/bounties`
+- [x] Web level detail funding flow, active bounty badge, and post-clear claim action
+- [x] Solidity, server-signature/API/indexer, and ABI type-string tests; generated ABIs and local deployment wiring
+
 ---
 
 ## 2. Game core — `game-core/` (pure TypeScript, deterministic)
@@ -101,12 +107,14 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] Manifest-driven preloader with placeholder fallback
 - [x] Level types, RLE, canonical JSON + `layoutHash`, sample level
 - [x] Real ABIs from export-abi (interim ABI deleted)
+- [x] LevelBounty ABI, config/address support, and `useBounty` transaction hook
 - [x] Hooks for `claimFaucet`, `publish`, `settleRun` + `settleRunWithPermit` (approve fallback), `useMarket` list/unlist/buy; Buy buttons wired
 - [x] Play settlement offers a gasless toggle when the server relayer is configured; player signs RunResult + permit, relayer pays gas
 - [x] PlayScene uses the game-core player + element runtime + fixed 60 Hz clock; replay bitmask + trace + checkpoints recorded (verified in browser)
 - [x] API and Colyseus client aligned with the server's real routes and rooms
 - [x] vitest added (10 tests)
 - [x] Pages read real indexer data instead of `data/mock.ts`: profile, market listings, activity and earnings come from `server/` endpoints (the mock only remains as a dev fallback when the API is down and `VITE_USE_MOCKS` is not false)
+- [x] Level detail can fund a FORGE bounty; level cards show active bounty badges; a qualifying clear offers server-proof claim settlement
 - [ ] Free Reown/WalletConnect project ID in `web/.env.local` (currently a 403 warning)
 - [x] Solo ghost replay picker (record holder + own best), validated trace playback on the fixed 60 Hz frame, and ahead/behind HUD; RaceScene remote avatars use tinted player sprites
 - [~] Race lobby on-chain (`useRace`): create with escrow, join with escrow, settle with the server-signed ranking (deadline included), refund after the timeout; wired in `Room.tsx`, type-checked and unit-tested, **not yet clicked with two wallets**. Server completes the ranking (finishers, then progress), `giveup` and `respawn` messages, Give up / Respawn buttons in the lobby
@@ -140,6 +148,7 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] `GET /levels/:id/remixes`: remix lineage (ancestors root first, direct children with their remix counts, subtree size) over the indexed `parent_id`
 - [x] Season ranking + signing: `GET /season/current`, `POST /season/close-proof` (rules of `docs/SEASONS.md`), proven against the real `closeSeason` (`npm run e2e:season`)
 - [x] Co-op UI (`/coop/new`, `/coop/:code`, nav “Co-op”): create a room (team of 2–4, no stake) or join by code, ready-up lobby, 3-2-1 towards the server's startAt, `CoopScene` (RaceScene networking + shared checkpoints: a fall respawns at the furthest checkpoint anyone reached, a teammate's checkpoints count for the flag), team result (team time = last arrival, combined time, splits) and per-player claim of the signed RunResult. Browser E2E `scripts/browser-e2e/coop.cjs` (two wallets: shared checkpoint, respawn at it after a real fall, team clear, 0 strikes, reward claimed on-chain)
+- [x] Bounty claim proof uses the shared run validator; indexer tracks created, funded, claimed and refunded bounties
 - [ ] Persisting race results, reconnect handling
 
 ## 5a. Soulbound achievement badges

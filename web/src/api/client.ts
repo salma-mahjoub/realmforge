@@ -4,6 +4,7 @@ import { SAMPLE_LEVEL } from '../game/level';
 import { markLive, markMock } from './dataSource';
 import { emptyLineage, mapLineage, type RemixLineage, type RemixLineageResponse } from './remix';
 import type { LevelFileV1, Theme } from '../game/level/types';
+import type { RunSubmission } from '../game/run';
 import { THEMES } from '../game/level/types';
 import { timeAgo } from '../components/ui/format';
 import type {
@@ -25,6 +26,8 @@ import type {
     SubmitRunRequest,
     SubmitRunResponse,
     RelayStatus,
+    BountySummary,
+    BountyClaimProof,
 } from './types';
 
 /** server/ Fastify API (default port 8787, see server/.env.example). */
@@ -88,6 +91,7 @@ export function rowToSummary(r: LevelRow): LevelSummary {
         listedPriceEth: r.listing_price && r.listing_price !== '0' ? formatEther(BigInt(r.listing_price)) : null,
         cid: r.level_cid ?? '',
         thumbnailUrl: r.thumbnail_cid ? `${IPFS_GATEWAY}${r.thumbnail_cid}` : undefined,
+        activeBounties: r.bounty_count ?? 0,
     };
 }
 
@@ -204,6 +208,8 @@ export const api = {
     submitRun: (body: SubmitRunRequest) => request<SubmitRunResponse>('/runs/validate', { method: 'POST', json: body }),
     relayStatus: () => request<RelayStatus>('/relay/status'),
     relaySettle: (body: { result: SubmitRunResponse['result']; signature: Hex; playerSignature: Hex; permit: { v: number; r: Hex; s: Hex; deadline: string } }) => request<{ hash: Hex; relayer: Address }>('/relay/settle', { method: 'POST', json: body }),
+    getBounties: (levelId: number) => request<{ levelId: number; bounties: BountySummary[] }>(`/levels/${levelId}/bounties`),
+    bountyClaimProof: (body: { player: Address; levelId: number; bountyId: number; run: RunSubmission }) => request<BountyClaimProof>('/bounties/claim-proof', { method: 'POST', json: body }),
 };
 
 export function ipfsToHttp(uri: string): string {

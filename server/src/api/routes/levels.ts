@@ -139,7 +139,7 @@ export function levelRoutes(app: FastifyInstance, svc: Services) {
     }[sort];
     const rows = svc.db
       .prepare(
-        `SELECT l.*, p.level_cid, p.metadata_cid, p.thumbnail_cid, p.min_time_ms, ${META_COLS}
+        `SELECT l.*, (SELECT COUNT(*) FROM bounties b WHERE b.level_id = l.id AND b.status = 'open' AND (b.expiry = 0 OR b.expiry > unixepoch())) AS bounty_count, p.level_cid, p.metadata_cid, p.thumbnail_cid, p.min_time_ms, ${META_COLS}
          FROM levels l LEFT JOIN pinned_levels p ON p.layout_hash = l.layout_hash
          WHERE ${where.join(" AND ")} ORDER BY ${order} LIMIT ? OFFSET ?`,
       )
@@ -152,7 +152,7 @@ export function levelRoutes(app: FastifyInstance, svc: Services) {
     if (!p.success) return badRequest(reply, "invalid id");
     const row = svc.db
       .prepare(
-        `SELECT l.*, p.level_cid, p.metadata_cid, p.thumbnail_cid, p.min_time_ms, ${META_COLS}
+        `SELECT l.*, (SELECT COUNT(*) FROM bounties b WHERE b.level_id = l.id AND b.status = 'open' AND (b.expiry = 0 OR b.expiry > unixepoch())) AS bounty_count, p.level_cid, p.metadata_cid, p.thumbnail_cid, p.min_time_ms, ${META_COLS}
          FROM levels l LEFT JOIN pinned_levels p ON p.layout_hash = l.layout_hash WHERE l.id = ?`,
       )
       .get(p.data.id);

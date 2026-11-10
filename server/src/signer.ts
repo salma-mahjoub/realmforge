@@ -4,6 +4,8 @@ import { bytesToBigInt, type Address, type Hex } from "viem";
 import {
   clearProofTypes,
   forgeCoinDomain,
+  levelBountyDomain,
+  bountyClaimTypes,
   levelNftDomain,
   raceResultTypes,
   runResultTypes,
@@ -14,6 +16,7 @@ import {
   type RaceResult,
   type RunResult,
   type SeasonResult,
+  type BountyClaim,
 } from "./eip712.js";
 
 export interface SignerOptions {
@@ -22,6 +25,7 @@ export interface SignerOptions {
   levelNftAddress?: Address;
   forgeCoinAddress?: Address;
   realmBadgesAddress?: Address;
+  levelBountyAddress?: Address;
   /** Validity window for deadlines, seconds. */
   ttlSec?: number;
 }
@@ -40,7 +44,8 @@ export const badgeClaimTypes = { BadgeClaim: [
 
 export class ContractNotConfiguredError extends Error {
   constructor(name: string) {
-    super(`${name} address is not configured (set ${name === "LevelNFT" ? "LEVEL_NFT_ADDRESS" : name === "ForgeCoin" ? "FORGE_COIN_ADDRESS" : "REALM_BADGES_ADDRESS"})`);
+    const env: Record<string, string> = { LevelNFT: "LEVEL_NFT_ADDRESS", ForgeCoin: "FORGE_COIN_ADDRESS", RealmBadges: "REALM_BADGES_ADDRESS", LevelBounty: "LEVEL_BOUNTY_ADDRESS" };
+    super(`${name} address is not configured (set ${env[name] ?? `${name.toUpperCase()}_ADDRESS`})`);
     this.name = "ContractNotConfiguredError";
   }
 }
@@ -64,6 +69,7 @@ export class GameSigner {
   readonly levelNftAddress?: Address;
   readonly forgeCoinAddress?: Address;
   readonly realmBadgesAddress?: Address;
+  readonly levelBountyAddress?: Address;
   readonly ttlSec: number;
 
   constructor(opts: SignerOptions) {
@@ -72,6 +78,7 @@ export class GameSigner {
     this.levelNftAddress = opts.levelNftAddress;
     this.forgeCoinAddress = opts.forgeCoinAddress;
     this.realmBadgesAddress = opts.realmBadgesAddress;
+    this.levelBountyAddress = opts.levelBountyAddress;
     this.ttlSec = opts.ttlSec ?? 3600;
   }
 
@@ -98,6 +105,18 @@ export class GameSigner {
       primaryType: "BadgeClaim",
       message,
     });
+    return { message, signature, signer: this.address };
+  }
+
+  private bountyDomain() {
+    if (!this.levelBountyAddress) throw new ContractNotConfiguredError("LevelBounty");
+    return levelBountyDomain(this.chainId, this.levelBountyAddress);
+  }
+
+  async signBountyClaim(input: Omit<BountyClaim, "nonce" | "deadline"> & { nonce?: bigint; deadline?: bigint }): Promise<Signed<BountyClaim>> {
+    if (!Number.isInteger(input.timeMs) || input.timeMs < 0 || input.timeMs > UINT32_MAX) throw new RangeError("timeMs must fit uint32");
+    const message: BountyClaim = { ...input, nonce: input.nonce ?? generateNonce(), deadline: input.deadline ?? deadlineFromNow(this.ttlSec) };
+    const signature = await this.account.signTypedData({ domain: this.bountyDomain(), types: bountyClaimTypes, primaryType: "BountyClaim", message });
     return { message, signature, signer: this.address };
   }
 

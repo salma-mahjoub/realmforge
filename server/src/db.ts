@@ -138,6 +138,25 @@ CREATE TABLE IF NOT EXISTS badge_claims (
   ref TEXT NOT NULL,
   tx_hash TEXT NOT NULL,
   PRIMARY KEY(holder, badge_id, ref)
+CREATE TABLE IF NOT EXISTS bounties (
+  bounty_id INTEGER PRIMARY KEY,
+  level_id INTEGER NOT NULL,
+  sponsor TEXT NOT NULL,
+  target_time_ms INTEGER NOT NULL,
+  expiry INTEGER NOT NULL,
+  amount TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open',
+  winner TEXT,
+  time_ms INTEGER,
+  tx_hash TEXT NOT NULL,
+  block_number INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS bounties_level ON bounties(level_id, status);
+CREATE TABLE IF NOT EXISTS bounty_contributions (
+  bounty_id INTEGER NOT NULL,
+  sponsor TEXT NOT NULL,
+  amount TEXT NOT NULL,
+  PRIMARY KEY (bounty_id, sponsor)
 );
 CREATE TABLE IF NOT EXISTS pinned_levels (
   layout_hash  TEXT PRIMARY KEY,

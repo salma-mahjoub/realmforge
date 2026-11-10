@@ -35,6 +35,7 @@ Four standalone npm packages (own `package.json` + lockfile, **no workspaces**).
 | Package | Stack | What | Tests |
 |---|---|---|---|
 | [contracts/](contracts/README.md) | Hardhat 3, Solidity 0.8.28, OpenZeppelin 5, Ignition, viem | `LevelNFT` (levels, market, royalties, ClearProof) · `ForgeCoin` (faucet, runs, races, seasons) · `RealmBadges` (soulbound ERC-1155 achievements) · `scripts/export-abi.ts` | Solidity unit/fuzz + node:test integration |
+| [contracts/](contracts/README.md) | Hardhat 3, Solidity 0.8.28, OpenZeppelin 5, Ignition, viem | `LevelNFT` (levels, market, royalties) · `ForgeCoin` (token, runs, races, seasons) · `LevelBounty` (FORGE bounty escrow) | Solidity unit/fuzz + node:test integration |
 | [game-core/](game-core/README.md) | strict TS, optional Phaser 3 Matter adapter | Mario-like controller (`stepController`), `createMatterPlayer`, fixed clock, replay bitmask encoder, `ELEMENTS` registry of all SPEC elements ([docs](game-core/docs/ELEMENTS.md)) | vitest (headless Matter) |
 | [server/](server/README.md) | Fastify 5, Colyseus 0.16, viem, node:sqlite, zod | level pinning, run plausibility (constants from game-core), EIP-712 signer, event indexer, race/co-op rooms | vitest |
 | [web/](web/README.md) | Vite, React 19, Phaser 3.90 (Matter), wagmi/RainbowKit | pages, editor, play/race scenes built on game-core, contract hooks on generated ABIs | vitest + `tsc` |
@@ -77,5 +78,7 @@ after every `dev:chain` restart.
 |---|---|---|
 | Contract | `LevelNFT.sol` (ERC-721) | `ForgeCoin.sol` (ERC-20) |
 | Product area | publish flow + market UI | play / race settlement |
+
+`LevelBounty` is a supporting escrow contract; the two students' core token contracts remain `LevelNFT` and `ForgeCoin`.
 
 Details: [OWNERSHIP.md](OWNERSHIP.md).

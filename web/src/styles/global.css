@@ -320,6 +320,7 @@ a.level-card:focus-visible { border-radius: var(--r-md); }
 .thumb.is-loaded img { opacity: 1; }
 a.level-card:hover .thumb img, .market-card:hover .thumb img { transform: scale(1.04); }
 .level-card-flag { position: absolute; left: 10px; top: 10px; display: inline-flex; align-items: center; gap: 5px; background: rgba(8, 11, 24, 0.82); color: var(--text); font-size: var(--fs-xs); font-weight: 700; padding: 4px 8px; border-radius: var(--r-xs); }
+.level-card-flag.bounty-flag { top: 38px; color: var(--gold); }
 .level-card-rank { position: absolute; right: 10px; top: 10px; background: var(--gold); color: var(--gold-ink); font-weight: 800; font-size: var(--fs-xs); padding: 3px 8px; border-radius: var(--r-xs); }
 .level-card-body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 2px; }
 .level-card-row { display: flex; justify-content: space-between; align-items: center; gap: var(--s-2); }

@@ -7,6 +7,7 @@ export { levelNFTAbi as levelNftAbi } from './LevelNFT.abi';
 export { forgeCoinAbi } from './ForgeCoin.abi';
 export { realmBadgesAbi } from './RealmBadges.abi';
 export { levelAuctionAbi } from './LevelAuction.abi';
+export { levelBountyAbi } from './LevelBounty.abi';
 import addresses from './addresses.json';
 
 /** `{ "<chainId>": { LevelNFT, ForgeCoin } }` read from contracts/ignition/deployments at export time. */

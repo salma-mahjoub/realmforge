@@ -25,6 +25,7 @@ export const envSchema = z.object({
   FORGE_COIN_ADDRESS: optionalAddress,
   REALM_BADGES_ADDRESS: optionalAddress,
   LEVEL_AUCTION_ADDRESS: optionalAddress,
+  LEVEL_BOUNTY_ADDRESS: optionalAddress,
   INDEXER_START_BLOCK: z.coerce.bigint().nonnegative().default(0n),
   INDEXER_ENABLED: z
     .preprocess(emptyToUndefined, z.enum(["true", "false"]).optional())

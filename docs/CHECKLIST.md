@@ -54,7 +54,7 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] Fuzz: fee split sums correctly, supply never exceeds the cap
 - [x] Resolve 6× `TODO(studentB)` design decisions (6/6 done: self-play earns no reward; coins bonus 0.1/coin, capped at 5; half of the treasury cut is burned; faucet daily budget of 10,000 FORGE; season ranking rules in `docs/SEASONS.md`; RaceResult carries a deadline)
 - [ ] Later: replace the faucet daily budget by a server-signed claim (new EIP-712 type + per-IP limit), keeping the budget as a second layer
-- [ ] Implement the season scoring from `docs/SEASONS.md` in the indexer + a season-signing endpoint
+- [x] Implement the season scoring from `docs/SEASONS.md` in the indexer + a season-signing endpoint (+ full standings `GET /season/standings`, indexed payouts, Season page admin close flow, `npm run season:ff` for the local demo)
 - [ ] Owner-side defence for the oral: tokenomics, signatures, escrow, reentrancy
 
 ---

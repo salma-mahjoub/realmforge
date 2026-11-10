@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS levels (
   created_at    INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS levels_creator ON levels(creator);
+CREATE INDEX IF NOT EXISTS levels_parent ON levels(parent_id);
 CREATE TABLE IF NOT EXISTS runs (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   level_id     INTEGER NOT NULL,

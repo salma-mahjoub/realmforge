@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import type { Services } from "../services.js";
 import { levelRoutes } from "./routes/levels.js";
+import { remixRoutes } from "./routes/remix.js";
 import { runRoutes } from "./routes/runs.js";
 import { seasonRoutes } from "./routes/season.js";
 import { statsRoutes } from "./routes/stats.js";
@@ -44,6 +45,7 @@ export async function buildApi(svc: Services, opts: { logger?: boolean } = {}): 
   });
 
   levelRoutes(app, svc);
+  remixRoutes(app, svc);
   runRoutes(app, svc);
   statsRoutes(app, svc);
   seasonRoutes(app, svc);

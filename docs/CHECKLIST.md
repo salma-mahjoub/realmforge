@@ -31,7 +31,7 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] `scripts/export-abi.ts`
 - [x] ABIs exported to web + server; `ignition/parameters/localhost.json` (account #1 signer)
 - [x] 42 tests passing (38 Solidity, 4 Node), 0 compiler warnings
-- [~] `it.todo` integration tests from §11: 5 of 9 done (setActive→LevelInactive, 4-player race, closeSeason ×2; token-cap clipping covered at unit level); left: remix-of-remix (A), reentrancy (A); gas and Slither reports are in docs/
+- [x] `it.todo` integration tests from §11: all done (setActive→LevelInactive, 4-player race, closeSeason ×2, remix-of-remix royalties, withdraw reentrancy via `mocks/ReentrantWithdrawer.sol`; token-cap clipping covered at unit level); gas and Slither reports are in docs/
 - [x] Slither static analysis report and discussion: `docs/security/SLITHER.md` (no high/medium finding; every result justified)
 - [x] Gas report for `publish`, `settleRun`, `buy` and `settleRace`, comparing L1 and L2: `docs/GAS.md`
 - [x] Coverage ≥ 90% per contract (Solidity tests: ForgeCoin 99.5%, LevelNFT 90.6%; the only uncovered ForgeCoin line is a defensive cap that cannot be reached)
@@ -101,7 +101,7 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [ ] Free Reown/WalletConnect project ID in `web/.env.local` (currently a 403 warning)
 - [ ] RaceScene waits for the server countdown/start; ghost replays rendered
 - [~] Race lobby on-chain (`useRace`): create with escrow, join with escrow, settle with the server-signed ranking (deadline included), refund after the timeout; wired in `Room.tsx`, type-checked and unit-tested, **not yet clicked with two wallets**. Server completes the ranking (finishers, then progress), `giveup` and `respawn` messages, Give up / Respawn buttons in the lobby
-- [ ] Wallet connect + transactions tested in a browser with MetaMask
+- [~] Wallet connect + transactions tested in a browser: the full flow is driven in Chromium through RainbowKit with an injected EIP-1193/6963 test wallet (`npm run e2e:browser`, real signatures on the Hardhat node); a manual MetaMask rehearsal is still to do
 - [ ] Read the minted token ID from the publish receipt
 
 ### Editor (§3.3)
@@ -136,16 +136,16 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] Shared `layoutHash` test vector `test-vectors/layout-hash.json` (web == server)
 - [x] Root `README.md` + root scripts: `dev:chain`, `deploy:local`, `dev:server`, `dev:web`, `test`, `build`, `e2e:chain`
 - [x] Scripted local end-to-end run (`npm run e2e:chain`): faucet → pin → clear-proof → publish → validate → settleRun + settleRunWithPermit → plays=2, creator +7, player +30, pool 2, treasury 1
-- [ ] Browser end-to-end run: build a level → publish → second wallet plays and pays → creator earns → sell the NFT
-- [~] Race 1v1 end to end with stake escrow: scripted and passing on the local chain with the real server signer (`npm run e2e:race`: escrow, signed ranking, 60/25/10/5 payout, expired result refused, refund); not yet played in the browser with two wallets
+- [x] Browser end-to-end run: build a level → publish → second wallet plays and pays → creator earns → sell the NFT → withdraw (`npm run e2e:browser`, passes on a fresh chain)
+- [~] Race 1v1 end to end with stake escrow: scripted and passing on the local chain with the real server signer (`npm run e2e:race`: escrow, signed ranking, 60/25/10/5 payout, expired result refused, refund); also played in the browser with two wallets (`scripts/browser-e2e/race.cjs`: escrow, live remote players, signed ranking, on-chain payout)
 
 ## 7. Module deliverables (BK-01)
-- [ ] **S6 intermediate version:** publish end to end + solo play + `settleRun` + browse page
+- [x] **S6 intermediate version:** publish end to end + solo play + `settleRun` + browse page (verified in the browser)
 - [~] Architecture diagram (`docs/architecture.*`): a Mermaid system diagram and flow diagrams are in `docs/BLOCKCHAIN.md`; no standalone file yet
 - [x] Blockchain explainer: `docs/BLOCKCHAIN.md` (9 Mermaid diagrams), shown in the app at `/how-it-works`, PDF `docs/RealmForge_Blockchain.pdf` (`cd web && npm run doc:pdf`)
 - [x] Threat model, including the server-signer centralisation point and its mitigations: `docs/security/THREAT_MODEL.md`
-- [ ] Slither + gas report (see §1)
-- [~] **S7 final demo script**: demo script written (editor → publish → friend plays → creator earns → race → sell NFT); not yet rehearsed with wallets
+- [x] Slither + gas report: `docs/security/SLITHER.md`, `docs/GAS.md`
+- [~] **S7 final demo script**: `docs/DEMO.md` (publish → friend plays → creator earns → sell NFT → race), rehearsed automatically by `npm run e2e:browser`; one manual MetaMask rehearsal left
 - [ ] Slides + each student's oral notes (AA4/AA5/AA6)
 
 ### Cut order if behind schedule
@@ -168,7 +168,7 @@ Coordinator re-ran root `npm test` and `npm run build`: game-core 83, contracts 
 - [x] Loading/empty/error states, responsive to 820 px and 390 px, skip link, focus rings, ARIA, reduced motion; 41 screenshots in `docs/screenshots/ui/`
 - [x] Faucet verified end to end in a browser against Hardhat (0 → 100 FORGE)
 - [ ] Full mint and settleRun clicked through the UI with a real level clear
-- [ ] Server endpoints for profile, listings, activity and earnings (pages still on sample data)
+- [x] Server endpoints for profile, listings, activity and earnings (pages read them; see §4)
 - [ ] Race lobby: real ready/finish state from Colyseus; live ranking
 - [ ] Indexer keeps stale data after a Hardhat restart (UI shows "Not found on this chain")
 - [ ] "Art" pack picker overlaps the canvas; editor is read-only on phones
@@ -207,3 +207,7 @@ Coordinator verification: game-core 87, contracts 42 (+9 todo), server 31, web 4
 
 ## Camera/background regression — 1 November 2026
 - [x] Reproduced before edits in real Chromium with keyboard input on `/play/1` and editor test-play, Mario/Kenney. Fixed physical camera target + grounded jump baseline/vertical velocity look-ahead, swept-bounds sprite sizing, same-render parallax and fractional-zoom rounding/backing sizes. Verified flat walk/run/jump/land/reverse, physical slopes, tall falls/springs, growth, pause/resume, editor return/zoom/pan and resize. 20 recorded trajectories (11,538 frames); 16 patched trajectory assertions pass. Web 50 tests + build, game-core 87 tests + build pass. Evidence, raw telemetry and full command output: `docs/screenshots/camera-fix/README.md`. No physics changes or commit/push.
+
+## Latest verification — browser demo pass
+
+Root `npm test` and `npm run build` pass: game-core 87, contracts 93 (83 Solidity + 10 integration, 0 todo), server 59, web 79. `npm run e2e:browser` passes on a fresh chain in real Chromium: publish (token id decoded from `LevelPublished`) → second wallet plays, settles and the creator earns → NFT listed, bought and royalties withdrawn → 1v1 staked race with live remote players, signed ranking and on-chain payout. Fixed during the pass: dash power-up runs rejected by the server; race stage going black after the finish; racers frozen at spawn for each other (lobby warm-up desynced the server frame counter); countdown stuck on 3; colliding racer colours; reward estimate (+50) not matching the mint (35); header balance lagging a settle; toasts covering dialog buttons; unreadable faucet button.

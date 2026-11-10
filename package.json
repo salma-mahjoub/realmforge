@@ -21,7 +21,8 @@
     "test:web": "cd web && npm test",
     "e2e:chain": "cd server && npx tsx scripts/e2e-chain-flow.ts",
     "e2e:race": "cd server && npx tsx scripts/e2e-race-flow.ts",
-    "e2e:season": "cd server && npx tsx scripts/e2e-season-flow.ts"
+    "e2e:season": "cd server && npx tsx scripts/e2e-season-flow.ts",
+    "e2e:browser": "node scripts/browser-e2e/run-all.mjs"
   },
   "engines": {
     "node": ">=22.13"

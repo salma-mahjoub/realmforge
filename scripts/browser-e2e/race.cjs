@@ -14,6 +14,11 @@ async function forge(addr) {
   const r = await fetch(RPC, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: env.VITE_FORGE_COIN_ADDRESS, data }, 'latest'] }) });
   return Number(BigInt((await r.json()).result) / 10n ** 15n) / 1000;
 }
+/** Claims the 100 FORGE faucet when the wallet holds none (fresh chain: the race needs a stake). */
+async function topUp(page) {
+  const faucet = page.getByRole('button', { name: /get 100 forge/i });
+  if (await faucet.isVisible().catch(() => false)) { await faucet.click(); await page.getByText(/100 FORGE/).first().waitFor(); await page.waitForTimeout(3000); }
+}
 async function session(browser, addr, path) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await ctx.newPage();
@@ -38,6 +43,7 @@ const run = async (page, ms) => {
   const browser = await chromium.launch({ ...(EXE ? { executablePath: EXE } : {}), args: ['--use-gl=angle', '--enable-unsafe-swiftshader'] });
   console.log('FORGE before: host', await forge(HOST), 'guest', await forge(GUEST));
   const host = await session(browser, HOST, '/room/new');
+  await topUp(host);
   await host.locator('#room-level').selectOption(LEVEL).catch((e) => console.log('select', e.message));
   await host.locator('#room-stake').fill('10');
   await shot(host, '30-create-room');
@@ -48,8 +54,7 @@ const run = async (page, ms) => {
   await host.waitForTimeout(2000);
 
   const guest = await session(browser, GUEST, '/');
-  const faucet = guest.getByRole('button', { name: /get 100 forge/i });
-  if (await faucet.isVisible().catch(() => false)) { await faucet.click(); await guest.getByText(/100 FORGE/).first().waitFor(); await guest.waitForTimeout(3000); }
+  await topUp(guest);
   await guest.goto(`${WEB}/room/${code}`, { waitUntil: 'load' });
   await guest.waitForTimeout(2500);
   await shot(guest, '31-guest-lobby');

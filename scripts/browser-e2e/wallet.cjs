@@ -30,7 +30,10 @@ module.exports.walletScript = (address, rpc = RPC) => `(() => {
         case 'wallet_requestPermissions': grant(true); return [{ parentCapability: 'eth_accounts' }];
         case 'wallet_getPermissions': return connected ? [{ parentCapability: 'eth_accounts' }] : [];
         case 'wallet_revokePermissions': grant(false); return null;
-        case 'personal_sign': return rpc('personal_sign', params);
+        case 'personal_sign':
+          // window.__rejectSign = true simulates a user clicking "Reject" (EIP-1193 code 4001)
+          if (window.__rejectSign) { const e = new Error('User rejected the request.'); e.code = 4001; throw e; }
+          return rpc('personal_sign', params);
         default: return rpc(method, params);
       }
     },

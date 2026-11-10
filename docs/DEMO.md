@@ -65,6 +65,8 @@ VARIANT=0 node scripts/browser-e2e/run-all.mjs           # on a fresh chain
 
 This drives the real UI in Chromium with an injected EIP-1193/EIP-6963 test wallet (`scripts/browser-e2e/wallet.cjs`). That wallet forwards to the Hardhat node's unlocked accounts, so `eth_sendTransaction` and `eth_signTypedData_v4` are real signatures.
 
+Room joins need a Sign-In With Ethereum signature; the test wallet signs `personal_sign` silently through the node. `node scripts/browser-e2e/siwe.cjs <levelId>` checks the refusal path (unsigned join, declined signature, then sign in and join). Set `E2E_WEB_URL` / `E2E_RPC_URL` to run the scripts against a stack on other ports.
+
 `VARIANT=n` changes the goal position. Each layout can be published once, so pick a new value to publish again on the same chain. Screenshots go to `scripts/browser-e2e/shots/`.
 
 The test wallet is not MetaMask. Do one manual rehearsal with MetaMask before the oral.

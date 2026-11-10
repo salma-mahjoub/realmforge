@@ -77,7 +77,11 @@ re-simulation of the input log on the server (`docs/SPEC.md` §3.6, stretch goal
 
 ## 5. Off-chain gaps (from `docs/CHECKLIST.md`, not solved yet)
 
-- No rate limiting on `/runs/validate`, and wallet sign-in (SIWE) is not mandatory: anyone can request signatures.
+- Rooms now require wallet ownership proof (SIWE session token or `joinMessage` signature), and the signing endpoints
+  are rate limited per IP and per address (in-memory token bucket: one server process only; several instances would
+  need a shared store). Session tokens are stateless HMAC tokens, so they cannot be revoked before their 1 h expiry.
+  `/runs/validate` still does not require a sign-in: anyone can ask for a `RunResult` naming any player, but only
+  that player can settle it (`NotRunPlayer`), so the limit is what bounds the signer's work.
 - The server checks plausibility (speed per tick, checkpoint order, minimum time, coins ≤ level maximum) but does not
   yet re-simulate the replay; a bot that stays within the physical limits would pass.
 - Level files fetched from IPFS for levels not pinned by this server are not yet verified.

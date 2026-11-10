@@ -779,7 +779,6 @@ a.level-card:hover .thumb img, .market-card:hover .thumb img { transform: scale(
 
 /* ── remix: lineage card (level page) + remix banner (editor) ─────────── */
 .lineage-card { margin-top: var(--s-5); }
-.title-row-end { margin-left: auto; display: inline-flex; }
 .lineage { display: flex; flex-direction: column; gap: var(--s-2); }
 .lineage .mini-title { margin: var(--s-2) 0 0; }
 .lineage-chain { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-1) 0; }
@@ -799,6 +798,9 @@ a.lineage-node:hover { border-color: var(--violet-line); color: var(--violet-ink
 .remix-banner a { text-decoration: underline; }
 .remix-banner.is-unchanged { background: var(--amber-soft); color: var(--text); }
 .remix-banner.is-unchanged > svg { color: var(--amber); }
+/* the banner is one more grid row of .editor (head, banner, toolbar, [narrow note], body, statusbar) */
+.editor.has-remix { grid-template-rows: auto auto auto minmax(0, 1fr) auto; }
+@media (max-width: 900px) { .editor.has-remix { grid-template-rows: auto auto auto auto minmax(0, 1fr) auto; } }
 .remix-loading { display: grid; place-items: center; height: 100%; min-height: 240px; padding: var(--s-6); }
 @media (max-width: 640px) {
     .lineage-children li { grid-template-columns: 1fr auto; }

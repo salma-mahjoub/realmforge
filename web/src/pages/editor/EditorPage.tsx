@@ -201,7 +201,7 @@ export default function EditorPage() {
     const toggleTest = () => EventBus.emit('editor:toggle-test');
 
     return (
-        <div className={cx('editor', testing && 'is-testing')}>
+        <div className={cx('editor', testing && 'is-testing', remix.parentId > 0 && 'has-remix')}>
             <div className="editor-head">
                 <div className="editor-title">
                     <label htmlFor="level-name" className="sr-only">

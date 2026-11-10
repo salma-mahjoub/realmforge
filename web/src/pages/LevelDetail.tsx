@@ -141,7 +141,7 @@ export default function LevelDetail() {
                     </Link>
                 )}
                 <Tooltip content={canRemix ? 'Open a copy in the editor. Change something, clear it and publish it as a child LevelNFT: the original creator shares its resale royalty.' : 'Remixing needs this level on-chain and its JSON on the game server.'}>
-                    <span className="title-row-end">
+                    <span className="row-sm">
                         <Button to={canRemix ? `/editor?remix=${id}` : undefined} icon={<GitFork size={16} aria-hidden />} disabled={!canRemix}>
                             Remix
                         </Button>

@@ -14,6 +14,8 @@
  *                 RACE_RESULT_TYPEHASH   RaceResult(bytes32 roomId,address[] ranking,uint256 deadline)
  *                 SEASON_RESULT_TYPEHASH SeasonResult(uint256 season,address[] players,address[] creators,uint256[] shares)
  *                 ERC20Permit("RealmForge ForgeCoin") -> EIP712 name "RealmForge ForgeCoin", version "1"
+ *   RealmBadges.sol BADGE_CLAIM_TYPEHASH BadgeClaim(address holder,uint256 badgeId,uint256 ref,uint256 nonce,uint256 deadline)
+ *                 EIP712("RealmForge Badges", "1")
  *
  * NOTE: RaceResult carries a `deadline` but no nonce: replay is prevented because a race room
  * can be settled only once, and a season only once per `season` value. The deadline makes a

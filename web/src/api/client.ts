@@ -113,7 +113,7 @@ const detailFromSummary = (l: LevelSummary): LevelDetail => ({
 });
 
 export const api = {
-    health: () => request<{ status: string; chainId: number; signer: Address; contracts: { levelNFT: Address | null; forgeCoin: Address | null } }>('/health'),
+    health: () => request<{ status: string; chainId: number; signer: Address; contracts: { levelNFT: Address | null; forgeCoin: Address | null; realmBadges: Address | null } }>('/health'),
 
     // levels / indexer — GET /levels returns { items: LevelRow[] }
     listLevels: (q: { sort?: LevelSort; creator?: string; theme?: string; search?: string } = {}) => {
@@ -176,6 +176,8 @@ export const api = {
                 recentClears: raw.recentClears.map((r) => ({ level: rowToSummary(r.level), timeMs: r.timeMs, reward: formatUnits(BigInt(r.reward || '0'), 18), ago: r.at ? timeAgo(r.at) : '' })),
             }),
         ),
+    getBadges: (address: Address) => request<{ address: Address; earned: { badgeId: number; ref: string; hash: string; name: string }[]; claimable: { badgeId: number; ref: string; name: string; description: string }[] }>(`/profiles/${address}/badges`),
+    getBadgeClaimProof: (holder: Address, badgeId: number, ref: string) => request<{ message: { holder: Address; badgeId: string; ref: string; nonce: string; deadline: string }; signature: `0x${string}` }>(`/badges/claim-proof`, { method: 'POST', json: { holder, badgeId, ref } }),
     listListings: () =>
         read<Listing[]>('/market/listings', () => (USE_MOCKS ? MOCK_LISTINGS : []), (raw: { items: LevelRow[] }) =>
             raw.items.map((r) => ({

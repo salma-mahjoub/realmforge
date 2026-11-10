@@ -18,7 +18,7 @@ npx hardhat test --gas-stats      # gas report (publish, settleRun, buy, settleR
 
 ## Deploy (SPEC §6 order, Hardhat Ignition)
 
-`ignition/modules/RealmForge.ts`: 1. `ForgeCoin(signer)` → 2. `LevelNFT(signer)` → 3. `forgeCoin.setLevelNFT(levelNFT)` → 4. `levelNFT.grantRole(GAME_ROLE, forgeCoin)`.
+`ignition/modules/RealmForge.ts`: 1. `ForgeCoin(signer)` → 2. `LevelNFT(signer)` → 3. link and grant the existing GAME_ROLE → 4. `RealmBadges(signer)` for server-signed, soulbound achievement claims. `RealmBadges` does not change either economic contract.
 
 ```bash
 # in-process simulated chain (smoke test, nothing persisted)
@@ -44,7 +44,7 @@ The `signer` parameter defaults to account #0 locally. Both constructors revert 
 npm run export-abi                                    # → ../web/src/contracts/generated/ (default in EXPORT_CONFIG)
 npm run export-abi -- --out ../server/src/generated   # or EXPORT_ABI_OUT=<dir>
 ```
-Writes `LevelNFT.abi.ts` / `ForgeCoin.abi.ts` (`as const`, typed for viem/wagmi), `*.json`, and `addresses.json` (`{ chainId: { LevelNFT, ForgeCoin } }` read from `ignition/deployments/`). Only run it when the owner of the target dir asks for it.
+Writes the `LevelNFT`, `ForgeCoin` and `RealmBadges` ABIs (`as const`, typed for viem/wagmi), `*.json`, and `addresses.json` (`{ chainId: { LevelNFT, ForgeCoin, RealmBadges } }` read from `ignition/deployments/`). Only run it when the owner of the target dir asks for it.
 
 ## Layout
 
@@ -53,12 +53,14 @@ contracts/
 ├─ src/
 │  ├─ LevelNFT.sol              Student A — ERC-721 levels, market, royalties, ClearProof
 │  ├─ ForgeCoin.sol             Student B — ERC-20 FORGE, runs, races, seasons
+│  ├─ RealmBadges.sol           EIP-712 claimed, soulbound ERC-1155 achievement badges
 │  ├─ interfaces/ILevelNFT.sol  frozen A↔B interface (SPEC §6)
 │  ├─ interfaces/IForgeCoin.sol RunResult struct, events, game functions
 │  └─ mocks/MockLevelNFT.sol    lets Student B test without LevelNFT
 ├─ test/
 │  ├─ LevelNFT.t.sol            Solidity unit + fuzz (A)
 │  ├─ ForgeCoin.t.sol           Solidity unit + fuzz, uses MockLevelNFT (B)
+│  ├─ RealmBadges.t.sol         Solidity unit tests for signatures, replay and soulbound rules
 │  └─ Integration.ts            Ignition deploy, publish → settleRun → recordRun → buy, permit, it.todo backlog
 ├─ ignition/modules/RealmForge.ts   deploy module · ignition/parameters/sepolia.json
 ├─ scripts/export-abi.ts

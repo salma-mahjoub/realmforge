@@ -127,6 +127,13 @@ CREATE TABLE IF NOT EXISTS season_payouts (
   amount       TEXT NOT NULL,
   PRIMARY KEY (season, position)
 );
+CREATE TABLE IF NOT EXISTS badge_claims (
+  holder TEXT NOT NULL,
+  badge_id INTEGER NOT NULL,
+  ref TEXT NOT NULL,
+  tx_hash TEXT NOT NULL,
+  PRIMARY KEY(holder, badge_id, ref)
+);
 CREATE TABLE IF NOT EXISTS pinned_levels (
   layout_hash  TEXT PRIMARY KEY,
   level_cid    TEXT NOT NULL,

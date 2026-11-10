@@ -34,6 +34,7 @@ export function createServices(config: Config, overrides: Partial<Services> = {}
         chainId: config.CHAIN_ID,
         levelNftAddress: config.LEVEL_NFT_ADDRESS,
         forgeCoinAddress: config.FORGE_COIN_ADDRESS,
+        realmBadgesAddress: config.REALM_BADGES_ADDRESS,
         ttlSec: config.SIGNATURE_TTL_SEC,
       }),
     pinner: overrides.pinner ?? (config.PINATA_JWT ? new PinataPinner(config.PINATA_JWT) : localPinner),

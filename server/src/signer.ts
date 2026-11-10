@@ -21,6 +21,7 @@ export interface SignerOptions {
   chainId: number;
   levelNftAddress?: Address;
   forgeCoinAddress?: Address;
+  realmBadgesAddress?: Address;
   /** Validity window for deadlines, seconds. */
   ttlSec?: number;
 }
@@ -31,9 +32,15 @@ export interface Signed<T> {
   signer: Address;
 }
 
+export interface BadgeClaim { holder: Address; badgeId: bigint; ref: bigint; nonce: bigint; deadline: bigint }
+export const badgeClaimTypes = { BadgeClaim: [
+  { name: "holder", type: "address" }, { name: "badgeId", type: "uint256" },
+  { name: "ref", type: "uint256" }, { name: "nonce", type: "uint256" }, { name: "deadline", type: "uint256" },
+] } as const;
+
 export class ContractNotConfiguredError extends Error {
   constructor(name: string) {
-    super(`${name} address is not configured (set ${name === "LevelNFT" ? "LEVEL_NFT_ADDRESS" : "FORGE_COIN_ADDRESS"})`);
+    super(`${name} address is not configured (set ${name === "LevelNFT" ? "LEVEL_NFT_ADDRESS" : name === "ForgeCoin" ? "FORGE_COIN_ADDRESS" : "REALM_BADGES_ADDRESS"})`);
     this.name = "ContractNotConfiguredError";
   }
 }
@@ -56,6 +63,7 @@ export class GameSigner {
   readonly chainId: number;
   readonly levelNftAddress?: Address;
   readonly forgeCoinAddress?: Address;
+  readonly realmBadgesAddress?: Address;
   readonly ttlSec: number;
 
   constructor(opts: SignerOptions) {
@@ -63,6 +71,7 @@ export class GameSigner {
     this.chainId = opts.chainId;
     this.levelNftAddress = opts.levelNftAddress;
     this.forgeCoinAddress = opts.forgeCoinAddress;
+    this.realmBadgesAddress = opts.realmBadgesAddress;
     this.ttlSec = opts.ttlSec ?? 3600;
   }
 
@@ -78,6 +87,18 @@ export class GameSigner {
   private coinDomain() {
     if (!this.forgeCoinAddress) throw new ContractNotConfiguredError("ForgeCoin");
     return forgeCoinDomain(this.chainId, this.forgeCoinAddress);
+  }
+
+  async signBadgeClaim(input: { holder: Address; badgeId: bigint; ref: bigint }): Promise<Signed<BadgeClaim>> {
+    if (!this.realmBadgesAddress) throw new ContractNotConfiguredError("RealmBadges");
+    const message: BadgeClaim = { ...input, nonce: generateNonce(), deadline: deadlineFromNow(this.ttlSec) };
+    const signature = await this.account.signTypedData({
+      domain: { name: "RealmForge Badges", version: "1", chainId: this.chainId, verifyingContract: this.realmBadgesAddress },
+      types: badgeClaimTypes,
+      primaryType: "BadgeClaim",
+      message,
+    });
+    return { message, signature, signer: this.address };
   }
 
   async signClearProof(input: { creator: Address; layoutHash: Hex; deadline?: bigint }): Promise<Signed<ClearProof>> {

@@ -7,6 +7,7 @@ import { remixRoutes } from "./routes/remix.js";
 import { runRoutes } from "./routes/runs.js";
 import { seasonRoutes } from "./routes/season.js";
 import { statsRoutes } from "./routes/stats.js";
+import { badgeRoutes } from "./routes/badges.js";
 
 const startedAt = Date.now();
 
@@ -40,6 +41,7 @@ export async function buildApi(svc: Services, opts: { logger?: boolean } = {}): 
       contracts: {
         levelNFT: svc.config.LEVEL_NFT_ADDRESS ?? null,
         forgeCoin: svc.config.FORGE_COIN_ADDRESS ?? null,
+        realmBadges: svc.config.REALM_BADGES_ADDRESS ?? null,
       },
       ipfs: svc.pinner.provider,
       indexer: Object.fromEntries(lastBlocks.map((r) => [r.key, r.value])),
@@ -52,6 +54,7 @@ export async function buildApi(svc: Services, opts: { logger?: boolean } = {}): 
   remixRoutes(app, svc);
   runRoutes(app, svc);
   statsRoutes(app, svc);
+  badgeRoutes(app, svc);
   seasonRoutes(app, svc);
   return app;
 }

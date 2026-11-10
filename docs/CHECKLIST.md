@@ -132,6 +132,13 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] Co-op UI (`/coop/new`, `/coop/:code`, nav “Co-op”): create a room (team of 2–4, no stake) or join by code, ready-up lobby, 3-2-1 towards the server's startAt, `CoopScene` (RaceScene networking + shared checkpoints: a fall respawns at the furthest checkpoint anyone reached, a teammate's checkpoints count for the flag), team result (team time = last arrival, combined time, splits) and per-player claim of the signed RunResult. Browser E2E `scripts/browser-e2e/coop.cjs` (two wallets: shared checkpoint, respawn at it after a real fall, team clear, 0 strikes, reward claimed on-chain)
 - [ ] Persisting race results, reconnect handling
 
+## 5a. Soulbound achievement badges
+- [x] `RealmBadges` ERC-1155 contract, EIP-712 claims, single-use `(holder, badge, ref)`, and soulbound restrictions
+- [x] Indexer-derived first-clear, record-holder, race-winner, and creator eligibility; claim-proof API and indexed claims
+- [x] Profile badges section with art and wallet claim transactions
+
+Badge feature verification — 10 November 2026: `npx hardhat test` — 103 passing (92 Solidity, 11 node); `server/npm test` — 62 passing; `game-core/npm test` — 87 passing; `web/npx vitest run` — 79 passing; root `npm run build` passes.
+
 ## 6. Integration and operations
 - [x] Private GitHub repo: https://github.com/MedSlimane/realmforge
 - [x] CI workflow written (`.github/workflows/ci.yml`)

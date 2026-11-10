@@ -3,7 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Check, Copy, Flag, HandHeart, Hourglass, KeyRound, LogOut, MapPin, Plus, RotateCcw, Timer, Users } from 'lucide-react';
 import type { Hex } from 'viem';
 import { api } from '../api/client';
-import { RaceConnection, closeRoom, colorFor, openRoom, stashConnection } from '../api/colyseus';
+import { RaceConnection, closeRoom, colorFor, describeJoinError, needsSignIn, openRoom, stashConnection } from '../api/colyseus';
+import { useSiwe } from '../web3/siwe';
 import { EventBus } from '../game/EventBus';
 import { PhaserGame } from '../game/PhaserGame';
 import { SCENES } from '../game/constants';
@@ -38,6 +39,7 @@ function CreateCoop() {
     const [team, setTeam] = useState(2);
     const [code, setCode] = useState('');
     const [creating, setCreating] = useState(false);
+    const siwe = useSiwe();
     const list = levels ?? MOCK_LEVELS;
     const level = list.find((l) => l.id === levelId) ?? list[0];
     const selectedId = level?.id ?? levelId;
@@ -46,11 +48,12 @@ function CreateCoop() {
         if (!web3.address) return;
         setCreating(true);
         try {
-            const conn = await RaceConnection.create('coop', { address: web3.address, levelId: selectedId, minPlayers: team, maxPlayers: team });
+            const conn = await RaceConnection.create('coop', { address: web3.address, levelId: selectedId, minPlayers: team, maxPlayers: team }, siwe.provider);
             stashConnection(conn); // keep the room alive while the lobby page opens
             navigate(`/coop/${conn.code}`);
         } catch (e) {
-            toast.show({ tone: 'warning', title: 'Could not create the co-op room', body: humanizeError(e) });
+            if (needsSignIn(e)) toast.show({ tone: 'error', title: 'Sign-in needed to create a room', body: describeJoinError(e) });
+            else toast.show({ tone: 'warning', title: 'Could not create the co-op room', body: humanizeError(e) });
         } finally {
             setCreating(false);
         }
@@ -164,6 +167,11 @@ function CoopLobby({ code }: { code: string }) {
     const web3 = useWeb3Status();
     const [online, setOnline] = useState<Online>('connecting');
     const [joinError, setJoinError] = useState<string | null>(null);
+    const [joinNeedsSignIn, setJoinNeedsSignIn] = useState(false);
+    const [joinAttempt, setJoinAttempt] = useState(0);
+    const siwe = useSiwe();
+    const siweProvider = useRef(siwe.provider);
+    siweProvider.current = siwe.provider;
     const [team, setTeam] = useState<Teammate[]>([]);
     const [levelId, setLevelId] = useState<number | null>(null);
     const [room, setRoom] = useState({ minPlayers: 2, checkpointCount: 0, shared: -1, phase: 'waiting' });
@@ -184,7 +192,7 @@ function CoopLobby({ code }: { code: string }) {
         setOnline('connecting');
         setJoinError(null);
         const key = `coop:${code}:${web3.address}`;
-        openRoom(key, code, () => RaceConnection.joinByCode(code, { address: web3.address!, levelId: 0 }))
+        openRoom(key, code, () => RaceConnection.joinByCode(code, { address: web3.address!, levelId: 0 }, siweProvider.current))
             .then((c) => {
                 if (cancelled) return;
                 conn.current = c;
@@ -241,7 +249,8 @@ function CoopLobby({ code }: { code: string }) {
             })
             .catch((e) => {
                 if (cancelled) return;
-                setJoinError(humanizeError(e));
+                setJoinError(describeJoinError(e));
+                setJoinNeedsSignIn(needsSignIn(e));
                 setOnline('error');
             });
         return () => {
@@ -249,7 +258,7 @@ function CoopLobby({ code }: { code: string }) {
             conn.current = null;
             closeRoom(key);
         };
-    }, [code, web3.address]);
+    }, [code, web3.address, joinAttempt]);
 
     // 3-2-1 towards the server's start time, then "GO!" for a moment.
     useEffect(() => {
@@ -315,10 +324,21 @@ function CoopLobby({ code }: { code: string }) {
 
             {joinError && (
                 <div className="notice notice-error" role="alert">
-                    <span>Could not join co-op room {code} ({joinError}). Check the code, or create a new room.</span>
-                    <Button size="sm" variant="secondary" to="/coop/new">
-                        Back to co-op
-                    </Button>
+                    {joinNeedsSignIn ? (
+                        <>
+                            <span><b>Wallet signature required.</b> {joinError}</span>
+                            <Button size="sm" variant="primary" icon={<KeyRound size={14} aria-hidden />} onClick={() => setJoinAttempt((n) => n + 1)}>
+                                Sign in and join
+                            </Button>
+                        </>
+                    ) : (
+                        <>
+                            <span>Could not join co-op room {code} ({joinError}). Check the code, or create a new room.</span>
+                            <Button size="sm" variant="secondary" to="/coop/new">
+                                Back to co-op
+                            </Button>
+                        </>
+                    )}
                 </div>
             )}
 

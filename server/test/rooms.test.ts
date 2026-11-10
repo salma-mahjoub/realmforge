@@ -63,8 +63,8 @@ describe("RaceRoom (Colyseus)", () => {
 
   it("keeps a spectator outside player state, readiness, and the signed ranking", async () => {
     const client = new Client(`ws://127.0.0.1:${PORT}`);
-    const a = await client.create("race", { address: PLAYER, timeLimitSec: 30 });
-    const b = await client.joinById(a.roomId, { address: P2 });
+    const a = await client.create("race", { ...auth(PLAYER), timeLimitSec: 30 });
+    const b = await client.joinById(a.roomId, auth(P2));
     const started = new Promise<void>((resolve) => a.onMessage("start", () => resolve()));
     a.send("ready"); b.send("ready");
     await started;

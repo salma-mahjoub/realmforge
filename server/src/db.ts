@@ -138,6 +138,7 @@ CREATE TABLE IF NOT EXISTS badge_claims (
   ref TEXT NOT NULL,
   tx_hash TEXT NOT NULL,
   PRIMARY KEY(holder, badge_id, ref)
+);
 CREATE TABLE IF NOT EXISTS bounties (
   bounty_id INTEGER PRIMARY KEY,
   level_id INTEGER NOT NULL,

@@ -1,81 +1,96 @@
 import { useEffect, useState } from 'react';
 import { formatEther } from 'viem';
-import { CalendarClock, Crown, Hammer, RefreshCw, ShieldCheck, Trophy, Users } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { CalendarClock, CheckCircle2, Crown, FileSignature, Hammer, History, RefreshCw, ShieldCheck, Trophy, Users } from 'lucide-react';
 import { api } from '../api/client';
-import { AddressChip, Badge, Button, Card, CardHeader, EmptyState, ForgeCoin, Skeleton, TokenAmount } from '../components/ui';
-import { useAsync } from '../components/useAsync';
-import { parseSeasonProof, prizeOf, useSeason } from '../contracts/hooks';
+import { Badge, Button, Card, CardHeader, EmptyState, ForgeCoin, Pill, Skeleton, TokenAmount, cx } from '../components/ui';
+import { formatCountdown, parseSeasonProof, payoutsFromReceipt, secondsLeft, useSeason, type SeasonPayout, type SignedSeason } from '../contracts/hooks';
 import { BlockerNotice } from '../components/BlockerNotice';
 import { useTxFlow, useWeb3Status } from '../web3/tx';
+import { ClosedSeasonsList, PayoutsTable, StandingsTable, bpsToPct } from './season/SeasonTables';
+import './season/season.css';
 
-const fmtLeft = (sec: number) => {
-    if (sec <= 0) return 'ended';
-    const d = Math.floor(sec / 86400);
-    const h = Math.floor((sec % 86400) / 3600);
-    const m = Math.floor((sec % 3600) / 60);
-    return d > 0 ? `${d}d ${h}h left` : h > 0 ? `${h}h ${m}m left` : `${m}m left`;
-};
+interface FetchedProof {
+    season: number;
+    signer: string;
+    signed: SignedSeason;
+}
 
-/** Season page: prize pool, live ranking (docs/SEASONS.md) and, for the contract admin, the closing action. */
+/**
+ * Season page: live standings (docs/SEASONS.md, GET /season/standings), the on-chain prize pool and a countdown to
+ * `seasonEnd` by the chain clock, and for the contract admin the two-step close: fetch the server-signed result,
+ * then submit `ForgeCoin.closeSeason` and show what each winner was paid.
+ */
 export default function Season() {
     const web3 = useWeb3Status();
     const season = useSeason();
     const tx = useTxFlow();
-    const { data, error, loading, reload } = useAsync(() => api.getSeason(), []);
-    const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
+    const standingsQ = useQuery({ queryKey: ['season', 'standings'], queryFn: () => api.getSeasonStandings(), refetchInterval: 10_000 });
+    const data = standingsQ.data;
+
+    const [nowMs, setNowMs] = useState(() => Date.now());
     useEffect(() => {
-        const t = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 30_000);
+        const t = setInterval(() => setNowMs(Date.now()), 1_000);
         return () => clearInterval(t);
     }, []);
 
-    const ended = season.seasonEnd !== undefined && now >= season.seasonEnd;
-    const pool = season.pool ?? 0n;
-    const nPlayers = data?.players.length ?? 0;
+    const [proof, setProof] = useState<FetchedProof | null>(null);
+    const [proofError, setProofError] = useState<string | null>(null);
+    const [fetchingProof, setFetchingProof] = useState(false);
+    const [result, setResult] = useState<{ season: bigint; pool: bigint; payouts: SeasonPayout[] } | null>(null);
 
-    const closeSeason = async () => {
-        const out = await tx.run('close-season', { title: 'Close the season', success: 'Season closed', successBody: 'The pool was paid to the winners and the next season started.' }, async () => {
-            const proof = parseSeasonProof(await api.requestSeasonProof());
-            if (!proof) throw new Error('The server returned an incomplete season proof.');
-            return season.close(proof);
-        });
-        if (out.ok) {
-            void season.refetch();
-            reload();
+    const left = season.seasonEnd !== undefined ? secondsLeft(season.seasonEnd, season.chainTs, season.chainTsObservedAt, nowMs) : undefined;
+    const ended = left !== undefined && left <= 0;
+    const pool = season.pool ?? 0n;
+    const onChainSeason = season.season;
+    const proofMatches = proof !== null && onChainSeason !== undefined && BigInt(proof.season) === onChainSeason;
+    const isLocal = web3.chainId === 31337;
+
+    const fetchProof = async () => {
+        setFetchingProof(true);
+        setProofError(null);
+        try {
+            const raw = (await api.requestSeasonProof()) as { message?: { season?: string }; signer?: string };
+            const signed = parseSeasonProof(raw);
+            if (!signed || !raw.message?.season) throw new Error('The server returned an incomplete season proof.');
+            setProof({ season: Number(raw.message.season), signer: raw.signer ?? '—', signed });
+        } catch (e) {
+            setProof(null);
+            setProofError((e as Error).message);
+        } finally {
+            setFetchingProof(false);
         }
     };
 
-    const winners = (list: { address: string; score: number }[], offset: number, label: string, icon: React.ReactNode) => (
-        <Card>
-            <CardHeader icon={icon} title={label} aside={<Badge tone="neutral">{list.length} / 10</Badge>} />
-            {loading && !data ? (
-                <Skeleton w="100%" h={120} />
-            ) : list.length === 0 ? (
-                <EmptyState compact title="No score yet">Scores appear after the first settled runs of the season.</EmptyState>
-            ) : (
-                <ol className="plain-steps" aria-label={label}>
-                    {list.map((w, i) => (
-                        <li key={w.address} style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
-                            <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                                <b>{i + 1}</b>
-                                <AddressChip address={w.address} avatar />
-                            </span>
-                            <span style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-                                <span className="fine">{w.score} pts</span>
-                                <TokenAmount value={Number(formatEther(prizeOf(pool, data!.shares[offset + i] ?? 0)))} size="sm" />
-                            </span>
-                        </li>
-                    ))}
-                </ol>
-            )}
-        </Card>
-    );
+    const closeSeason = async () => {
+        if (!proof || onChainSeason === undefined) return;
+        const closing = onChainSeason;
+        const poolBefore = pool;
+        const out = await tx.run('close-season', { title: `Close season ${closing}`, success: `Season ${closing} closed`, successBody: 'The pool was paid to the winners and the next season started.' }, () =>
+            season.close(proof.signed),
+        );
+        if (out.ok && out.receipt) {
+            setResult({ season: closing, pool: poolBefore, payouts: payoutsFromReceipt(out.receipt, season.forgeCoin, proof.signed) });
+            setProof(null);
+            void season.refetch();
+            void standingsQ.refetch();
+        }
+    };
+
+    const step = result ? 3 : proof ? 2 : 1;
+    const np = proof?.signed.players.length ?? 0;
+    const nc = proof?.signed.creators.length ?? 0;
+    const maxWinners = data?.maxWinners ?? 10;
 
     return (
         <div className="page page-season">
             <header className="page-head">
                 <div>
-                    <h1 className="page-title">Season {season.season !== undefined ? season.season.toString() : '…'}</h1>
-                    <p className="page-sub">20% of every play fee and 5% of every race pot feed the prize pool. At the end of the season it is shared between the top players and the top creators.</p>
+                    <h1 className="page-title">
+                        Season {onChainSeason !== undefined ? onChainSeason.toString() : '…'}{' '}
+                        {left !== undefined && (ended ? <Pill tone="gold">Ended · awaiting close</Pill> : <Pill tone="green" pulse>Live</Pill>)}
+                    </h1>
+                    <p className="page-sub">20% of every play fee and 5% of every race pot feed the prize pool. At the end of the season it is shared between the top 10 players and the top 10 creators.</p>
                 </div>
                 <dl className="inline-stats">
                     <div>
@@ -84,48 +99,123 @@ export default function Season() {
                     </div>
                     <div>
                         <dt>
-                            <CalendarClock size={13} aria-hidden /> Ends
+                            <CalendarClock size={13} aria-hidden /> Ends in
                         </dt>
-                        <dd>{season.seasonEnd !== undefined ? fmtLeft(season.seasonEnd - now) : '—'}</dd>
+                        <dd className={cx('season-countdown', ended && 'is-over')} data-testid="season-countdown">
+                            {left !== undefined ? formatCountdown(left) : '—'}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt>Scorers</dt>
+                        <dd>{data ? `${data.players.length} · ${data.creators.length}` : '—'}</dd>
                     </div>
                 </dl>
             </header>
 
-            {error && !data && (
-                <EmptyState tone="error" title="The ranking could not be loaded" action={<Button icon={<RefreshCw size={15} aria-hidden />} onClick={reload}>Retry</Button>}>
-                    {error.message}
+            {standingsQ.error && !data && (
+                <EmptyState tone="error" title="The standings could not be loaded" action={<Button icon={<RefreshCw size={15} aria-hidden />} onClick={() => void standingsQ.refetch()}>Retry</Button>}>
+                    {(standingsQ.error as Error).message}
                 </EmptyState>
             )}
 
-            <div className="room-new-grid">
-                {winners(data?.players ?? [], 0, 'Top players', <Trophy size={18} />)}
-                {winners(data?.creators ?? [], nPlayers, 'Top creators', <Crown size={18} />)}
+            <div className="season-grid">
+                <Card>
+                    <CardHeader icon={<Trophy size={18} />} title="Players" aside={<Badge tone="neutral">{Math.min(data?.players.length ?? 0, maxWinners)} / {maxWinners} paid</Badge>} />
+                    {!data ? <Skeleton w="100%" h={120} /> : <StandingsTable kind="players" rows={data.players} pool={pool} maxWinners={maxWinners} you={web3.address} />}
+                </Card>
+                <Card>
+                    <CardHeader icon={<Crown size={18} />} title="Creators" aside={<Badge tone="neutral">{Math.min(data?.creators.length ?? 0, maxWinners)} / {maxWinners} paid</Badge>} />
+                    {!data ? <Skeleton w="100%" h={120} /> : <StandingsTable kind="creators" rows={data.creators} pool={pool} maxWinners={maxWinners} you={web3.address} />}
+                </Card>
             </div>
 
-            <Card>
-                <CardHeader icon={<Users size={18} />} title="How the ranking works" />
-                <ul className="plain-steps">
-                    <li>Players: +1 point per level cleared (once per level) and +2 per level where they hold the best settled time.</li>
-                    <li>Creators: +1 point per different player who paid to play one of their levels.</li>
-                    <li>Playing your own level never scores. The pool is split 50% players, 50% creators, in proportion to the points.</li>
-                    <li>The server computes the ranking from public on-chain events and signs it; only the admin can submit it, after the season ends.</li>
-                </ul>
-            </Card>
+            {result && (
+                <Card>
+                    <CardHeader icon={<CheckCircle2 size={18} />} title={`Season ${result.season.toString()} payouts`} aside={<TokenAmount value={Number(formatEther(result.pool))} size="sm" />} />
+                    <PayoutsTable payouts={result.payouts} pool={result.pool} />
+                </Card>
+            )}
 
             {web3.address && season.isAdmin && (
                 <Card>
                     <CardHeader icon={<ShieldCheck size={18} />} title="Admin: close the season" aside={<ForgeCoin size={18} />} />
-                    <p className="fine">
-                        {ended
-                            ? `The season is over. Closing it pays ${Number(formatEther(pool)).toLocaleString()} FORGE to the winners above and starts season ${season.season !== undefined ? (season.season + 1n).toString() : '…'}.`
-                            : 'The contract only accepts the closing after the season end.'}
-                    </p>
-                    <BlockerNotice compact />
-                    <Button variant="primary" icon={<Hammer size={16} aria-hidden />} disabled={!ended || !!web3.blocker} loading={tx.isBusy('close-season')} onClick={() => void closeSeason()}>
-                        Close season {season.season?.toString()}
-                    </Button>
+                    <ol className="season-steps">
+                        <li className={cx('season-step', step > 1 ? 'is-done' : 'is-active')}>
+                            <span className="season-step-n">1</span>
+                            <div>
+                                <h3>Fetch the signed result</h3>
+                                <p className="fine">The server signs the ranking it computed itself (EIP-712 SeasonResult). It never signs a ranking sent by a caller.</p>
+                                {proof && (
+                                    <dl className="season-proof" aria-label="Signed season result">
+                                        <dt>Season</dt>
+                                        <dd>{proof.season}</dd>
+                                        <dt>Players</dt>
+                                        <dd>{np === 0 ? 'none' : proof.signed.shares.slice(0, np).map(bpsToPct).join(' · ')}</dd>
+                                        <dt>Creators</dt>
+                                        <dd>{nc === 0 ? 'none' : proof.signed.shares.slice(np).map(bpsToPct).join(' · ')}</dd>
+                                        <dt>Signer</dt>
+                                        <dd>{proof.signer}</dd>
+                                    </dl>
+                                )}
+                                {proof && !proofMatches && <p className="season-warn">This proof is for season {proof.season}, but the contract is at season {onChainSeason?.toString()}. Fetch it again.</p>}
+                                {proof && np + nc === 0 && <p className="season-warn">Nobody scored: closing pays nothing and the pool rolls over.</p>}
+                                {proofError && <p className="season-warn">{proofError}</p>}
+                                <Button icon={<FileSignature size={16} aria-hidden />} loading={fetchingProof} onClick={() => void fetchProof()}>
+                                    {proof ? 'Fetch again' : 'Fetch signed result'}
+                                </Button>
+                            </div>
+                        </li>
+                        <li className={cx('season-step', step === 2 && 'is-active', step > 2 && 'is-done')}>
+                            <span className="season-step-n">2</span>
+                            <div>
+                                <h3>Submit closeSeason from the admin wallet</h3>
+                                <p className="fine">
+                                    {ended
+                                        ? `The season is over. Closing pays ${Number(formatEther(pool)).toLocaleString()} FORGE and starts season ${onChainSeason !== undefined ? (onChainSeason + 1n).toString() : '…'}.`
+                                        : `The contract reverts with SeasonNotOver until the season end (${left !== undefined ? formatCountdown(left) : '…'}).`}
+                                </p>
+                                {!ended && isLocal && (
+                                    <p className="fine">
+                                        Local demo: run <code className="season-code">npm run season:ff</code> to move the chain clock to the season end.
+                                    </p>
+                                )}
+                                <BlockerNotice compact />
+                                <Button variant="primary" icon={<Hammer size={16} aria-hidden />} disabled={!ended || !proofMatches || !!web3.blocker} loading={tx.isBusy('close-season')} onClick={() => void closeSeason()}>
+                                    Close season {onChainSeason?.toString()}
+                                </Button>
+                            </div>
+                        </li>
+                        <li className={cx('season-step', step === 3 && 'is-done')}>
+                            <span className="season-step-n">3</span>
+                            <div>
+                                <h3>Payouts</h3>
+                                <p className="fine">{result ? `Season ${result.season} paid ${result.payouts.length} winner${result.payouts.length === 1 ? '' : 's'}, see above.` : 'Read from the transaction receipt once the close is confirmed.'}</p>
+                            </div>
+                        </li>
+                    </ol>
                 </Card>
             )}
+
+            <div className="season-grid">
+                <Card>
+                    <CardHeader icon={<Users size={18} />} title="How the ranking works" />
+                    <ul className="plain-steps">
+                        <li>Players: +1 point per level cleared (once per level) and +2 per level where they hold the best settled time.</li>
+                        <li>Creators: +1 point per different player who paid to play one of their levels.</li>
+                        <li>Playing your own level never scores. The pool is split 50% players, 50% creators, in proportion to the points; ties go to whoever reached the score first.</li>
+                        <li>The server computes the ranking from public on-chain events and signs it; only the admin can submit it, after the season ends.</li>
+                    </ul>
+                    {data && (
+                        <p className="fine">
+                            This season: {data.totals.runs} paid runs, {data.totals.clears} clears, {data.totals.activePlayers} players on {data.totals.activeLevels} levels.
+                        </p>
+                    )}
+                </Card>
+                <Card>
+                    <CardHeader icon={<History size={18} />} title="Past seasons" />
+                    {!data ? <Skeleton w="100%" h={60} /> : <ClosedSeasonsList closed={data.closed} />}
+                </Card>
+            </div>
         </div>
     );
 }

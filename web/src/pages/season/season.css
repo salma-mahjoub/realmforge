@@ -1,0 +1,33 @@
+/* Season page (web/src/pages/Season.tsx). Design tokens only (styles/tokens.css). */
+.season-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); align-items: start; }
+@media (max-width: 960px) { .season-grid { grid-template-columns: 1fr; } }
+
+.season-table td { vertical-align: middle; }
+.season-breakdown { margin-top: 2px; }
+.season-table tr.season-unpaid td { opacity: 0.55; }
+.season-table tr.season-cut td { border-top: 1px dashed var(--line-strong); }
+
+.season-countdown { font-variant-numeric: tabular-nums; }
+.season-countdown.is-over { color: var(--gold); }
+
+.season-steps { list-style: none; margin: 0 0 var(--s-4); padding: 0; display: flex; flex-direction: column; gap: var(--s-3); }
+.season-step { display: grid; grid-template-columns: 28px 1fr; gap: var(--s-3); align-items: start; }
+.season-step-n { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--surface-3); color: var(--text-2); font-weight: 700; font-size: var(--fs-sm); }
+.season-step.is-done .season-step-n { background: var(--green-soft); color: var(--green); }
+.season-step.is-active .season-step-n { background: var(--violet-soft); color: var(--violet-ink); }
+.season-step h3 { margin: 0 0 4px; font-size: var(--fs-md); }
+.season-step .btn { margin-top: var(--s-2); }
+
+.season-proof { margin: var(--s-2) 0 0; padding: var(--s-2) var(--s-3); background: var(--bg-sunken); border: 1px solid var(--line); border-radius: var(--r-sm); font-size: var(--fs-sm); display: grid; grid-template-columns: auto 1fr; gap: 4px var(--s-3); }
+.season-proof dt { color: var(--muted); }
+.season-proof dd { margin: 0; overflow-wrap: anywhere; }
+.season-warn { color: var(--amber); font-size: var(--fs-sm); }
+.season-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--surface-2); padding: 1px 6px; border-radius: var(--r-xs); }
+
+.season-total { margin-top: var(--s-3); }
+
+.season-history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s-3); }
+.season-history > li { border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--s-3); background: var(--surface); }
+.season-history-head { display: flex; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; align-items: baseline; }
+.season-history-payouts { margin: var(--s-2) 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.season-history-payouts li { display: flex; justify-content: space-between; gap: var(--s-3); align-items: center; }

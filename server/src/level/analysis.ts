@@ -58,7 +58,12 @@ export function analyzeLevel(level: Level): LevelAnalysis {
       0,
     ) + countTerrain(level.layers.terrain ?? "", TERRAIN_QUESTION_BLOCK);
   const dxTiles = teleports.length > 0 ? 0 : Math.abs(level.goal.x - level.spawn.x);
-  const maxTilesPerMs = (PHYSICS.maxRunTilesPerTick * PHYSICS.tickHz) / 1000;
+  // With a dash power-up in the level a run can chain bursts (one per airtime), so the lower bound
+  // assumes dash speed throughout; otherwise running speed.
+  const hasDash = level.entities.some(
+    (e) => e.type === "powerup_dash" || (e.type === "question_block" && e.props?.reward === "powerup_dash"),
+  );
+  const maxTilesPerMs = ((hasDash ? PHYSICS.dashTilesPerTick : PHYSICS.maxRunTilesPerTick) * PHYSICS.tickHz) / 1000;
   const minTimeMs = Math.floor(dxTiles / maxTilesPerMs / PHYSICS.minTimeSafetyFactor);
   return {
     checkpoints,

@@ -3,7 +3,7 @@ import {ELEMENTS,inventoryFor,surfaceForBody,carryAtBody,hurtPlayer,type Element
 import type {ElementDef,EntityId} from './schema.js';
 import {EMPTY_INPUT,type InputState} from '../input.js';
 import {springLaunch,MovementState} from '../controller.js';
-import {toFixed} from '../constants.js';
+import {MOVEMENT,toFixed} from '../constants.js';
 /** Construct before the Matter player: filtering and movement precede contact queries. */
 export function createElementRuntime(scene:Phaser.Scene,options:{tile:number;textures?:ElementContext['textures'];input?:()=>InputState;onEvent?:(type:string,element:ElementInstance)=>void}) {
   const elements=new Map<EntityId,ElementInstance>();let player:ElementPlayer|undefined,previous=EMPTY_INPUT,drop=0,airJump=false,dashUsed=false;
@@ -20,7 +20,7 @@ export function createElementRuntime(scene:Phaser.Scene,options:{tile:number;tex
       const grounded=[...elements.values()].some(e=>e.enabled&&e.bodies.some(b=>!b.isSensor&&above(b)));
       if(grounded){airJump=false;dashUsed=false;}
       if(inv.doubleJump&&!airJump&&!grounded&&player.state.coyote===0&&input.jump&&!previous.jump&&!input.down){airJump=true;player.setState(springLaunch(player.state,-4));}
-      if(inv.dash&&!dashUsed&&input.run&&!previous.run){dashUsed=true;player.setState({...player.state,vx:toFixed(6*player.state.facing),airMax:toFixed(6),vy:0});}
+      if(inv.dash&&!dashUsed&&input.run&&!previous.run){dashUsed=true;player.setState({...player.state,vx:toFixed(MOVEMENT.dashSpeed*player.state.facing),airMax:toFixed(MOVEMENT.dashSpeed),vy:0});}
     }
     for(const e of elements.values()){
       if(player&&['one_way','semi_solid'].includes(e.def.type)){

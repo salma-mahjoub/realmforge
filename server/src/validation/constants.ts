@@ -13,9 +13,13 @@ export const PHYSICS = {
   tickHz: FIXED_HZ,
   /** Fastest horizontal speed, tiles per tick. */
   maxRunTilesPerTick: MOVEMENT.runMax / REFERENCE_TILE,
+  /** Dash power-up burst, tiles per tick (faster than running; one burst per airtime). */
+  dashTilesPerTick: MOVEMENT.dashSpeed / REFERENCE_TILE,
+  /** Head-room on a dash burst for conveyor/platform carry and float error. */
+  dashTolerance: 1.25,
   /** Fastest vertical speed (spring launch / falling), tiles per tick. */
   maxVerticalTilesPerTick: Math.max(MOVEMENT.springVelocity, MOVEMENT.maxFallSpeed, -MOVEMENT.springVelocity) / REFERENCE_TILE,
-  /** Head-room for dash power-ups, conveyors, moving platforms, float error. */
+  /** Head-room for conveyors, moving platforms and float error on running speed. */
   speedTolerance: 1.75,
   /** Divide theoretical min time by this (dash, springs) to get a safe lower bound. */
   minTimeSafetyFactor: 1.6,

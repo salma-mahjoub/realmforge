@@ -19,7 +19,9 @@ export function checkStep(
 ): ValidationIssue | null {
   const ticks = b.f - a.f;
   if (ticks <= 0) return { code: "trace_order", message: `frames not increasing at ${b.f}`, frame: b.f };
-  const maxDx = PHYSICS.maxRunTilesPerTick * PHYSICS.speedTolerance * ticks + 0.05;
+  // A dash burst beats running speed; the bound is the faster of the two, each with its own head-room.
+  const maxDxPerTick = Math.max(PHYSICS.maxRunTilesPerTick * PHYSICS.speedTolerance, PHYSICS.dashTilesPerTick * PHYSICS.dashTolerance);
+  const maxDx = maxDxPerTick * ticks + 0.05;
   const maxDy = PHYSICS.maxVerticalTilesPerTick * PHYSICS.speedTolerance * ticks + 0.05;
   const dx = Math.abs(b.x - a.x);
   const dy = Math.abs(b.y - a.y);

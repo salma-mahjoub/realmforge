@@ -17,6 +17,8 @@ export const MOVEMENT = Object.freeze({
   maxFallSpeed: 4, coyoteFrames: 6, jumpBufferFrames: 6,
   wallSlideMax: 1, wallJumpX: 2.5, wallJumpY: -4.5, wallLockFrames: 8,
   cornerCorrection: 4, stompVelocity: -3, heldStompVelocity: -5, springVelocity: -7,
+  /** Dash power-up burst (horizontal, reference px/frame); one per airtime, refilled on landing. */
+  dashSpeed: 6,
 });
 export const toFixed = (pixels: number): number => Math.round(pixels * SUBPIXEL);
 export const fromFixed = (value: number): number => value / SUBPIXEL;

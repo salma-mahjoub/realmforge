@@ -21,6 +21,6 @@ export function usePublishLevel() {
             args: [a.layoutHash, a.uri, a.playFee, a.parentId, a.deadline, a.clearSig],
         });
 
-    // TODO: parse LevelPublished from tx.receipt.data.logs to return the minted token id.
+    // The caller decodes `LevelPublished` from the receipt to get the minted token id (PublishModal).
     return { publish, ...tx };
 }

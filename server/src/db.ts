@@ -35,6 +35,11 @@ CREATE TABLE IF NOT EXISTS levels (
   best_time_ms  INTEGER,
   best_player   TEXT,
   listing_price TEXT,
+  auction_end INTEGER,
+  auction_seller TEXT,
+  auction_price TEXT,
+  auction_bid TEXT,
+  auction_bidder TEXT,
   block_number  INTEGER NOT NULL,
   tx_hash       TEXT NOT NULL,
   created_at    INTEGER NOT NULL
@@ -153,6 +158,10 @@ export function openDb(path: string): Db {
   if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
   const db = new DatabaseSync(path);
   db.exec(SCHEMA);
+  for (const [name, type] of [["auction_end", "INTEGER"], ["auction_seller", "TEXT"], ["auction_price", "TEXT"], ["auction_bid", "TEXT"], ["auction_bidder", "TEXT"]]) {
+    const columns = db.prepare("PRAGMA table_info(levels)").all() as { name: string }[];
+    if (!columns.some((column) => column.name === name)) db.exec(`ALTER TABLE levels ADD COLUMN ${name} ${type}`);
+  }
   return db;
 }
 

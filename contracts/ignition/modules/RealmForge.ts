@@ -6,6 +6,7 @@ import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
  *   2. LevelNFT(signer)
  *   3. forgeCoin.setLevelNFT(levelNFT)
  *   4. levelNFT.grantRole(GAME_ROLE, forgeCoin)
+ *   5. LevelAuction(levelNFT, forgeCoin)
  *
  * Parameter `signer` = PUBLIC address of the game-server signing key.
  * Local default: account #0 (the deployer). Sepolia: ignition/parameters/sepolia.json.
@@ -19,11 +20,11 @@ export default buildModule("RealmForgeModule", (m) => {
 
   const forgeCoin = m.contract("ForgeCoin", [signer]);
   const levelNFT = m.contract("LevelNFT", [signer]);
-
   const linked = m.call(forgeCoin, "setLevelNFT", [levelNFT]);
 
   const gameRole = m.staticCall(levelNFT, "GAME_ROLE", []);
   m.call(levelNFT, "grantRole", [gameRole, forgeCoin], { after: [linked] });
+  const levelAuction = m.contract("LevelAuction", [levelNFT, forgeCoin], { after: [linked] });
 
-  return { forgeCoin, levelNFT };
+  return { forgeCoin, levelNFT, levelAuction };
 });

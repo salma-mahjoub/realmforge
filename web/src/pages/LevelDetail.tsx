@@ -4,9 +4,10 @@ import { formatEther, parseEther, zeroAddress } from 'viem';
 import { ArrowUpRight, ChevronRight, Clock, Flag, Gamepad2, Heart, Pencil, Percent, Play, Receipt, RefreshCw, Tag, Trophy, UserRound } from 'lucide-react';
 import { api } from '../api/client';
 import { useMockData } from '../api/dataSource';
-import { AddressChip, Badge, Button, Card, CardHeader, EmptyState, ExternalLink, ForgeCoin, LevelThumb, Pill, Skeleton, Stat, Tooltip, formatMs, shortAddr } from '../components/ui';
+import { AddressChip, Badge, Button, Card, CardHeader, EmptyState, ExternalLink, Field, ForgeCoin, Input, LevelThumb, Select, Pill, Skeleton, Stat, Tooltip, formatMs, shortAddr } from '../components/ui';
 import { useAsync } from '../components/useAsync';
 import { useLevel, useMarket } from '../contracts/hooks';
+import { useAuction } from '../contracts/hooks';
 import { formatForge } from '../contracts/hooks/useForgeBalance';
 import { explorerTxUrl } from '../web3/config';
 import { chainName, useTxFlow, useWeb3Status } from '../web3/tx';
@@ -72,12 +73,19 @@ export default function LevelDetail() {
     const earnings = useAsync(() => api.getCreatorEarnings(id), [id]);
     const chain = useLevel(valid ? id : undefined);
     const market = useMarket();
+    const auctionFlow = useAuction(BigInt(id));
     const tx = useTxFlow();
     const mockDetail = useMockData('/levels/1');
     const mockActivity = useMockData('/levels/:id/activity');
     const mockEarnings = useMockData('/levels/:id/earnings');
     const [buying, setBuying] = useState(false);
     const [listing, setListing] = useState(false);
+    const [auctionOpen, setAuctionOpen] = useState(false);
+    const [reserve, setReserve] = useState('0.01');
+    const [increment, setIncrement] = useState('0.001');
+    const [duration, setDuration] = useState(86400);
+    const positive = (v: string) => /^\d*\.?\d+$/.test(v) && Number(v) > 0;
+    const auctionError = !positive(reserve) ? 'Enter a reserve above 0' : !positive(increment) ? 'Enter a minimum raise above 0' : null;
 
     if (!valid) return <EmptyState tone="error" title="Invalid level id" action={<Button to="/browse">Browse levels</Button>}>Level ids are positive integers, e.g. /level/42.</EmptyState>;
     if (error && !lvl) {
@@ -182,9 +190,32 @@ export default function LevelDetail() {
                             </div>
                             <div className="ownership-cta">
                                 {isOwner ? (
-                                    <Button variant="primary" block icon={<Tag size={16} aria-hidden />} onClick={() => setListing(true)}>
-                                        {listedEth ? `Listed ${listedEth} ETH · Edit` : 'List for sale'}
-                                    </Button>
+                                    <>
+                                        <Button variant="primary" block icon={<Tag size={16} aria-hidden />} onClick={() => setListing(true)}>{listedEth ? `Listed ${listedEth} ETH · Edit` : 'List for sale'}</Button>
+                                        <Button block onClick={() => setAuctionOpen((v) => !v)} aria-expanded={auctionOpen}>{auctionOpen ? 'Cancel auction setup' : 'Auction this level'}</Button>
+                                        {auctionOpen && (
+                                            <div className="auction-form">
+                                                <Field label="Reserve price" htmlFor="auc-reserve" error={auctionError}>
+                                                    <Input id="auc-reserve" inputMode="decimal" value={reserve} onChange={(e) => setReserve(e.target.value.replace(',', '.'))} suffix="ETH" />
+                                                </Field>
+                                                <Field label="Minimum raise" htmlFor="auc-inc">
+                                                    <Input id="auc-inc" inputMode="decimal" value={increment} onChange={(e) => setIncrement(e.target.value.replace(',', '.'))} suffix="ETH" />
+                                                </Field>
+                                                <Field label="Duration" htmlFor="auc-dur">
+                                                    <Select id="auc-dur" value={String(duration)} onChange={(e) => setDuration(Number(e.target.value))}>
+                                                        <option value={3600}>1 hour</option>
+                                                        <option value={21600}>6 hours</option>
+                                                        <option value={86400}>24 hours</option>
+                                                        <option value={259200}>3 days</option>
+                                                    </Select>
+                                                </Field>
+                                                <p className="fine">The NFT is held by the auction contract until it ends. Paid runs are paused meanwhile, and a bid in the last 10 minutes extends it by 10 minutes. Two wallet confirmations: approve, then start.</p>
+                                                <Button variant="primary" block disabled={!!auctionError || tx.isBusy('create auction')} loading={tx.isBusy('create auction')} onClick={() => void tx.run('create auction', { title: `Auction level #${id}`, success: 'Auction started' }, () => auctionFlow.create(BigInt(id), reserve, increment, BigInt(duration))).then((r) => r.ok && setAuctionOpen(false))}>
+                                                    Start auction
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </>
                                 ) : listedEth ? (
                                     <Button variant="primary" block onClick={() => setBuying(true)}>
                                         Listed {listedEth} ETH — Buy

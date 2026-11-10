@@ -37,7 +37,8 @@ run("npx hardhat ignition deploy ignition/modules/RealmForge.ts --network localh
 const deployed = JSON.parse(readFileSync(join(dep, "deployed_addresses.json"), "utf8"));
 const levelNFT = deployed["RealmForgeModule#LevelNFT"];
 const forgeCoin = deployed["RealmForgeModule#ForgeCoin"];
-if (!levelNFT || !forgeCoin) throw new Error("deployment addresses not found");
+const levelAuction = deployed["RealmForgeModule#LevelAuction"];
+if (!levelNFT || !forgeCoin || !levelAuction) throw new Error("deployment addresses not found");
 
 // 2. ABIs
 run("node scripts/export-abi.ts");
@@ -57,6 +58,7 @@ const webEnv = setEnv(readFileSync(join(ROOT, "web", ".env.example"), "utf8"), {
   VITE_DEFAULT_CHAIN_ID: "31337",
   VITE_LEVEL_NFT_ADDRESS: levelNFT,
   VITE_FORGE_COIN_ADDRESS: forgeCoin,
+  VITE_LEVEL_AUCTION_ADDRESS: levelAuction,
   VITE_API_URL: "http://localhost:8787",
   VITE_GAME_SERVER_URL: "ws://localhost:2567",
   VITE_IPFS_GATEWAY: "http://localhost:8787/ipfs/",
@@ -67,10 +69,11 @@ const serverEnv = setEnv(readFileSync(join(ROOT, "server", ".env.example"), "utf
   CHAIN_ID: "31337",
   LEVEL_NFT_ADDRESS: levelNFT,
   FORGE_COIN_ADDRESS: forgeCoin,
+  LEVEL_AUCTION_ADDRESS: levelAuction,
   INDEXER_START_BLOCK: "0",
   // a fresh chain reuses token ids: keep one SQLite DB per deployment
   DATA_DIR: `./data/local-${levelNFT.slice(2, 10).toLowerCase()}`,
 });
 writeFileSync(join(ROOT, "server", ".env"), serverEnv);
 
-console.log(`\nDeployed on chain ${chainId}:\n  LevelNFT  ${levelNFT}\n  ForgeCoin ${forgeCoin}\nWrote web/.env.local and server/.env. Next: npm run dev:server · npm run dev:web`);
+console.log(`\nDeployed on chain ${chainId}:\n  LevelNFT     ${levelNFT}\n  ForgeCoin    ${forgeCoin}\n  LevelAuction ${levelAuction}\nWrote web/.env.local and server/.env. Next: npm run dev:server · npm run dev:web`);

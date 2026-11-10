@@ -776,3 +776,4 @@ a.level-card:hover .thumb img, .market-card:hover .thumb img { transform: scale(
     .doc-toc a { border: 1px solid var(--line); border-radius: var(--r-pill); margin: 0; padding: 4px 10px; }
     .doc-toc a.active { border-color: var(--violet-line); }
 }
+.auction-form { display: flex; flex-direction: column; gap: var(--s-3); margin-top: var(--s-2); padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--r-md); }

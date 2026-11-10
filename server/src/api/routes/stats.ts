@@ -55,6 +55,15 @@ export function statsRoutes(app: FastifyInstance, svc: Services) {
     return { items };
   });
 
+  /** Active English auctions, newest ending first; optional levelId filters to one level. */
+  app.get("/auctions", async (req) => {
+    const levelId = Number((req.query as { levelId?: string }).levelId);
+    const items = Number.isInteger(levelId) && levelId > 0
+      ? svc.db.prepare("SELECT id AS levelId, auction_seller AS seller, auction_price AS reservePrice, auction_bid AS highestBid, auction_bidder AS highestBidder, auction_end AS endTime FROM levels WHERE id = ? AND auction_end IS NOT NULL").all(levelId)
+      : svc.db.prepare("SELECT id AS levelId, auction_seller AS seller, auction_price AS reservePrice, auction_bid AS highestBid, auction_bidder AS highestBidder, auction_end AS endTime FROM levels WHERE auction_end IS NOT NULL ORDER BY auction_end ASC LIMIT 100").all();
+    return { items };
+  });
+
   /** A player's stats, created and owned levels, and their latest clears. */
   app.get("/profiles/:address", async (req, reply) => {
     const a = addressSchema.safeParse((req.params as { address: string }).address);

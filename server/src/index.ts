@@ -31,7 +31,7 @@ async function main() {
 
   await api.listen({ host: config.HOST, port: config.PORT });
 
-  const game = createGameServer({ signer: svc.signer, levels: svc.levels, log });
+  const game = createGameServer({ signer: svc.signer, levels: svc.levels, sessions: svc.sessions, log });
   await game.listen(config.GAME_PORT, config.HOST);
   api.log.info(`Colyseus game server listening on ws://${config.HOST}:${config.GAME_PORT}`);
 

@@ -1,6 +1,9 @@
 // Injected test wallet: EIP-1193 + EIP-6963, backed by the local Hardhat node's unlocked dev accounts.
 // Usage: page.addInitScript({ content: walletScript(address) })
-module.exports.walletScript = (address, rpc = 'http://127.0.0.1:8545') => `(() => {
+// Ports come from the environment so parallel stacks can run side by side (defaults: the usual dev ports).
+const WEB = (module.exports.WEB = (process.env.E2E_WEB_URL || process.env.WEB_URL || 'http://localhost:8080').replace(/\/$/, ''));
+const RPC = (module.exports.RPC = process.env.E2E_RPC_URL || process.env.RPC_URL || 'http://127.0.0.1:8545');
+module.exports.walletScript = (address, rpc = RPC) => `(() => {
   const ADDRESS = ${JSON.stringify(address)};
   const RPC = ${JSON.stringify(rpc)};
   const listeners = {};
@@ -27,7 +30,10 @@ module.exports.walletScript = (address, rpc = 'http://127.0.0.1:8545') => `(() =
         case 'wallet_requestPermissions': grant(true); return [{ parentCapability: 'eth_accounts' }];
         case 'wallet_getPermissions': return connected ? [{ parentCapability: 'eth_accounts' }] : [];
         case 'wallet_revokePermissions': grant(false); return null;
-        case 'personal_sign': return rpc('personal_sign', params);
+        case 'personal_sign':
+          // window.__rejectSign = true simulates a user clicking "Reject" (EIP-1193 code 4001)
+          if (window.__rejectSign) { const e = new Error('User rejected the request.'); e.code = 4001; throw e; }
+          return rpc('personal_sign', params);
         default: return rpc(method, params);
       }
     },

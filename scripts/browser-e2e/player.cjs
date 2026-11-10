@@ -1,11 +1,10 @@
 // Browser E2E, player half: faucet → play level #N → clear → settle run on-chain (fee to the level owner).
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
-const { walletScript } = require('./wallet.cjs');
+const { walletScript, WEB, RPC } = require('./wallet.cjs');
 const EXE = process.env.CHROME_PATH || undefined; // default: Playwright's bundled Chromium
 const PLAYER = process.env.PLAYER || '0x90F79bf6EB2c4f870365E785982E1f101E93b906'; // Hardhat #3
 const LEVEL = process.argv[2] || '1';
 const shot = (p, n) => p.screenshot({ path: `${__dirname}/shots/${n}.png` }).then(() => console.log('shot', n));
-const RPC = 'http://127.0.0.1:8545';
 const env = Object.fromEntries(require('fs').readFileSync(require('path').resolve(__dirname, '../../web/.env.local'), 'utf8').split('\n').filter((l) => l.includes('=')).map((l) => l.split('=')));
 async function balance(addr) {
   const data = '0x70a08231' + addr.slice(2).toLowerCase().padStart(64, '0');
@@ -20,7 +19,7 @@ async function balance(addr) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   page.on('pageerror', (e) => console.log('PAGEERROR', e.message));
   await page.addInitScript({ content: walletScript(PLAYER) });
-  await page.goto(`http://localhost:8080/level/${LEVEL}`, { waitUntil: 'networkidle' });
+  await page.goto(`${WEB}/level/${LEVEL}`, { waitUntil: 'networkidle' });
   await page.getByRole('button', { name: /connect wallet/i }).first().click();
   await page.getByText('RealmForge Test Wallet').first().click();
   await page.waitForTimeout(2000);
@@ -33,7 +32,7 @@ async function balance(addr) {
     console.log('after faucet: player', await balance(PLAYER));
   }
 
-  await page.goto(`http://localhost:8080/play/${LEVEL}`, { waitUntil: 'networkidle' });
+  await page.goto(`${WEB}/play/${LEVEL}`, { waitUntil: 'networkidle' });
   await page.getByRole('button', { name: /start run/i }).click();
   await page.waitForTimeout(1200);
   await page.keyboard.down('ArrowRight'); await page.keyboard.down('Shift');

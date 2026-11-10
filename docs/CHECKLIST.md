@@ -123,8 +123,8 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] 29 tests passing
 - [x] Movement constants imported from game-core (`file:../game-core`)
 - [x] `GET /levels/:id/file`; schema accepts the web level format; 31 tests
-- [ ] Join signatures / SIWE mandatory
-- [ ] Rate limiting on `/runs/validate`
+- [x] Sign-In With Ethereum (EIP-4361): `GET /auth/nonce`, `POST /auth/verify` → HMAC-signed session token (1 h TTL, single-use nonces, chain/domain/origin/time checks); race and co-op rooms refuse a join without a valid token or `joinMessage` signature (code 4401); the web asks for one signature after connect (banner) or on the first room join and keeps the token per address (`server/src/auth/siwe.ts`, `web/src/web3/siwe.ts`, `scripts/browser-e2e/siwe.cjs`)
+- [x] Rate limiting (in-memory token bucket, per IP and per address) on `/runs/validate`, `/levels/clear-proof`, `/season/close-proof`, `/auth/*` → 429 + `Retry-After` (`server/src/api/rateLimit.ts`)
 - [ ] Fetch level JSON from IPFS for levels not pinned through this server
 - [x] Profile / market / activity / earnings endpoints (indexer now handles FeeSplit, FeeBurned, SeasonClosed)
 - [x] `GET /levels/:id/remixes`: remix lineage (ancestors root first, direct children with their remix counts, subtree size) over the indexed `parent_id`

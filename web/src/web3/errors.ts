@@ -85,6 +85,8 @@ export function humanizeError(e: unknown): string {
     if (!e) return 'Something went wrong.';
     if (typeof e === 'string') return e;
     const chain = walk(e);
+    // Colyseus join refusals carry the room's own codes (4001 = bad options), not EIP-1193 ones.
+    if (chain[0]?.name === 'MatchMakeError') return (chain[0].message || 'The game server refused to join the room.').split('\n')[0].slice(0, 180);
     const all = chain.map((c) => `${c.name ?? ''} ${c.shortMessage ?? ''} ${c.message ?? ''} ${c.details ?? ''}`).join(' | ');
 
     if (chain.some((c) => c.code === 4001 || c.name === 'UserRejectedRequestError') || /user (rejected|denied)|rejected the request|denied transaction/i.test(all)) {

@@ -1,6 +1,8 @@
 import { Client, type Room } from 'colyseus.js';
 import type { Address } from 'viem';
 import { EventBus, type RemotePlayerState } from '../game/EventBus';
+import { humanizeError, isUserRejection } from '../web3/errors';
+import type { SessionProvider } from '../web3/siwe';
 
 /**
  * Colyseus client (SPEC §3.5/§3.6), aligned with server/src/game.ts + rooms/BaseMatchRoom.ts:
@@ -23,13 +25,41 @@ export interface JoinOptions {
     levelId: number;
     /** Display name (≤ 24 chars). */
     name?: string;
-    /** Optional personal_sign of `RealmForge: join room <roomId> as <address>` (server joinMessage). */
+    /** SIWE session token (POST /auth/verify). Rooms require it or `signature`. Filled in from the SessionProvider. */
+    token?: string;
+    /** Alternative ownership proof: personal_sign of `RealmForge: join room <roomId> as <address>` (server joinMessage). */
     signature?: string;
     /** bytes32 race id from ForgeCoin.createRaceRoom (derived from the room id when omitted). */
     raceId?: string;
     minPlayers?: number;
     /** FORGE stake (decimal string) — escrow happens on-chain (createRaceRoom/joinRace), not in the room. */
     stake?: string;
+}
+
+/** Server code (BaseMatchRoom AUTH_ERROR) for a missing or invalid wallet ownership proof. */
+export const ROOM_AUTH_ERROR = 4401;
+export const isRoomAuthError = (e: unknown) => (e as { code?: number } | null)?.code === ROOM_AUTH_ERROR;
+
+/** True when a join failed for lack of a wallet signature (refused, or refused by the server): the UI offers to sign again. */
+export const needsSignIn = (e: unknown) => isRoomAuthError(e) || isUserRejection(humanizeError(e));
+
+/** One sentence for a failed room join, explaining the sign-in requirement instead of a raw code. */
+export function describeJoinError(e: unknown): string {
+    if (isRoomAuthError(e)) return `Rooms only accept players who prove they own their wallet (${(e as Error).message}). Sign the free sign-in message and try again.`;
+    const text = humanizeError(e);
+    if (isUserRejection(text)) return 'You declined the sign-in signature. Rooms need it to prove that you own this wallet: it is free and sends no transaction.';
+    return text;
+}
+
+/** Joins with a session token; if the server refuses that token (expired, server restarted), signs in again once. */
+async function withSession<T>(opts: JoinOptions, auth: SessionProvider | undefined, join: (o: JoinOptions) => Promise<T>): Promise<T> {
+    if (!auth) return join(opts);
+    try {
+        return await join({ ...opts, token: await auth.token() });
+    } catch (e) {
+        if (!isRoomAuthError(e)) throw e;
+        return join({ ...opts, token: await auth.renew() });
+    }
 }
 
 const PALETTE = [0x22d3ee, 0xf472b6, 0xa3e635, 0xfbbf24];
@@ -56,12 +86,12 @@ export class RaceConnection {
 
     private constructor(readonly room: Room<RaceStateLike>) {}
 
-    static async create(kind: RoomKind, opts: JoinOptions) {
-        return new RaceConnection(await getGameClient().create<RaceStateLike>(kind, opts));
+    static async create(kind: RoomKind, opts: JoinOptions, auth?: SessionProvider) {
+        return new RaceConnection(await withSession(opts, auth, (o) => getGameClient().create<RaceStateLike>(kind, o)));
     }
 
-    static async joinByCode(code: string, opts: JoinOptions) {
-        return new RaceConnection(await getGameClient().joinById<RaceStateLike>(code, opts));
+    static async joinByCode(code: string, opts: JoinOptions, auth?: SessionProvider) {
+        return new RaceConnection(await withSession(opts, auth, (o) => getGameClient().joinById<RaceStateLike>(code, o)));
     }
 
     get code() {

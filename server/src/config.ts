@@ -36,6 +36,15 @@ export const envSchema = z.object({
   GAME_PORT: port.default(2567),
   CORS_ORIGIN: z.string().default("*"),
   DATA_DIR: z.string().default("./data"),
+  /** HMAC key for SIWE session tokens (>= 32 chars). Unset = random per process (sessions end on restart). */
+  SESSION_SECRET: z.preprocess(emptyToUndefined, z.string().min(32).optional()),
+  /** SIWE session token lifetime. Tokens are stateless and cannot be revoked, so keep this short. */
+  SESSION_TTL_SEC: z.coerce.number().int().min(60).max(86_400).default(3600),
+  /** Comma-separated EIP-4361 domains accepted at /auth/verify (e.g. "realmforge.example"). Empty = any. */
+  SIWE_DOMAINS: z.preprocess(emptyToUndefined, z.string().optional()).transform((v) => (v ? v.split(",").map((d) => d.trim()).filter(Boolean) : [])),
+  /** Token-bucket limits on signing endpoints (requests per minute). */
+  RATE_LIMIT_IP_PER_MIN: z.coerce.number().int().positive().default(60),
+  RATE_LIMIT_ADDRESS_PER_MIN: z.coerce.number().int().positive().default(20),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
 });
 

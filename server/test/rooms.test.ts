@@ -9,12 +9,14 @@ import { FORGE_COIN, PLAYER, TEST_SIGNER, testServices } from "./helpers.js";
 
 const P2 = "0x90F79bf6EB2c4f870365E785982E1f101E93b906";
 let svc: Services;
+/** Join options with a SIWE session token: rooms require wallet ownership proof (see room-auth.test.ts). */
+const auth = (address: string) => ({ address, token: svc.sessions.issue(address as `0x${string}`).token });
 let game: Server;
 const PORT = 25_000 + Math.floor(Math.random() * 1000);
 
 beforeAll(async () => {
   svc = testServices();
-  game = createGameServer({ signer: svc.signer, levels: svc.levels });
+  game = createGameServer({ signer: svc.signer, levels: svc.levels, sessions: svc.sessions });
   await game.listen(PORT, "127.0.0.1");
 });
 afterAll(async () => {
@@ -25,9 +27,9 @@ afterAll(async () => {
 describe("RaceRoom (Colyseus)", () => {
   it("runs a 2-player race and broadcasts a signed RaceResult", async () => {
     const client = new Client(`ws://127.0.0.1:${PORT}`);
-    const a = await client.create("race", { address: PLAYER, timeLimitSec: 30 });
+    const a = await client.create("race", { ...auth(PLAYER), timeLimitSec: 30 });
     expect(a.roomId).toMatch(/^[A-Z2-9]{4}$/); // short and uppercase: what a player can type
-    const b = await client.joinById(a.roomId, { address: P2 });
+    const b = await client.joinById(a.roomId, auth(P2));
 
     await expect(client.joinById(a.roomId, { address: "not-an-address" })).rejects.toBeTruthy();
 
@@ -61,8 +63,8 @@ describe("RaceRoom (Colyseus)", () => {
 
   it("ends the race when the last racer gives up and ranks the finisher first", async () => {
     const client = new Client(`ws://127.0.0.1:${PORT}`);
-    const a = await client.create("race", { address: PLAYER, timeLimitSec: 30 });
-    const b = await client.joinById(a.roomId, { address: P2 });
+    const a = await client.create("race", { ...auth(PLAYER), timeLimitSec: 30 });
+    const b = await client.joinById(a.roomId, auth(P2));
     const result = new Promise<any>((resolve) => a.onMessage("result", resolve));
     b.onMessage("result", () => {});
     const started = new Promise<void>((resolve) => a.onMessage("start", () => resolve()));
@@ -82,8 +84,8 @@ describe("RaceRoom (Colyseus)", () => {
 
   it("settles with a full ranking when nobody finishes (everyone gives up)", async () => {
     const client = new Client(`ws://127.0.0.1:${PORT}`);
-    const a = await client.create("race", { address: PLAYER, timeLimitSec: 30 });
-    const b = await client.joinById(a.roomId, { address: P2 });
+    const a = await client.create("race", { ...auth(PLAYER), timeLimitSec: 30 });
+    const b = await client.joinById(a.roomId, auth(P2));
     const result = new Promise<any>((resolve) => a.onMessage("result", resolve));
     b.onMessage("result", () => {});
     const started = new Promise<void>((resolve) => a.onMessage("start", () => resolve()));
@@ -103,8 +105,8 @@ describe("RaceRoom (Colyseus)", () => {
 
   it("accepts positions again after a respawn restarts the frame counter", async () => {
     const client = new Client(`ws://127.0.0.1:${PORT}`);
-    const a = await client.create("race", { address: PLAYER, timeLimitSec: 30 });
-    const b = await client.joinById(a.roomId, { address: P2 });
+    const a = await client.create("race", { ...auth(PLAYER), timeLimitSec: 30 });
+    const b = await client.joinById(a.roomId, auth(P2));
     const started = new Promise<void>((resolve) => a.onMessage("start", () => resolve()));
     for (const r of [a, b]) {
       r.onMessage("*", () => {});

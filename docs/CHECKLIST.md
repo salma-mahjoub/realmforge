@@ -141,7 +141,8 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 
 ## 7. Module deliverables (BK-01)
 - [ ] **S6 intermediate version:** publish end to end + solo play + `settleRun` + browse page
-- [ ] Architecture diagram (`docs/architecture.*`)
+- [~] Architecture diagram (`docs/architecture.*`): a Mermaid system diagram and flow diagrams are in `docs/BLOCKCHAIN.md`; no standalone file yet
+- [x] Blockchain explainer: `docs/BLOCKCHAIN.md` (9 Mermaid diagrams), shown in the app at `/how-it-works`, PDF `docs/RealmForge_Blockchain.pdf` (`cd web && npm run doc:pdf`)
 - [x] Threat model, including the server-signer centralisation point and its mitigations: `docs/security/THREAT_MODEL.md`
 - [ ] Slither + gas report (see §1)
 - [~] **S7 final demo script**: demo script written (editor → publish → friend plays → creator earns → race → sell NFT); not yet rehearsed with wallets

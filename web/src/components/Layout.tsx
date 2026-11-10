@@ -27,6 +27,7 @@ const NAV = [
     { to: '/room/new', label: 'Race', match: '/room' },
     { to: '/market', label: 'Market' },
     { to: '/season', label: 'Season' },
+    { to: '/how-it-works', label: 'How it works' },
 ];
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {

@@ -12,3 +12,4 @@ ignition/deployments/chain-31337/
 assets/_downloads/
 .DS_Store
 *.log
+.playwright-cli/

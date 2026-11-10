@@ -727,3 +727,49 @@ a.level-card:hover .thumb img, .market-card:hover .thumb img { transform: scale(
 @media (max-width: 760px) { .step-strip { grid-template-columns: repeat(2, 1fr); } }
 /* the lobby column is long: keep the game and its buttons in view while the page scrolls */
 @media (min-width: 1101px) { .race-stage-card { position: sticky; top: calc(var(--nav-h) + var(--s-3)); } }
+
+/* ── how it works (docs/BLOCKCHAIN.md rendered by src/docs/renderDoc.ts) ── */
+.doc-layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: var(--s-8); align-items: start; }
+.doc-side { position: sticky; top: calc(var(--nav-h) + var(--s-4)); display: flex; flex-direction: column; gap: var(--s-4); max-height: calc(100vh - var(--nav-h) - var(--s-8)); overflow-y: auto; }
+.doc-toc-title { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: var(--s-2); }
+.doc-toc ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; border-left: 1px solid var(--line); }
+.doc-toc a { display: block; padding: 5px var(--s-3); margin-left: -1px; border-left: 2px solid transparent; color: var(--text-2); font-size: var(--fs-sm); line-height: 1.35; }
+.doc-toc a:hover { color: var(--text); }
+.doc-toc a.active { color: var(--violet-ink); border-left-color: var(--violet); font-weight: 600; }
+.doc-contracts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s-2); }
+.doc-contract { display: flex; justify-content: space-between; align-items: center; gap: var(--s-3); font-size: var(--fs-sm); }
+.doc-contract-name { color: var(--text-2); font-weight: 600; }
+
+.doc-side, .doc-prose { min-width: 0; }
+.doc-prose { max-width: 860px; color: var(--text-2); font-size: var(--fs-base); line-height: 1.7; }
+.doc-prose > :first-child { margin-top: 0; }
+.doc-prose h2 { font-size: var(--fs-xl); color: var(--text); margin: var(--s-12) 0 var(--s-3); padding-top: var(--s-4); border-top: 1px solid var(--line); scroll-margin-top: calc(var(--nav-h) + var(--s-4)); }
+.doc-prose h2:first-child { border-top: 0; padding-top: 0; }
+.doc-prose h3 { font-size: var(--fs-lg); color: var(--text); margin: var(--s-8) 0 var(--s-2); scroll-margin-top: calc(var(--nav-h) + var(--s-4)); }
+.doc-prose p, .doc-prose ul, .doc-prose ol { margin: 0 0 var(--s-4); }
+.doc-prose ul, .doc-prose ol { padding-left: 1.3em; }
+.doc-prose li + li { margin-top: 4px; }
+.doc-prose strong { color: var(--text); }
+.doc-prose a { color: var(--violet-ink); text-decoration: underline; text-underline-offset: 2px; }
+.doc-prose .doc-ref { color: var(--text); font-weight: 600; border-bottom: 1px dotted var(--faint); cursor: help; }
+.doc-prose table { width: 100%; border-collapse: collapse; margin: 0 0 var(--s-5); font-size: var(--fs-md); display: block; overflow-x: auto; }
+.doc-prose th, .doc-prose td { padding: 8px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.doc-prose th { color: var(--text); background: var(--surface); font-weight: 600; white-space: nowrap; }
+.doc-prose pre:not(.mermaid) { background: var(--bg-sunken); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--s-4); overflow-x: auto; margin: 0 0 var(--s-5); }
+.doc-prose pre code { background: none; padding: 0; font-size: var(--fs-sm); color: var(--text-2); }
+.doc-prose blockquote { margin: 0 0 var(--s-5); padding: var(--s-4) var(--s-5); border-left: 3px solid var(--gold); background: var(--gold-soft); border-radius: 0 var(--r-md) var(--r-md) 0; }
+.doc-prose blockquote p:last-child { margin-bottom: 0; }
+.doc-diagram { margin: 0 0 var(--s-6); padding: var(--s-5); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); overflow-x: auto; }
+.doc-diagram pre.mermaid { margin: 0; color: transparent; min-height: 120px; background: var(--surface-2); border-radius: var(--r-md); animation: pulse 1.4s ease-in-out infinite; }
+.doc-diagram pre.mermaid.is-failed { color: var(--text-2); animation: none; padding: var(--s-4); white-space: pre-wrap; font-size: var(--fs-sm); }
+.doc-diagram-svg { display: flex; justify-content: center; }
+.doc-diagram-svg svg { max-width: 100%; height: auto; }
+.doc-diagram-svg svg[aria-roledescription='pie'] { max-width: 440px; }
+
+@media (max-width: 1100px) {
+    .doc-layout { grid-template-columns: minmax(0, 1fr); }
+    .doc-side { position: static; max-height: none; }
+    .doc-toc ol { flex-direction: row; flex-wrap: wrap; border-left: 0; gap: 4px; }
+    .doc-toc a { border: 1px solid var(--line); border-radius: var(--r-pill); margin: 0; padding: 4px 10px; }
+    .doc-toc a.active { border-color: var(--violet-line); }
+}

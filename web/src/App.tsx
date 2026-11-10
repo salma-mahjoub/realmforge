@@ -14,6 +14,7 @@ const Season = lazy(() => import('./pages/Season'));
 const EditorPage = lazy(() => import('./pages/editor/EditorPage'));
 const Play = lazy(() => import('./pages/Play'));
 const Room = lazy(() => import('./pages/Room'));
+const HowItWorks = lazy(() => import('./pages/HowItWorks'));
 
 function NotFound() {
     return (
@@ -58,6 +59,7 @@ export default function App() {
                     <Route path="profile/:address" element={<Suspense fallback={<RouteFallback />}><Profile /></Suspense>} />
                     <Route path="market" element={<Suspense fallback={<RouteFallback />}><Market /></Suspense>} />
                     <Route path="season" element={<Suspense fallback={<RouteFallback />}><Season /></Suspense>} />
+                    <Route path="how-it-works" element={<Suspense fallback={<RouteFallback />}><HowItWorks /></Suspense>} />
                     <Route path="*" element={<NotFound />} />
                 </Route>
             </Routes>

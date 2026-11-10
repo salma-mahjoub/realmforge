@@ -5,6 +5,7 @@ ERC-721 NFTs, and earn the ERC-20 **FORGE** token when others play them. Gamepla
 the chain handles ownership, the economy and settlement through server-signed EIP-712 results.
 
 - Spec: [docs/SPEC.md](docs/SPEC.md) (PDF: [docs/RealmForge_Spec.pdf](docs/RealmForge_Spec.pdf))
+- How the blockchain side works: [docs/BLOCKCHAIN.md](docs/BLOCKCHAIN.md) (in the app at `/how-it-works`; PDF: [docs/RealmForge_Blockchain.pdf](docs/RealmForge_Blockchain.pdf), rebuilt with `cd web && npm run doc:pdf`)
 - UI mockups: [docs/mockups/](docs/mockups/) (browse, editor, gameplay, race, publish, level/market)
 - Ownership: [OWNERSHIP.md](OWNERSHIP.md)
 

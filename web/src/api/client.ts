@@ -143,9 +143,9 @@ export const api = {
         read<LeaderboardEntry[]>(`/levels/${id}/leaderboard?limit=${top}`, () => MOCK_LEADERBOARD.slice(0, top), (raw: { entries: { rank: number; player: string; timeMs: number }[] }) =>
             raw.entries.map((e) => ({ rank: e.rank, player: addr(e.player), timeMs: e.timeMs })),
         ),
-    getReplays: (id: number) =>
-        read<{ player: Address; timeMs: number; inputLog: string }[]>(`/levels/${id}/replays`, () => [], (raw: { replays: { player: string; timeMs: number; inputLog: string }[] }) =>
-            raw.replays.map((r) => ({ ...r, player: addr(r.player) })),
+    getReplays: (id: number, player?: Address) =>
+        read<{ player: Address; timeMs: number; inputLog: string; trace: { f: number; x: number; y: number }[] }[]>(`/levels/${id}/replays${player ? `?player=${player}` : ''}`, () => [], (raw: { replays: { player: string; timeMs: number; inputLog: string; trace?: { f: number; x: number; y: number }[] }[] }) =>
+            raw.replays.map((r) => ({ ...r, trace: r.trace ?? [], player: addr(r.player) })),
         ),
 
     // Indexed from the chain by server/ (GET /levels/:id/activity, /levels/:id/earnings, /profiles/:address, /market/listings).

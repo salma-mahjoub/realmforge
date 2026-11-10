@@ -46,7 +46,8 @@ export default defineConfig({
     localhost: {
       type: "http",
       chainType: "l1",
-      url: "http://127.0.0.1:8545",
+      // Let isolated worktrees use their assigned Hardhat node port via RPC_URL.
+      url: process.env.RPC_URL ?? "http://127.0.0.1:8545",
     },
     sepolia: {
       type: "http",

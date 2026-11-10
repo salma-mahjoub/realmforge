@@ -43,8 +43,8 @@ export function runRoutes(app: FastifyInstance, svc: Services) {
       });
       svc.db
         .prepare(
-          `INSERT INTO signed_runs (nonce, kind, player, level_id, layout_hash, time_ms, cleared, coins, input_log, created_at)
-           VALUES (?, 'run', ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO signed_runs (nonce, kind, player, level_id, layout_hash, time_ms, cleared, coins, input_log, trace, created_at)
+           VALUES (?, 'run', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           signed.message.nonce.toString(),
@@ -55,6 +55,7 @@ export function runRoutes(app: FastifyInstance, svc: Services) {
           run.cleared ? 1 : 0,
           run.coins,
           run.inputLog ?? null,
+          JSON.stringify(run.trace),
           Date.now(),
         );
       return { result: toJsonSafe(signed.message), signature: signed.signature, signer: signed.signer };

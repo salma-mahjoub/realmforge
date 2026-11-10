@@ -138,6 +138,9 @@ describe("API", () => {
 
     const replays = await app.inject({ method: "GET", url: "/levels/1/replays" });
     expect(replays.json().replays).toHaveLength(1);
+    expect(replays.json().replays[0].trace).toEqual(makeRun().trace);
+    const ownReplay = await app.inject({ method: "GET", url: `/levels/1/replays?player=${PLAYER}` });
+    expect(ownReplay.json().replays).toHaveLength(1);
   });
 
   it("POST /runs/validate refuses the same recording twice (409) but accepts a different run", async () => {

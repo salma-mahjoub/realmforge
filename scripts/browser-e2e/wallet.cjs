@@ -1,6 +1,6 @@
 // Injected test wallet: EIP-1193 + EIP-6963, backed by the local Hardhat node's unlocked dev accounts.
 // Usage: page.addInitScript({ content: walletScript(address) })
-module.exports.walletScript = (address, rpc = 'http://127.0.0.1:8545') => `(() => {
+module.exports.walletScript = (address, rpc = process.env.CHAIN_RPC || 'http://127.0.0.1:8545') => `(() => {
   const ADDRESS = ${JSON.stringify(address)};
   const RPC = ${JSON.stringify(rpc)};
   const listeners = {};

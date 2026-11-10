@@ -191,12 +191,20 @@ export function levelRoutes(app: FastifyInstance, svc: Services) {
   app.get("/levels/:id/replays", async (req, reply) => {
     const p = idParamSchema.safeParse(req.params);
     if (!p.success) return badRequest(reply, "invalid id");
-    const rows = svc.db
-      .prepare(
-        `SELECT player, time_ms AS timeMs, input_log AS inputLog, created_at AS createdAt FROM signed_runs
-         WHERE level_id = ? AND cleared = 1 AND input_log IS NOT NULL ORDER BY time_ms ASC LIMIT 3`,
-      )
-      .all(String(p.data.id));
-    return { levelId: p.data.id, replays: rows };
+    const query = req.query as { player?: string };
+    const player = query.player?.toLowerCase();
+    type ReplayRow = { player: string; timeMs: number; inputLog: string; trace: string | null; createdAt: number };
+    const top = svc.db.prepare(
+      `SELECT player, time_ms AS timeMs, input_log AS inputLog, trace, created_at AS createdAt FROM signed_runs
+       WHERE level_id = ? AND cleared = 1 AND input_log IS NOT NULL ORDER BY time_ms ASC LIMIT 3`,
+    ).all(String(p.data.id)) as ReplayRow[];
+    const own = player && /^0x[0-9a-f]{40}$/.test(player)
+      ? svc.db.prepare(
+          `SELECT player, time_ms AS timeMs, input_log AS inputLog, trace, created_at AS createdAt FROM signed_runs
+           WHERE level_id = ? AND player = ? AND cleared = 1 AND input_log IS NOT NULL ORDER BY time_ms ASC LIMIT 1`,
+        ).all(String(p.data.id), player) as ReplayRow[]
+      : [];
+    const rows = [...new Map([...top, ...own].map((row) => [row.player, row])).values()];
+    return { levelId: p.data.id, replays: rows.map((row) => ({ ...row, trace: row.trace ? JSON.parse(String(row.trace)) : [] })) };
   });
 }

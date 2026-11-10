@@ -101,7 +101,7 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] vitest added (10 tests)
 - [x] Pages read real indexer data instead of `data/mock.ts`: profile, market listings, activity and earnings come from `server/` endpoints (the mock only remains as a dev fallback when the API is down and `VITE_USE_MOCKS` is not false)
 - [ ] Free Reown/WalletConnect project ID in `web/.env.local` (currently a 403 warning)
-- [ ] RaceScene waits for the server countdown/start; ghost replays rendered
+- [x] Solo ghost replay picker (record holder + own best), validated trace playback on the fixed 60 Hz frame, and ahead/behind HUD; RaceScene remote avatars use tinted player sprites
 - [~] Race lobby on-chain (`useRace`): create with escrow, join with escrow, settle with the server-signed ranking (deadline included), refund after the timeout; wired in `Room.tsx`, type-checked and unit-tested, **not yet clicked with two wallets**. Server completes the ranking (finishers, then progress), `giveup` and `respawn` messages, Give up / Respawn buttons in the lobby
 - [~] Wallet connect + transactions tested in a browser: the full flow is driven in Chromium through RainbowKit with an injected EIP-1193/6963 test wallet (`npm run e2e:browser`, real signatures on the Hardhat node); a manual MetaMask rehearsal is still to do
 - [ ] Read the minted token ID from the publish receipt

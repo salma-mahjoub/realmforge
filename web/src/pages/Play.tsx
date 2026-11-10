@@ -15,6 +15,7 @@ import { humanizeError, isUserRejection } from '../web3/errors';
 import { useServiceStatus, useTxFlow, useWeb3Status } from '../web3/tx';
 import { toast } from '../components/ui';
 import { estimateReward } from '../game/reward/estimateReward';
+import type { GhostReplay } from '../game/scenes/PlayScene';
 
 type Phase = 'intro' | 'playing' | 'paused' | 'dead' | 'cleared';
 type StepState = 'todo' | 'active' | 'done' | 'error';
@@ -187,6 +188,7 @@ export default function Play() {
     const meta = useAsync(() => api.getLevel(id), [id]);
     const { address: web3Address } = useWeb3Status();
     const file = useAsync(() => api.getLevelFile(id), [id]);
+    const replays = useAsync(() => api.getReplays(id, web3Address), [id, web3Address]);
     const mockFile = useMockData('/levels/1/file');
     const [phase, setPhase] = useState<Phase>('intro');
     const [introOpen, setIntroOpen] = useState(true);
@@ -194,6 +196,7 @@ export default function Play() {
     const [result, setResult] = useState<RunFinished | null>(null);
     const [deaths, setDeaths] = useState(0);
     const [ouch, setOuch] = useState(false);
+    const [ghostChoice, setGhostChoice] = useState('');
     const holdRef = useRef(false);
     const introRef = useRef(true);
     introRef.current = introOpen;
@@ -244,6 +247,8 @@ export default function Play() {
     }, [ouch, deaths]);
 
     const start = () => {
+        const chosen = selectedGhost;
+        EventBus.emit('play:set-ghost', chosen);
         setIntroOpen(false);
         setPhase('playing');
         EventBus.emit('play:resume');
@@ -282,6 +287,11 @@ export default function Play() {
     }, [phase, result, pause, resume]);
 
     const lvl = meta.data;
+    const ownReplay = replays.data?.find((r) => web3Address && r.player.toLowerCase() === web3Address.toLowerCase());
+    const recordReplay = replays.data?.[0];
+    const selectedGhost: GhostReplay | null = ghostChoice === 'own' && ownReplay?.trace.length
+        ? ownReplay
+        : ghostChoice === 'record' && recordReplay?.trace.length ? recordReplay : null;
     const fee = lvl?.playFee ?? '—';
     const selfPlay = Boolean(lvl && web3Address && lvl.owner?.toLowerCase() === web3Address.toLowerCase());
     // Before a run: what a clear that sets the record would earn (coins add up to 5 more). After: this run.
@@ -373,6 +383,14 @@ export default function Play() {
                         </div>
                     </dl>
                     <p className="fine">The fee is only charged when you settle a cleared run on-chain. Practice runs are free.</p>
+                    <label className="field-label" htmlFor="ghost-choice">Race a replay</label>
+                    <select id="ghost-choice" className="input" value={ghostChoice} onChange={(e) => setGhostChoice(e.target.value)}>
+                        <option value="">No ghost</option>
+                        {recordReplay?.trace.length ? <option value="record">Race the record holder&apos;s ghost · {recordReplay.player.slice(0, 6)}… · {formatMs(recordReplay.timeMs)}</option> : null}
+                        {ownReplay?.trace.length ? <option value="own">Race your own best · {formatMs(ownReplay.timeMs)}</option> : null}
+                    </select>
+                    {replays.loading && <p className="fine">Loading replay records…</p>}
+                    {!replays.loading && !recordReplay && <p className="fine">No validated ghost replays yet. Complete a run to create the first record.</p>}
                     <ControlsList />
                 </Modal>
 

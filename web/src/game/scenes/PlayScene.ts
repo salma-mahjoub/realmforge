@@ -28,6 +28,9 @@ import { PlayerCameraTarget } from '../render/PlayerCameraTarget';
 import { PlayEffects } from '../render/PlayEffects';
 import { coreTextures, terrainDef, toCoreDef } from '../elements/bridge';
 import { TRACE_STRIDE, changePairs, encodeInputLog, type RunSubmission, type TraceSample } from '../run';
+import { sampleGhostTrace } from '../ghost';
+
+export interface GhostReplay { player: string; timeMs: number; trace: TraceSample[] }
 
 export interface PlaySceneData {
     level?: LevelFileV1;
@@ -40,6 +43,7 @@ export interface PlaySceneData {
     spawn?: Waypoint;
     /** Start playing at once, without the title card (a race restarts on the server's GO). */
     skipIntro?: boolean;
+    ghost?: GhostReplay;
 }
 
 type MatterPlayer = ReturnType<typeof createMatterPlayer> & { form?: 'small' | 'big'; setForm?: (form: 'small' | 'big') => void; invulnerable?: boolean };
@@ -102,6 +106,9 @@ export class PlayScene extends Phaser.Scene {
     private playerTex = '';
     private renderedForm: 'small' | 'big' = 'small';
     private formTransition?: { start: number; from: number; to: number };
+    private ghostReplay?: GhostReplay;
+    private ghostSprite?: Phaser.GameObjects.Sprite;
+    private ghostHud?: Phaser.GameObjects.Text;
     private keys!: Record<'left' | 'right' | 'up' | 'down' | 'a' | 'd' | 'w' | 's' | 'space' | 'z' | 'x' | 'shift', Phaser.Input.Keyboard.Key>;
     protected unsubs: Array<() => void> = [];
 
@@ -131,6 +138,7 @@ export class PlayScene extends Phaser.Scene {
         this.levelId = data?.levelId ?? null;
         this.creator = data?.creator;
         this.skipIntro = Boolean(data?.skipIntro);
+        this.ghostReplay = data?.ghost;
         this.sequence = null;
         this.previousMode = MovementState.idle;
         this.previousVy = 0;
@@ -218,6 +226,7 @@ export class PlayScene extends Phaser.Scene {
         this.playerSprite = this.add.sprite(sp.x, sp.y, tex.key, tex.frame).setOrigin(0.5, 1).setDepth(50);
         this.playerSprite.setScale(PLAYER_DISPLAY_H / Math.max(1, this.playerSprite.height));
         this.syncSprite();
+        this.configureGhost(this.ghostReplay);
 
         // 4. Fixed 60 Hz clock shared by runtime + player (game-core accumulator).
         installFixedMatterClock(this);
@@ -270,6 +279,7 @@ export class PlayScene extends Phaser.Scene {
         // Cinematics animate visual offsets only; no controller steps are fabricated.
         if (this.player && this.sequence !== 'death' && this.sequence !== 'dead' && this.sequence !== 'goal') {
             this.syncSprite();
+            this.updateGhost();
             const cam = this.cameras.main;
             const mode = this.player.state.mode;
             const grounded = [MovementState.idle, MovementState.walk, MovementState.run, MovementState.skid, MovementState.crouch].includes(mode);
@@ -610,6 +620,7 @@ export class PlayScene extends Phaser.Scene {
         this.unsubs.push(EventBus.subscribe('play:restart', () => this.restart()));
         this.unsubs.push(EventBus.subscribe('play:pause', (paused = true) => this.setPaused(paused)));
         this.unsubs.push(EventBus.subscribe('play:resume', () => this.setPaused(false)));
+        this.unsubs.push(EventBus.subscribe('play:set-ghost', (ghost) => this.configureGhost(ghost)));
         this.unsubs.push(
             EventBus.subscribe('play:load-level', ({ levelId, level }) => this.scene.restart({ level, levelId, from: this.from })),
         );
@@ -641,7 +652,7 @@ export class PlayScene extends Phaser.Scene {
     }
 
     protected restart() {
-        this.scene.restart({ level: this.file, levelId: this.levelId, from: this.from, spawn: this.spawnTile, creator: this.creator });
+        this.scene.restart({ level: this.file, levelId: this.levelId, from: this.from, spawn: this.spawnTile, creator: this.creator, ghost: this.ghostReplay });
     }
 
     protected teardown() {
@@ -660,10 +671,39 @@ export class PlayScene extends Phaser.Scene {
         EventBus.emit('play:hud', { timeMs: this.timeMs, coins: this.coins, checkpoint: this.checkpointName });
     }
 
+    /** Ghost is a display-only sprite driven by the recorded 60 Hz trace; it has no Matter body. */
+    private updateGhost() {
+        if (!this.ghostReplay || !this.ghostSprite || !this.ghostHud) return;
+        const position = sampleGhostTrace(this.ghostReplay.trace, this.frame);
+        this.ghostSprite.setVisible(Boolean(position));
+        if (!position) return;
+        this.ghostSprite.setPosition(position.x * TILE + TILE / 2, position.y * TILE + TILE / 2);
+        const delta = position.x - this.player.body.position.x / TILE + 0.5;
+        const relation = Math.abs(delta) < 0.15 ? 'Even' : `${Math.abs(delta).toFixed(1)} tiles ${delta > 0 ? 'ahead' : 'behind'}`;
+        this.ghostHud.setText(`GHOST  ${shortGhostName(this.ghostReplay.player)} · ${formatTime(this.ghostReplay.timeMs)}\n${relation}`);
+    }
+
+    private configureGhost(ghost: GhostReplay | null | undefined) {
+        this.ghostReplay = ghost ?? undefined;
+        if (!this.player) return;
+        this.ghostSprite?.destroy();
+        this.ghostHud?.destroy();
+        this.ghostSprite = undefined;
+        this.ghostHud = undefined;
+        if (!ghost?.trace.length) return;
+        const tex = playerTexture('small');
+        this.ghostSprite = this.add.sprite(this.playerSprite.x, this.playerSprite.y, tex.key, tex.frame).setOrigin(0.5, 1).setAlpha(0.38).setTint(0x7c5cff).setDepth(49);
+        this.ghostSprite.setDisplaySize(PLAYER_DISPLAY_H * (tex.displaySize ? tex.displaySize.w / tex.displaySize.h : 0.75), PLAYER_DISPLAY_H);
+        this.ghostHud = this.add.text(14, 14, '', { fontFamily: 'system-ui, sans-serif', fontSize: '13px', color: '#ffffff', backgroundColor: '#0f1424dd', padding: { x: 9, y: 6 } }).setScrollFactor(0).setDepth(210);
+        this.updateGhost();
+    }
+
     protected tileCenter(p: Waypoint) {
         return { x: p.x * TILE + TILE / 2, y: p.y * TILE + TILE / 2 };
     }
 }
+
+function shortGhostName(name: string) { return name.length > 18 ? `${name.slice(0, 8)}…${name.slice(-6)}` : name; }
 
 /** Trace frames must be strictly increasing. */
 function dedupeTrace(trace: TraceSample[]): TraceSample[] {

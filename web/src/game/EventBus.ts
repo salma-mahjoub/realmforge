@@ -105,6 +105,7 @@ export interface BusEvents {
     'play:restart': [];
     'play:pause': [paused?: boolean];
     'play:resume': [];
+    'play:set-ghost': [ghost: { player: string; timeMs: number; trace: { f: number; x: number; y: number }[] } | null];
     'race:remote-states': [players: RemotePlayerState[]];
     'race:local-state': [state: LocalRacerState];
     'race:checkpoint': [hit: { id: number }];

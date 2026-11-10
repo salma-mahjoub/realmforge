@@ -153,6 +153,7 @@ CREATE TABLE IF NOT EXISTS signed_runs (
   cleared      INTEGER NOT NULL,
   coins        INTEGER NOT NULL,
   input_log    TEXT,
+  trace        TEXT,
   created_at   INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS signed_runs_level ON signed_runs(level_id, cleared, time_ms);
@@ -181,6 +182,9 @@ export function openDb(path: string): Db {
   if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
   const db = new DatabaseSync(path);
   db.exec(SCHEMA);
+  // Existing worktrees may already have the replay table without sampled positions.
+  const columns = db.prepare("PRAGMA table_info(signed_runs)").all() as { name: string }[];
+  if (!columns.some((column) => column.name === "trace")) db.exec("ALTER TABLE signed_runs ADD COLUMN trace TEXT");
   return db;
 }
 

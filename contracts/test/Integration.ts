@@ -381,7 +381,60 @@ describe("RealmForge integration", async () => {
   // ---------------------------------------------------------------- SPEC §11 backlog (students)
   // [B] "reward clipping at token cap" is covered at unit level (ForgeCoin.t.sol, forge-std deal()): minting
   // 100M FORGE through the public API is not realistic in an integration test.
-  it.todo("[A] publish: remix of a remix → royalty split goes to the right ancestors");
-  it.todo("[A] withdraw: reentrancy attack by a malicious receiver contract fails");
+  it("[A] publish: remix of a remix → royalty split goes to the right ancestors", async () => {
+    const ctx = await deploy();
+    const { levelNFT, creator, player: remixer, buyer, deployer: reRemixer, now } = ctx;
+    const deadline = now + 3600n;
+    async function publishAs(who: typeof creator, label: string, parentId: bigint) {
+      const layoutHash = keccak256(stringToHex(label));
+      const sig = await ctx.signClearProof(who.account.address, layoutHash, deadline);
+      await levelNFT.write.publish([layoutHash, `ipfs://${label}`, 0n, parentId, deadline, sig], { account: who.account });
+    }
+    await publishAs(creator, "original", 0n); // #1  A
+    await publishAs(remixer, "remix", 1n); // #2  B remixes A
+    await publishAs(reRemixer, "remix-of-remix", 2n); // #3  C remixes B
+    assert.equal((await levelNFT.read.levels([3n]))[2], 2n); // parentId is the direct parent only
+
+    // C sells #3 for 1 ETH: royalty 5% = 0.05 ETH, split 50/50 between C (creator) and B (direct parent).
+    // Royalties are one level deep by design: A, the grandparent, earns nothing from a remix of a remix.
+    await levelNFT.write.list([3n, parseEther("1")], { account: reRemixer.account });
+    await levelNFT.write.buy([3n], { account: buyer.account, value: parseEther("1") });
+    assert.equal(await levelNFT.read.pendingWithdrawals([remixer.account.address]), parseEther("0.025")); // B
+    assert.equal(await levelNFT.read.pendingWithdrawals([creator.account.address]), 0n); // A
+    // C is both creator and seller: 0.025 royalty + 0.95 proceeds
+    assert.equal(await levelNFT.read.pendingWithdrawals([reRemixer.account.address]), parseEther("0.975"));
+
+    // ERC-2981 (external marketplaces) names one receiver: the remix's own creator.
+    const [receiver, amount] = await levelNFT.read.royaltyInfo([3n, parseEther("1")]);
+    assert.equal(receiver.toLowerCase(), reRemixer.account.address.toLowerCase());
+    assert.equal(amount, parseEther("0.05"));
+  });
+
+  it("[A] withdraw: reentrancy attack by a malicious receiver contract fails", async () => {
+    const ctx = await deploy();
+    const { levelNFT, creator, buyer } = ctx;
+    await ctx.publishLevel("victim-level", 0n);
+    const attacker = await viem.deployContract("ReentrantWithdrawer", [levelNFT.address]);
+    await levelNFT.write.transferFrom([creator.account.address, attacker.address, 1n], { account: creator.account });
+    await attacker.write.listLevel([1n, parseEther("1")]);
+    await levelNFT.write.buy([1n], { account: buyer.account, value: parseEther("1") });
+    const owed = parseEther("0.95"); // seller proceeds; the 5% royalty went to the creator
+    assert.equal(await levelNFT.read.pendingWithdrawals([attacker.address]), owed);
+
+    const publicClient = ctx.publicClient;
+    const nftBalance = await publicClient.getBalance({ address: levelNFT.address });
+    // receive() re-enters withdraw(): nonReentrant reverts it, so the payout call fails and everything rolls back.
+    await assert.rejects(attacker.write.cashOut(), /EthTransferFailed/);
+    assert.equal(await levelNFT.read.pendingWithdrawals([attacker.address]), owed);
+    assert.equal(await publicClient.getBalance({ address: levelNFT.address }), nftBalance);
+    assert.equal(await attacker.read.reentries(), 0n); // rolled back with the failed transfer
+
+    // Control: the same contract without the attack withdraws exactly once.
+    await attacker.write.setAttack([false]);
+    await attacker.write.cashOut();
+    assert.equal(await levelNFT.read.pendingWithdrawals([attacker.address]), 0n);
+    assert.equal(await publicClient.getBalance({ address: attacker.address }), owed);
+    await assert.rejects(attacker.write.cashOut(), /NothingToWithdraw/);
+  });
   // [A+B] gas report: docs/GAS.md · Slither report: docs/security/SLITHER.md
 });

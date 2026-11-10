@@ -187,12 +187,15 @@ contract LevelNFT is ERC721, ERC721URIStorage, ERC2981, AccessControl, Reentranc
         });
 
         // ERC-2981 for external marketplaces: the creator always receives the royalty.
-        // TODO(studentA): ERC-2981 supports one receiver only. For remixes, consider a splitter
-        //                 (e.g. OZ PaymentSplitter pattern) so external markets also pay the parent creator.
+        // Design decision: ERC-2981 names a single receiver, so external marketplaces pay the remix's own
+        // creator. The parent's share is paid only by our built-in market ({buy}). A per-remix splitter
+        // contract would cost an extra deployment on every remix publish for a market we don't use in the demo.
+        // Covered by Integration.ts "remix of a remix".
         _setTokenRoyalty(id, msg.sender, REMIX_ROYALTY_BPS);
 
-        // `_mint` (not `_safeMint`): no external callback during publish → no reentrancy surface.
-        // TODO(studentA): switch to `_safeMint` + `nonReentrant` if contract wallets must be supported safely.
+        // Design decision: `_mint`, not `_safeMint`. `msg.sender` just signed a ClearProof for itself, so it
+        // is a wallet that can hold the NFT; skipping `onERC721Received` removes the only external call in
+        // publish (no reentrancy surface, less gas). Smart-contract wallets still receive the token.
         _mint(msg.sender, id);
         _setTokenURI(id, uri);
 
@@ -265,8 +268,9 @@ contract LevelNFT is ERC721, ERC721URIStorage, ERC2981, AccessControl, Reentranc
         Level storage lvl = levels[id];
         uint256 royalty = (price * REMIX_ROYALTY_BPS) / _feeDenominator();
 
-        // TODO(studentA): the 50/50 remix split is a design choice — document or change it
-        //                 (e.g. a separate PARENT_ROYALTY_BPS, or recursive royalties up the remix chain).
+        // Design decision: the 5% royalty is split 50/50 with the DIRECT parent only (one level deep).
+        // Recursive royalties would loop over an unbounded remix chain in {buy} (gas DoS) and dilute every
+        // share; a fixed split keeps {buy} O(1). Covered by LevelNFT.t.sol and Integration.ts.
         if (lvl.parentId != 0) {
             address parentCreator = levels[lvl.parentId].creator;
             uint256 parentCut = royalty / 2;

@@ -43,10 +43,11 @@ export default defineConfig({
       chainType: "l1",
     },
     // `npx hardhat node` in another terminal, then `--network localhost` (used by web/ and server/ dev).
+    // RPC_URL (as passed to scripts/deploy-local.mjs) selects a node on another port.
     localhost: {
       type: "http",
       chainType: "l1",
-      url: "http://127.0.0.1:8545",
+      url: process.env.RPC_URL ?? "http://127.0.0.1:8545",
     },
     sepolia: {
       type: "http",

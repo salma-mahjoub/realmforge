@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import type { Hash, TransactionReceipt } from 'viem';
 import { zeroAddress } from 'viem';
 import { useAccount, useChainId, usePublicClient } from 'wagmi';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from '../components/ui/Toast';
 import { shortAddr } from '../components/ui/format';
 import { getAddresses } from '../contracts/addresses';
@@ -76,6 +76,7 @@ export interface TxOutcome {
 export function useTxFlow() {
     const client = usePublicClient();
     const chainId = useChainId();
+    const queryClient = useQueryClient();
     const [busy, setBusy] = useState<string | null>(null);
     const [stage, setStage] = useState<'idle' | 'signing' | 'pending' | 'confirmed' | 'error'>('idle');
 
@@ -104,6 +105,10 @@ export function useTxFlow() {
                 const receipt = await client.waitForTransactionReceipt({ hash, timeout: 120_000 });
                 if (receipt.status !== 'success') throw new Error('Transaction reverted on-chain');
                 setStage('confirmed');
+                // Every confirmed write can move balances, allowances and level stats: refresh on-chain reads
+                // now instead of waiting for the next poll (the header balance lagged a settle by ~12 s).
+                void queryClient.invalidateQueries({ queryKey: ['readContract'] });
+                void queryClient.invalidateQueries({ queryKey: ['readContracts'] });
                 toast.update(id, {
                     tone: 'success',
                     title: copy.success ?? `${copy.title}: confirmed`,
@@ -121,7 +126,7 @@ export function useTxFlow() {
                 setBusy(null);
             }
         },
-        [client, chainId],
+        [client, chainId, queryClient],
     );
 
     return { run, busy, stage, isBusy: (key?: string) => (key ? busy === key : busy !== null) };

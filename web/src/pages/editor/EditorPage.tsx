@@ -42,6 +42,9 @@ const SHORTCUTS: [string[], string][] = [
 
 const INITIAL_STATUS: EditorStatus = { tool: 'place', element: 'ground', mode: 'edit', canUndo: false, canRedo: false, zoom: 1, grid: true, cursor: null, dirty: false };
 
+/** One sticky id so a re-clear replaces the nudge instead of stacking copies. */
+const CLEARED_TOAST = 'editor-cleared';
+
 export default function EditorPage() {
     const [status, setStatus] = useState<EditorStatus>(INITIAL_STATUS);
     const [mode, setMode] = useState<'edit' | 'test'>('edit');
@@ -51,6 +54,10 @@ export default function EditorPage() {
     const [, tick] = useState(0);
     const [clear, setClear] = useState<CreatorClear | null>(null);
     const [publishing, setPublishing] = useState(false);
+    // The "cleared, publish now" nudge is done once the publish dialog opens.
+    useEffect(() => {
+        if (publishing) toast.dismiss(CLEARED_TOAST);
+    }, [publishing]);
     const [shortcuts, setShortcuts] = useState(false);
     const levelRef = useRef(level);
     levelRef.current = level;
@@ -73,7 +80,7 @@ export default function EditorPage() {
                 }
                 const l = levelRef.current;
                 setClear({ hash: layoutHash(l), timeMs: r.timeMs, inputs: r.inputs, run: r.run });
-                toast.show({ tone: 'success', title: `Level cleared in ${formatMs(r.timeMs)}`, body: 'This layout is ready to publish.', action: { label: 'Publish now', onClick: () => setPublishing(true) } });
+                toast.show({ id: CLEARED_TOAST, tone: 'success', title: `Level cleared in ${formatMs(r.timeMs)}`, body: 'This layout is ready to publish.', action: { label: 'Publish now', onClick: () => setPublishing(true) } });
             }),
         ];
         const t = setInterval(() => tick((n) => n + 1), 30_000);

@@ -31,7 +31,8 @@ export function useForgeBalance(address?: Address) {
     };
 }
 
-export function formatForge(v: bigint, maxFrac = 0): string {
+/** Up to 2 decimals, trailing zeros dropped: 130 → "130", 3.5 → "3.5" (never rounds 3.5 up to 4). */
+export function formatForge(v: bigint, maxFrac = 2): string {
     const n = Number(formatUnits(v, FORGE_DECIMALS));
     return n.toLocaleString('en-US', { maximumFractionDigits: maxFrac });
 }

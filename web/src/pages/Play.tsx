@@ -14,12 +14,12 @@ import { BlockerNotice } from '../components/BlockerNotice';
 import { humanizeError, isUserRejection } from '../web3/errors';
 import { useServiceStatus, useTxFlow, useWeb3Status } from '../web3/tx';
 import { toast } from '../components/ui';
+import { estimateReward } from '../game/reward/estimateReward';
 
 type Phase = 'intro' | 'playing' | 'paused' | 'dead' | 'cleared';
 type StepState = 'todo' | 'active' | 'done' | 'error';
 
 /** Mirrors ForgeCoin._computeReward: min(5 + 45·(1 − clears/plays), 50), before first-clear / record bonuses. */
-export const estimateReward = (clearRate: number) => Math.round(Math.min(5 + 45 * (1 - (Number.isFinite(clearRate) ? clearRate : 1)), 50));
 
 const CONTROLS: [string[], string][] = [
     [['A', 'D'], 'Move'],
@@ -91,7 +91,7 @@ function SettlePanel({ levelId, result, fee, onSettled }: { levelId: number; res
             signedRef.current = signed;
             const r = signed.result;
             const runResult = { player: r.player, levelId: BigInt(r.levelId), timeMs: r.timeMs, cleared: r.cleared, coins: r.coins, nonce: BigInt(r.nonce), deadline: BigInt(r.deadline) };
-            mark(0, 'done', `Signed by ${signed.signer.slice(0, 8)}… · nonce ${r.nonce}`);
+            mark(0, 'done', `Signed by ${signed.signer.slice(0, 8)}… · nonce ${String(r.nonce).slice(0, 6)}…`);
 
             i = 1;
             mark(1, 'active', 'Sign the permit in your wallet');
@@ -165,6 +165,7 @@ export default function Play() {
     const id = Number(useParams().id);
     const navigate = useNavigate();
     const meta = useAsync(() => api.getLevel(id), [id]);
+    const { address: web3Address } = useWeb3Status();
     const file = useAsync(() => api.getLevelFile(id), [id]);
     const mockFile = useMockData('/levels/1/file');
     const [phase, setPhase] = useState<Phase>('intro');
@@ -262,7 +263,9 @@ export default function Play() {
 
     const lvl = meta.data;
     const fee = lvl?.playFee ?? '—';
-    const reward = lvl ? estimateReward(lvl.clearRate) : null;
+    const selfPlay = Boolean(lvl && web3Address && lvl.owner?.toLowerCase() === web3Address.toLowerCase());
+    // Before a run: what a clear that sets the record would earn (coins add up to 5 more). After: this run.
+    const reward = lvl ? estimateReward(lvl, result ? { timeMs: result.timeMs, coins: result.coins, cleared: result.cleared } : { timeMs: 0, coins: 0 }, selfPlay) : null;
     const gameOver = phase === 'dead' && lives === 0;
 
     if (!Number.isInteger(id) || id <= 0) return <EmptyState tone="error" title="Invalid level id" action={<Button to="/browse">Browse levels</Button>} />;

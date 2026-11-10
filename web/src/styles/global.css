@@ -231,6 +231,8 @@ input[type='search']::-webkit-search-cancel-button { filter: invert(0.6); }
 .kv-list dt { color: var(--muted); }
 .kv-list dd { margin: 0 0 0 auto; display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap; text-align: right; }
 .toaster { position: fixed; right: var(--s-4); bottom: var(--s-4); z-index: var(--z-toast); width: min(380px, calc(100vw - 32px)); pointer-events: none; }
+/* With a dialog open, toasts move to the top so they never cover its footer actions. */
+body:has(.modal-backdrop:not(.is-inline)) .toaster { top: calc(var(--s-4) + 64px); bottom: auto; }
 .toaster-stack { display: flex; flex-direction: column; gap: var(--s-2); }
 .toast { pointer-events: auto; display: flex; gap: var(--s-3); align-items: flex-start; padding: 12px 12px 12px 14px; border-radius: var(--r-md); background: #0b1020; border: 1px solid var(--line-strong); border-left-width: 3px; box-shadow: var(--shadow-pop); animation: rise var(--dur-3) var(--ease-out); }
 .toast-icon { margin-top: 1px; }

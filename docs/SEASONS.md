@@ -79,6 +79,10 @@ LEAVE_SECONDS=90 npm run season:ff   # stop 90 s before the end to show the coun
 is 31337 (it refuses anything else), then calls `evm_increaseTime` + `evm_mine`. Sepolia cannot do this: there the
 season really lasts 30 days.
 
+Whole flow in a real browser (admin wallet = Hardhat #0): `node scripts/browser-e2e/season.cjs` with
+`WEB_URL` / `RPC_URL` set: standings → signed result → *Close* disabled before the end → `season:ff` → close →
+payouts checked against on-chain balances and the indexed `GET /season/:n/payouts`.
+
 ## Known limits (to state at the oral exam)
 
 - The signer decides what to publish: a compromised signer plus a compromised admin could pay anyone. Mitigation:

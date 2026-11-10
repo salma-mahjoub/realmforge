@@ -1,5 +1,7 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import type { Services } from "../services.js";
+import { registerRateLimit } from "./rateLimit.js";
+import { authRoutes } from "./routes/auth.js";
 import { levelRoutes } from "./routes/levels.js";
 import { runRoutes } from "./routes/runs.js";
 import { seasonRoutes } from "./routes/season.js";
@@ -22,7 +24,7 @@ export async function buildApi(svc: Services, opts: { logger?: boolean } = {}): 
       reply.header("Access-Control-Allow-Origin", origin);
       reply.header("Vary", "Origin");
     }
-    reply.header("Access-Control-Allow-Headers", "content-type");
+    reply.header("Access-Control-Allow-Headers", "content-type,authorization");
     reply.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
     if (req.method === "OPTIONS") return reply.code(204).send();
   });
@@ -43,6 +45,8 @@ export async function buildApi(svc: Services, opts: { logger?: boolean } = {}): 
     };
   });
 
+  registerRateLimit(app, { perIpPerMin: svc.config.RATE_LIMIT_IP_PER_MIN, perAddressPerMin: svc.config.RATE_LIMIT_ADDRESS_PER_MIN });
+  authRoutes(app, svc);
   levelRoutes(app, svc);
   runRoutes(app, svc);
   statsRoutes(app, svc);

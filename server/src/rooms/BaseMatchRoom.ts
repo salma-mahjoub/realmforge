@@ -42,8 +42,10 @@ export const createOptionsSchema = z.object({
 export const joinOptionsSchema = z.object({
   address: z.string().refine((a) => isAddress(a), "invalid wallet address"),
   name: z.string().max(24).optional(),
-  /** Optional personal_sign of joinMessage(roomId, address) proving wallet ownership. */
-  signature: z.string().optional(),
+  /** SIWE session token from POST /auth/verify (proves wallet ownership; preferred). */
+  token: z.string().max(1024).optional(),
+  /** personal_sign of joinMessage(roomId, address): the alternative ownership proof. */
+  signature: z.string().max(1024).optional(),
 });
 
 const posSchema = z.object({
@@ -55,6 +57,9 @@ const posSchema = z.object({
 });
 const checkpointSchema = z.object({ id: z.number().int().nonnegative() });
 const coinSchema = z.object({ count: z.number().int().min(0).max(255) });
+
+/** Colyseus error code for a missing or invalid wallet ownership proof (clients show a sign-in prompt). */
+export const AUTH_ERROR = 4401;
 
 export const joinMessage = (roomId: string, address: string) => `RealmForge: join room ${roomId} as ${address.toLowerCase()}`;
 
@@ -118,7 +123,7 @@ export abstract class BaseMatchRoom<S extends MatchState> extends Room<S, unknow
     this.onMessage("respawn", (client) => this.handleRespawn(client));
   }
 
-  onAuth(_client: Client, rawOptions: unknown) {
+  async onAuth(_client: Client, rawOptions: unknown) {
     const parsed = joinOptionsSchema.safeParse(rawOptions ?? {});
     if (!parsed.success) throw new ServerError(4001, parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
     const options = parsed.data;
@@ -127,15 +132,26 @@ export abstract class BaseMatchRoom<S extends MatchState> extends Room<S, unknow
     for (const p of this.state.players.values()) {
       if (p.address === address && p.connected) throw new ServerError(4009, "address already in room");
     }
-    if (options.signature) {
-      // Ownership proof is optional for now; when present it must be valid.
-      // TODO(auth): require it (or SIWE) once the web client signs joinMessage().
-      return verifyMessage({ address, message: joinMessage(this.roomId, address), signature: options.signature as Hex }).then((ok) => {
-        if (!ok) throw new ServerError(4001, "invalid join signature");
-        return { address, name: options.name };
-      });
-    }
+    await this.proveOwnership(address, options);
     return { address, name: options.name };
+  }
+
+  /**
+   * Wallet ownership proof, required for every player: a SIWE session token (POST /auth/verify) for this address,
+   * or a personal_sign of joinMessage(roomId, address). Without it anyone could join (and be paid) as any address.
+   */
+  protected async proveOwnership(address: Address, options: { token?: string; signature?: string }) {
+    if (options.token) {
+      const session = roomServices().sessions?.verifyToken(options.token);
+      if (session && session.sub === address) return;
+      if (!options.signature) throw new ServerError(AUTH_ERROR, "sign-in expired or made with another wallet: sign in with Ethereum again");
+    }
+    if (options.signature) {
+      const ok = await verifyMessage({ address, message: joinMessage(this.roomId, address), signature: options.signature as Hex }).catch(() => false);
+      if (ok) return;
+      throw new ServerError(AUTH_ERROR, "invalid join signature");
+    }
+    throw new ServerError(AUTH_ERROR, "wallet signature required: sign in with Ethereum (one free signature) before joining a room");
   }
 
   onJoin(client: Client<ClientData>, _options: unknown, auth: { address: Address; name?: string }) {

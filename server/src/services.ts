@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import type { Config } from "./config.js";
+import { SiweAuth } from "./auth/siwe.js";
 import { openDb, type Db } from "./db.js";
 import { LocalPinner, PinataPinner, type Pinner } from "./ipfs.js";
 import { LevelRepo } from "./levels.js";
@@ -15,6 +16,8 @@ export interface Services {
   localPinner: LocalPinner;
   levels: LevelRepo;
   validator: RunValidator;
+  /** SIWE nonces + session tokens (wallet ownership proof for rooms). */
+  sessions: SiweAuth;
 }
 
 export function createServices(config: Config, overrides: Partial<Services> = {}): Services {
@@ -37,5 +40,8 @@ export function createServices(config: Config, overrides: Partial<Services> = {}
     localPinner,
     levels: overrides.levels ?? new LevelRepo(db),
     validator: overrides.validator ?? new RunValidator(),
+    sessions:
+      overrides.sessions ??
+      new SiweAuth({ chainId: config.CHAIN_ID, secret: config.SESSION_SECRET, ttlSec: config.SESSION_TTL_SEC, domains: config.SIWE_DOMAINS }),
   };
 }

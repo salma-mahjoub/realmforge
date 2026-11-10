@@ -1,9 +1,12 @@
+import type { SiweAuth } from "../auth/siwe.js";
 import type { LevelRepo } from "../levels.js";
 import type { GameSigner } from "../signer.js";
 
 export interface RoomServices {
   signer: GameSigner;
   levels: LevelRepo;
+  /** Verifies SIWE session tokens. Without it, only joinMessage() signatures prove wallet ownership. */
+  sessions?: Pick<SiweAuth, "verifyToken">;
   log?: (msg: string, extra?: unknown) => void;
 }
 

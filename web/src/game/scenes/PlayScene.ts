@@ -38,6 +38,8 @@ export interface PlaySceneData {
     from?: 'editor' | 'play' | 'race';
     /** Tile-space spawn override (test-play from cursor). */
     spawn?: Waypoint;
+    /** Start playing at once, without the title card (a race restarts on the server's GO). */
+    skipIntro?: boolean;
 }
 
 type MatterPlayer = ReturnType<typeof createMatterPlayer> & { form?: 'small' | 'big'; setForm?: (form: 'small' | 'big') => void; invulnerable?: boolean };
@@ -76,16 +78,17 @@ export class PlayScene extends Phaser.Scene {
     protected runtime!: ElementRuntime;
     protected frame = 0;
     protected finished = false;
+    private skipIntro = false;
     protected paused = false;
     protected checkpointName: string | null = null;
     protected replay: Replay = createReplay();
     protected trace: TraceSample[] = [];
     protected checkpointHits: { id: number; f: number }[] = [];
     protected currentInput: InputState = EMPTY_INPUT;
-    private spawnTile!: Waypoint;
+    protected spawnTile!: Waypoint;
     private goalReached = false;
     private lastMissingWarning = -1000;
-    private creator?: string;
+    protected creator?: string;
     private sequence: 'intro' | 'death' | 'dead' | 'goal' | null = null;
     private effects!: PlayEffects;
     private previousMode = MovementState.idle;
@@ -127,6 +130,7 @@ export class PlayScene extends Phaser.Scene {
         this.doc = decodeLevel(file);
         this.levelId = data?.levelId ?? null;
         this.creator = data?.creator;
+        this.skipIntro = Boolean(data?.skipIntro);
         this.sequence = null;
         this.previousMode = MovementState.idle;
         this.previousVy = 0;
@@ -236,7 +240,8 @@ export class PlayScene extends Phaser.Scene {
         this.emitHud();
         if (import.meta.env.DEV) (window as unknown as { __play?: PlayScene }).__play = this;
         EventBus.emit('current-scene-ready', this);
-        this.showIntro();
+        if (this.skipIntro) this.startPlaying();
+        else this.showIntro();
     }
 
     /** BEFORE_UPDATE — once per 16.67 ms physics step. */
@@ -287,10 +292,15 @@ export class PlayScene extends Phaser.Scene {
         const card = this.add.container(cam.width / 2, cam.height / 2, [panel, title, subtitle]).setScrollFactor(0).setDepth(200).setScale(1 / cam.zoom);
         this.tweens.add({ targets: card, alpha: 0, delay: 1000, duration: 280, onComplete: () => {
             card.destroy();
-            this.sequence = null;
-            this.matter.world.resume();
-            this.emitPlayState('playing');
+            this.startPlaying();
         } });
+    }
+
+    private startPlaying() {
+        this.sequence = null;
+        this.cameras.main.setAlpha(1);
+        this.matter.world.resume();
+        this.emitPlayState('playing');
     }
 
     private onPlayerFormChange(form: 'small' | 'big') {
@@ -393,6 +403,11 @@ export class PlayScene extends Phaser.Scene {
 
     /** Hook for subclasses (RaceScene). */
     protected afterStep(): void {}
+
+    /** End of the goal walk. Solo play closes the iris (a results dialog takes over); a race keeps the stage. */
+    protected afterGoalWalk(): void {
+        this.effects.iris(false, 450);
+    }
 
     get timeMs() {
         return Math.round(this.frame * STEP_MS);
@@ -527,9 +542,7 @@ export class PlayScene extends Phaser.Scene {
         this.playerSprite.setFlipX(false).setVisible(true);
         const walk = `${this.playerTex}:walk`;
         if (this.anims.exists(walk)) this.playerSprite.play(walk);
-        this.tweens.add({ targets: this.playerSprite, x: this.playerSprite.x + TILE * 2.5, duration: 1300, ease: 'Linear', onComplete: () => {
-            this.effects.iris(false, 450);
-        } });
+        this.tweens.add({ targets: this.playerSprite, x: this.playerSprite.x + TILE * 2.5, duration: 1300, ease: 'Linear', onComplete: () => this.afterGoalWalk() });
         const run: RunSubmission = {
             timeMs: this.timeMs,
             cleared: true,

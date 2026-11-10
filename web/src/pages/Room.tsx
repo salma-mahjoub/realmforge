@@ -14,6 +14,7 @@ import { MOCK_LEVELS, MOCK_ROOM_PLAYERS } from '../data/mock';
 import { formatEther, parseEther } from 'viem';
 import { RACE_STATUS, RACE_TIMEOUT_SEC, parseRaceResult, useForgeBalance, useRace, type SignedRaceResult } from '../contracts/hooks';
 import { useServiceStatus, useTxFlow, useWeb3Status } from '../web3/tx';
+import { liveRanking, secondsUntil } from './room/ranking';
 import { BlockerNotice } from '../components/BlockerNotice';
 import { humanizeError } from '../web3/errors';
 
@@ -212,6 +213,7 @@ function RaceRoom({ code }: { code: string }) {
     const [online, setOnline] = useState<Online>('connecting');
     const [joinError, setJoinError] = useState<string | null>(null);
     const [countdown, setCountdown] = useState<number | null>(null);
+    const [startAt, setStartAt] = useState<number | null>(null);
     const [started, setStarted] = useState(false);
     const [copied, setCopied] = useState<'code' | 'link' | null>(null);
     const [fell, setFell] = useState(false);
@@ -248,16 +250,19 @@ function RaceRoom({ code }: { code: string }) {
                     const lid = Number(st.levelId);
                     if (Number.isFinite(lid) && st.levelId) setLiveLevelId(lid);
                     const list: RoomPlayer[] = [];
+                    let slot = 0;
                     st.players?.forEach((p, sessionId) => {
+                        const mySlot = slot++;
                         if (sessionId === c.room.sessionId) setMyRace({ finished: Boolean((p as { finished?: boolean }).finished), gaveUp: Boolean((p as { gaveUp?: boolean }).gaveUp) });
                         list.push({
                             sessionId,
                             address: (p.address ?? '0x') as RoomPlayer['address'],
-                            color: colorFor(sessionId),
+                            color: colorFor(mySlot),
                             stakePaid: false,
                             ready: Boolean((p as { ready?: boolean }).ready),
                             isYou: sessionId === c.room.sessionId,
                             finishedMs: (p as { finishTimeMs?: number }).finishTimeMs || undefined,
+                            progress: (p as { x?: number }).x ?? 0,
                         });
                     });
                     setLivePlayers(list);
@@ -266,11 +271,18 @@ function RaceRoom({ code }: { code: string }) {
                 if (!c.bound) {
                     c.bound = true;
                     c.attachToScene();
-                    c.room.onMessage('result', (m: unknown) => setResult(parseRaceResult(m)));
+                    c.room.onMessage('result', (m: unknown) => {
+                        const r = parseRaceResult(m);
+                        setResult(r);
+                        if (r) EventBus.emit('race:ended', r.ranking.findIndex((a) => a.toLowerCase() === web3.address?.toLowerCase()) + 1);
+                    });
                     c.room.onStateChange(applyState);
-                    c.room.onMessage('countdown', (m: unknown) => setCountdown(typeof m === 'number' ? m : Number((m as { seconds?: number })?.seconds ?? 3)));
+                    // The server sends the start time; tick the 3-2-1 locally towards it.
+                    c.room.onMessage('countdown', (m: unknown) => setStartAt(Number((m as { startAt?: number })?.startAt) || Date.now() + 3000));
                     c.room.onMessage('start', () => {
-                        setCountdown(0);
+                        EventBus.emit('race:start');
+                        setStartAt(null);
+                        setCountdown(0); // "GO!", cleared by the effect below
                         setStarted(true);
                     });
                 }
@@ -302,6 +314,20 @@ function RaceRoom({ code }: { code: string }) {
     useEffect(() => {
         if (web3.address) setPlayers((ps) => ps.map((p) => (p.isYou ? { ...p, address: web3.address! } : p)));
     }, [web3.address]);
+
+    // Live room: show 3-2-1 towards the server's start time, then "GO!" for a moment.
+    useEffect(() => {
+        if (startAt === null) return;
+        const tick = () => setCountdown(Math.max(1, secondsUntil(startAt, Date.now())));
+        tick();
+        const t = setInterval(tick, 200);
+        return () => clearInterval(t);
+    }, [startAt]);
+    useEffect(() => {
+        if (online !== 'live' || countdown !== 0) return;
+        const t = setTimeout(() => setCountdown(null), 900);
+        return () => clearTimeout(t);
+    }, [countdown, online]);
 
     // Demo lobby: once everyone is ready, run a local 3-2-1 countdown (the live room gets it from the server).
     useEffect(() => {
@@ -374,7 +400,9 @@ function RaceRoom({ code }: { code: string }) {
     const stake = race.race && race.race.stake > 0n ? Number(formatEther(race.race.stake)) : 20;
     const pot = stake * players.filter((p) => p.stakePaid).length;
     const readyCount = players.filter((p) => p.ready).length;
-    const ranking = started ? [players[3], players[0], players[1], players[2]].filter(Boolean) : players;
+    // The demo lobby keeps its scripted order; a live room shows the real one.
+    const ranking = !started ? players : online === 'live' ? liveRanking(players, result?.ranking) : [players[3], players[0], players[1], players[2]].filter(Boolean);
+    const finishedRace = started && Boolean(result);
 
     return (
         <div className="page page-race">
@@ -438,7 +466,7 @@ function RaceRoom({ code }: { code: string }) {
                                 <Pill tone={p.ready ? 'green' : 'neutral'}>{p.ready ? 'Ready' : 'Not ready'}</Pill>
                             </li>
                         ))}
-                        {Array.from({ length: Math.max(0, 4 - players.length) }, (_, i) => (
+                        {!started && Array.from({ length: Math.max(0, 4 - players.length) }, (_, i) => (
                             <li key={`empty-${i}`} className="player-row is-empty">
                                 <Hourglass size={18} aria-hidden /> Waiting for a player…
                             </li>
@@ -492,14 +520,14 @@ function RaceRoom({ code }: { code: string }) {
                         </Button>
                     )}
                     <Button variant={me?.ready ? 'secondary' : 'primary'} size="lg" block onClick={toggleReady} disabled={started || countdown !== null || (live && !me?.stakePaid)} icon={me?.ready ? <Check size={18} aria-hidden /> : undefined}>
-                        {started ? 'Race in progress' : countdown !== null ? 'Starting…' : me?.ready ? 'Ready — waiting for others' : 'I’m ready'}
+                        {finishedRace ? 'Race finished' : started ? 'Race in progress' : countdown !== null ? 'Starting…' : me?.ready ? 'Ready — waiting for others' : 'I’m ready'}
                     </Button>
                 </Card>
 
                 <Card className="race-stage-card" pad={false}>
                     <div className="race-stage-head">
                         <h2 className="card-title">{level.name}</h2>
-                        <span className="fine">{started ? 'Race in progress' : 'Lobby: warm up while players get ready'}</span>
+                        <span className="fine">{finishedRace ? 'Race finished' : started ? 'Race in progress' : 'Lobby: warm up while players get ready'}</span>
                         {racing && (
                             <div className="race-actions">
                                 {fell && (
@@ -522,7 +550,7 @@ function RaceRoom({ code }: { code: string }) {
                             </div>
                         )}
                         <div className="ranking" aria-label={started ? 'Live ranking' : 'Players'}>
-                            <b>{started ? 'Live ranking' : 'Players'}</b>
+                            <b>{finishedRace ? 'Final ranking' : started ? 'Live ranking' : 'Players'}</b>
                             <ol>
                                 {ranking.map((p, i) => (
                                     <li key={p.sessionId}>

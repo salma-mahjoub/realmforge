@@ -76,6 +76,8 @@ export interface RoomPlayer {
     ready: boolean;
     isYou?: boolean;
     finishedMs?: number;
+    /** Live rooms: x position in tiles (race progress). */
+    progress?: number;
 }
 
 // ── request/response for write endpoints (server/src/api/routes, server/src/api/schemas.ts) ──

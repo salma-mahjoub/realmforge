@@ -33,7 +33,11 @@ export interface JoinOptions {
 }
 
 const PALETTE = [0x22d3ee, 0xf472b6, 0xa3e635, 0xfbbf24];
-export const colorFor = (sessionId: string) => PALETTE[[...sessionId].reduce((a, c) => a + c.charCodeAt(0), 0) % PALETTE.length];
+/**
+ * Racer colour by join slot (the room's player map keeps join order, the same on every client), so up to
+ * 4 players never share a colour. A hash of the session id collided often with only 4 colours.
+ */
+export const colorFor = (slot: number) => PALETTE[((slot % PALETTE.length) + PALETTE.length) % PALETTE.length];
 
 /** Shape the client expects from the server's room state (schema classes on the server). */
 export interface RaceStateLike {
@@ -68,12 +72,14 @@ export class RaceConnection {
     attachToScene() {
         this.room.onStateChange((state) => {
             const players: RemotePlayerState[] = [];
+            let slot = 0;
             state.players?.forEach((p, sessionId) => {
+                const mySlot = slot++;
                 if (sessionId === this.room.sessionId) return;
                 players.push({
                     sessionId,
                     address: p.address ?? '0x',
-                    color: colorFor(sessionId),
+                    color: colorFor(mySlot),
                     x: p.x ?? 0,
                     y: p.y ?? 0,
                     vx: p.vx ?? 0,

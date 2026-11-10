@@ -44,7 +44,7 @@ export function LevelThumb({ level, className, eager, alt = '', sizes = '(max-wi
 
 export function LevelCard({ level, rank }: { level: LevelSummary; rank?: number }) {
     return (
-        <Link to={`/level/${level.id}`} className="level-card" aria-label={`${level.name}, play fee ${level.playFee} FORGE, ${level.plays} plays, ${pct(level.clearRate)} clear rate`}>
+        <Link to={`/level/${level.id}`} className="level-card" aria-label={`${level.name}, play fee ${level.playFee} FORGE, ${level.plays} ${level.plays === 1 ? 'play' : 'plays'}, ${pct(level.clearRate)} clear rate`}>
             <div className="level-card-media">
                 <LevelThumb level={level} />
                 {level.listedPriceEth && (
@@ -64,7 +64,7 @@ export function LevelCard({ level, rank }: { level: LevelSummary; rank?: number 
                 <div className="level-card-creator">{shortAddr(level.creator)}</div>
                 <div className="level-card-meta">
                     <span title="Plays">
-                        <Play size={13} aria-hidden /> {compact(level.plays)} plays
+                        <Play size={13} aria-hidden /> {compact(level.plays)} {level.plays === 1 ? 'play' : 'plays'}
                     </span>
                     <span title="Clear rate">
                         <Trophy size={13} aria-hidden /> {pct(level.clearRate)} clear

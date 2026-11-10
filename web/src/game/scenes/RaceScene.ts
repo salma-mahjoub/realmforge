@@ -4,7 +4,19 @@ import { EventBus, type RemotePlayerState } from '../EventBus';
 import { SCENES, TILE } from '../constants';
 import { PlayScene, type PlaySceneData } from './PlayScene';
 import { elementTexture } from '../assets/registry';
-import type { ElementInstance } from '@realmforge/game-core';
+import type { ElementInstance, InputState } from '@realmforge/game-core';
+
+/**
+ * Keys held right now, tracked on the window. A scene restart (the race restarts on GO) creates fresh Phaser
+ * key objects that only see *new* keydowns, so a player already holding → at GO would not move.
+ */
+const held = new Set<string>();
+if (typeof window !== 'undefined') {
+    window.addEventListener('keydown', (e) => held.add(e.code));
+    window.addEventListener('keyup', (e) => held.delete(e.code));
+    window.addEventListener('blur', () => held.clear());
+}
+const isHeld = (...codes: string[]) => codes.some((c) => held.has(c));
 
 export interface RaceSceneData extends PlaySceneData {
     roomCode?: string;
@@ -18,6 +30,7 @@ export interface RaceSceneData extends PlaySceneData {
  * Finish order / timing authority is the server — `play:finished` here is only a local claim.
  */
 export class RaceScene extends PlayScene {
+    private finishNote?: Phaser.GameObjects.Text;
     private remotes = new Map<string, { sprite: Phaser.GameObjects.Sprite; label: Phaser.GameObjects.Text; target: RemotePlayerState }>();
     roomCode?: string;
 
@@ -26,26 +39,44 @@ export class RaceScene extends PlayScene {
     }
 
     init(data: RaceSceneData) {
+        this.finishNote = undefined;
         super.init({ ...data, from: 'race' });
         this.roomCode = data?.roomCode;
         this.remotes.clear();
     }
 
     /** A restart starts the frame counter again; tell the room first so it keeps accepting our positions. */
-    protected restart() {
+    protected restart(raceStart = false) {
         EventBus.emit('race:respawn');
-        super.restart();
+        this.scene.restart({ level: this.file, levelId: this.levelId, from: 'race', spawn: raceStart ? undefined : this.spawnTile, creator: this.creator, roomCode: this.roomCode, skipIntro: raceStart } satisfies RaceSceneData);
     }
 
     protected bindBus() {
         super.bindBus();
         this.unsubs.push(EventBus.subscribe('race:remote-states', (players) => this.applyRemote(players)));
+        // GO: lobby warm-up frames and position do not count. Restart at spawn on frame 0; `restart()` also
+        // tells the server (race:respawn), which then expects the next position at spawn from frame 0.
+        this.unsubs.push(EventBus.subscribe('race:start', () => this.restart(true)));
+        this.unsubs.push(EventBus.subscribe('race:ended', (place) => this.showNote(place === 1 ? 'YOU WIN!' : place ? `RACE OVER  ·  YOU PLACED ${ordinal(place)}` : 'RACE OVER')));
     }
 
     protected onElementEvent(type: string, el: ElementInstance) {
         super.onElementEvent(type, el);
         if (type === 'checkpoint') EventBus.emit('race:checkpoint', { id: Number(el.def.id) });
         if (type === 'coin' || type === 'big_coin') EventBus.emit('race:coins', this.coins);
+    }
+
+    protected readInput(): InputState {
+        const k = super.readInput();
+        if (this.paused) return k;
+        return {
+            left: k.left || isHeld('ArrowLeft', 'KeyA'),
+            right: k.right || isHeld('ArrowRight', 'KeyD'),
+            up: k.up || isHeld('ArrowUp', 'KeyW'),
+            down: k.down || isHeld('ArrowDown', 'KeyS'),
+            jump: k.jump || isHeld('Space', 'KeyZ'),
+            run: k.run || isHeld('ShiftLeft', 'ShiftRight', 'KeyX'),
+        };
     }
 
     protected afterStep() {
@@ -56,6 +87,11 @@ export class RaceScene extends PlayScene {
             const scale = TILE / MOVEMENT.referenceTile;
             EventBus.emit('race:local-state', { f: s.f, x: s.x, y: s.y, vx: fixedToWorld(st.vx, scale) / TILE, vy: fixedToWorld(st.vy, scale) / TILE });
         }
+    }
+
+    /** Remotes are interpolated every render frame: physics steps stop once the local player finishes. */
+    update(time: number, delta: number) {
+        super.update(time, delta);
         // interpolate remotes toward last snapshot (tiles → px)
         for (const r of this.remotes.values()) {
             const tx = r.target.x * TILE + TILE / 2;
@@ -64,6 +100,25 @@ export class RaceScene extends PlayScene {
             r.sprite.y = Phaser.Math.Linear(r.sprite.y, ty, 0.35);
             r.label.setPosition(r.sprite.x, r.sprite.y - 52);
         }
+    }
+
+    /** The race goes on after you finish: keep the stage visible and say so, instead of the solo iris close. */
+    protected afterGoalWalk() {
+        if (!this.finishNote) this.showNote('FINISHED  ·  WAITING FOR THE OTHERS');
+    }
+
+    private showNote(text: string) {
+        this.finishNote?.destroy();
+        const cam = this.cameras.main;
+        const note = this.add
+            .text(cam.width / 2, 28, text, { fontFamily: 'system-ui, sans-serif', fontSize: '16px', fontStyle: 'bold', color: '#ffc83d', backgroundColor: '#0f1424d9', padding: { x: 12, y: 6 } })
+            .setOrigin(0.5, 0)
+            .setScrollFactor(0)
+            .setDepth(200)
+            .setScale(1 / cam.zoom);
+        // Scroll-factor-0 objects still zoom around the camera centre: undo that so the note sits 28 px from the top.
+        note.setPosition(cam.width / 2, cam.height / 2 + (28 - cam.height / 2) / cam.zoom);
+        this.finishNote = note;
     }
 
     private applyRemote(players: RemotePlayerState[]) {
@@ -98,6 +153,10 @@ export class RaceScene extends PlayScene {
             }
         }
     }
+}
+
+function ordinal(n: number) {
+    return `${n}${n === 1 ? 'ST' : n === 2 ? 'ND' : n === 3 ? 'RD' : 'TH'}`;
 }
 
 function shortAddress(a: string) {

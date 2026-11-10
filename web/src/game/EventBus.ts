@@ -111,6 +111,10 @@ export interface BusEvents {
     'race:coins': [count: number];
     /** The race scene restarted after a fall: the server must reset this player's frame counter. */
     'race:respawn': [];
+    /** The server started the race: every client restarts at spawn on frame 0 (lobby warm-up does not count). */
+    'race:start': [];
+    /** The server signed the final ranking (1-based place of this client, 0 if unranked). */
+    'race:ended': [place: number];
 }
 
 type Handler<K extends keyof BusEvents> = (...args: BusEvents[K]) => void;

@@ -405,8 +405,9 @@ a.level-card:hover .thumb img, .market-card:hover .thumb img { transform: scale(
 .profile-wallet { display: flex; gap: var(--s-6); align-items: center; flex-wrap: wrap; }
 .profile-balance { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
 .faucet-cta { display: flex; align-items: center; gap: var(--s-4); padding: var(--s-3) var(--s-4); border-radius: var(--r-md); background: var(--gold-soft); border: 1px solid var(--gold-line); }
-.faucet-cta b { display: block; color: var(--gold); }
-.faucet-cta span { font-size: var(--fs-sm); color: var(--text-2); }
+.faucet-cta > div > b { display: block; color: var(--gold); }
+/* Direct text only: a bare `span` selector also hit the Claim button's label (grey text on gold). */
+.faucet-cta > div > span { font-size: var(--fs-sm); color: var(--text-2); }
 .stat-strip { display: grid; grid-template-columns: repeat(4, 1fr); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); }
 .stat-strip > .stat { padding: var(--s-4) var(--s-5); }
 .stat-strip > .stat + .stat { border-left: 1px solid var(--line); }

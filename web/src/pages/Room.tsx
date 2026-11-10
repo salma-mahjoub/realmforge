@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Check, Copy, Flag, Hourglass, KeyRound, LogOut, Plus, Radio, RotateCcw, Swords, Users } from 'lucide-react';
 import { api } from '../api/client';
-import { RaceConnection, closeRoom, colorFor, openRoom, stashConnection } from '../api/colyseus';
+import { RaceConnection, closeRoom, colorFor, describeJoinError, needsSignIn, openRoom, stashConnection } from '../api/colyseus';
 import type { RoomPlayer } from '../api/types';
 import { EventBus } from '../game/EventBus';
 import { PhaserGame } from '../game/PhaserGame';
@@ -17,6 +17,7 @@ import { useServiceStatus, useTxFlow, useWeb3Status } from '../web3/tx';
 import { liveRanking, secondsUntil } from './room/ranking';
 import { BlockerNotice } from '../components/BlockerNotice';
 import { humanizeError } from '../web3/errors';
+import { useSiwe } from '../web3/siwe';
 
 /** ForgeCoin race payout (SPEC §5.1): winner / second / level owner / season pool. */
 export const PAYOUT = [
@@ -35,6 +36,7 @@ function CreateRoom() {
     const bal = useForgeBalance();
     const race = useRace();
     const tx = useTxFlow();
+    const siwe = useSiwe();
     const { data: levels, loading } = useAsync(() => api.listLevels({ sort: 'popular' }), []);
     const [levelId, setLevelId] = useState<number>(MOCK_LEVELS[0].id);
     const [stake, setStake] = useState('20');
@@ -56,7 +58,7 @@ function CreateRoom() {
         if (!web3.address) return;
         setCreating(true);
         try {
-            const conn = await RaceConnection.create('race', { address: web3.address, levelId: selectedId, stake });
+            const conn = await RaceConnection.create('race', { address: web3.address, levelId: selectedId, stake }, siwe.provider);
             const c = conn.code;
             // Escrow the creator's stake on-chain (ForgeCoin.createRaceRoom); the room code is the on-chain id.
             const out = await tx.run('create-race', { title: `Escrow ${stake} FORGE`, success: 'Race created', successBody: 'Your stake is in escrow. Share the room code.' }, () => race.createRoom(c, BigInt(selectedId), parseEther(stake)));
@@ -64,6 +66,7 @@ function CreateRoom() {
             stashConnection(conn); // keep the room alive while the lobby page opens
             navigate(`/room/${c}`);
         } catch (e) {
+            if (needsSignIn(e)) return void toast.show({ tone: 'error', title: 'Sign-in needed to create a room', body: describeJoinError(e) });
             toast.show({ tone: 'warning', title: 'Game server unreachable', body: `${humanizeError(e)} Opening a demo lobby instead.` });
             navigate('/room/DEMO');
         } finally {
@@ -138,7 +141,9 @@ function CreateRoom() {
                         <Button variant="primary" size="lg" icon={<Swords size={18} aria-hidden />} loading={creating} disabled={!web3.address || !!stakeError || !level} onClick={() => void create()}>
                             Create room and stake {fmt(stakeN)} FORGE
                         </Button>
-                        <p className="fine">One wallet confirmation. Then you get the room code to share with the other players.</p>
+                        <p className="fine">
+                            {siwe.signedIn ? 'One wallet confirmation.' : 'First one free sign-in signature (no gas) proving this wallet is yours, then one wallet confirmation for the stake.'} Then you get the room code to share with the other players.
+                        </p>
                     </div>
                 </Card>
                 <Card>
@@ -212,6 +217,12 @@ function RaceRoom({ code }: { code: string }) {
     const [result, setResult] = useState<SignedRaceResult | null>(null);
     const [online, setOnline] = useState<Online>('connecting');
     const [joinError, setJoinError] = useState<string | null>(null);
+    /** The join failed for lack of a wallet signature: offer to sign in and retry instead of the demo lobby. */
+    const [joinNeedsSignIn, setJoinNeedsSignIn] = useState(false);
+    const [joinAttempt, setJoinAttempt] = useState(0);
+    const siwe = useSiwe();
+    const siweProvider = useRef(siwe.provider);
+    siweProvider.current = siwe.provider;
     const [countdown, setCountdown] = useState<number | null>(null);
     const [startAt, setStartAt] = useState<number | null>(null);
     const [started, setStarted] = useState(false);
@@ -241,8 +252,9 @@ function RaceRoom({ code }: { code: string }) {
         }
         setOnline('connecting');
         setJoinError(null);
+        setJoinNeedsSignIn(false);
         const key = `${code}:${web3.address}`;
-        openRoom(key, code, () => RaceConnection.joinByCode(code, { address: web3.address!, levelId: demoLevel.id }))
+        openRoom(key, code, () => RaceConnection.joinByCode(code, { address: web3.address!, levelId: demoLevel.id }, siweProvider.current))
             .then((c) => {
                 if (cancelled) return;
                 conn.current = c;
@@ -291,7 +303,8 @@ function RaceRoom({ code }: { code: string }) {
             })
             .catch((e) => {
                 if (cancelled) return;
-                setJoinError(humanizeError(e));
+                setJoinError(describeJoinError(e));
+                setJoinNeedsSignIn(needsSignIn(e));
                 setOnline('demo');
             });
         return () => {
@@ -299,7 +312,7 @@ function RaceRoom({ code }: { code: string }) {
             conn.current = null;
             closeRoom(key);
         };
-    }, [code, web3.address, demoLevel.id]);
+    }, [code, web3.address, demoLevel.id, joinAttempt]);
 
     // Falling ends the attempt, not the race: offer a respawn (R) or leaving the race.
     useEffect(() => {
@@ -492,7 +505,17 @@ function RaceRoom({ code }: { code: string }) {
                             </div>
                         ))}
                     </dl>
-                    {joinError && web3.address && (
+                    {joinError && web3.address && joinNeedsSignIn && (
+                        <div className="notice notice-error" role="alert">
+                            <span>
+                                <b>Wallet signature required.</b> {joinError} What you see below is a demo lobby, not your race.
+                            </span>
+                            <Button size="sm" variant="primary" icon={<KeyRound size={14} aria-hidden />} onClick={() => setJoinAttempt((n) => n + 1)}>
+                                Sign in and join
+                            </Button>
+                        </div>
+                    )}
+                    {joinError && web3.address && !joinNeedsSignIn && (
                         <div className="notice notice-error" role="alert">
                             <span>Could not join the live room ({joinError}). What you see is a demo lobby with sample players and a sample level, not your race.</span>
                         </div>

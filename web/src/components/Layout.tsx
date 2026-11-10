@@ -8,6 +8,7 @@ import { useMockData } from '../api/dataSource';
 import { API_URL } from '../api/client';
 import { BLOCKER_TEXT, chainName, targetChain, useServiceStatus, useTxFlow, useWeb3Status } from '../web3/tx';
 import { Avatar, Button, ForgeCoin, Skeleton, Toaster, Tooltip, cx } from './ui';
+import { SiweBanner } from './SiweBanner';
 
 export function Logo() {
     return (
@@ -238,6 +239,7 @@ export function Layout() {
                 )}
             </header>
             <StatusBanners />
+            <SiweBanner />
             <main id="main" className={fullBleed ? 'main main-full' : 'main'} tabIndex={-1}>
                 <Outlet />
             </main>

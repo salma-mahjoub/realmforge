@@ -46,7 +46,8 @@ export default defineConfig({
     localhost: {
       type: "http",
       chainType: "l1",
-      url: "http://127.0.0.1:8545",
+      // RPC_URL lets `RPC_URL=... npm run deploy:local` reach a node on another port (it used to deploy to 8545 regardless).
+      url: process.env.RPC_URL || "http://127.0.0.1:8545",
     },
     sepolia: {
       type: "http",

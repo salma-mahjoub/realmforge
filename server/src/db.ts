@@ -11,7 +11,7 @@ import { DatabaseSync } from "node:sqlite";
  *  - races        : indexed Race* events
  *  - fee_splits   : indexed FeeSplit / FeeBurned (owner earnings, season pool, treasury, burn) + race payouts
  *  - activity     : one row per notable event of a level (published, play, record, listed, sold) for the UI feed
- *  - seasons      : indexed SeasonClosed
+ *  - seasons      : indexed SeasonClosed (+ season_payouts: the ERC-20 transfers of that closeSeason tx)
  *  - pinned_levels: level JSON pinned through this API (+ min time computed at publish)
  *  - signed_runs  : RunResults signed by this server (replay storage for ghost races)
  *  - run_fingerprints : sha256 of every validated run, so the same recording is never signed twice
@@ -108,6 +108,23 @@ CREATE TABLE IF NOT EXISTS seasons (
   block_number INTEGER NOT NULL,
   tx_hash      TEXT NOT NULL,
   closed_at    INTEGER NOT NULL
+);
+-- FORGE sent out of ForgeCoin's own balance in the transaction being indexed (only the latest tx is kept);
+-- when that tx turns out to be a closeSeason, its rows become the season's payouts.
+CREATE TABLE IF NOT EXISTS forge_outflows (
+  tx_hash      TEXT NOT NULL,
+  log_index    INTEGER NOT NULL,
+  recipient    TEXT NOT NULL,
+  amount       TEXT NOT NULL,
+  PRIMARY KEY (tx_hash, log_index)
+);
+-- What closeSeason paid, in transfer order (players first, then creators, as in the signed arrays).
+CREATE TABLE IF NOT EXISTS season_payouts (
+  season       INTEGER NOT NULL,
+  position     INTEGER NOT NULL,
+  recipient    TEXT NOT NULL,
+  amount       TEXT NOT NULL,
+  PRIMARY KEY (season, position)
 );
 CREATE TABLE IF NOT EXISTS pinned_levels (
   layout_hash  TEXT PRIMARY KEY,

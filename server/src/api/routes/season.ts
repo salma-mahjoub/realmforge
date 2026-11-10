@@ -1,15 +1,29 @@
 import type { FastifyInstance } from "fastify";
 import { toJsonSafe } from "../../eip712.js";
 import { ContractNotConfiguredError } from "../../signer.js";
-import { computeSeason } from "../../season/scoring.js";
+import { closedSeasons, computeSeason, computeStandings, MAX_WINNERS } from "../../season/scoring.js";
 import type { Services } from "../../services.js";
 
 export function seasonRoutes(app: FastifyInstance, svc: Services) {
   /** Live ranking of the running season (what `closeSeason` would pay), with the closed seasons for history. */
   app.get("/season/current", async () => {
     const ranking = computeSeason(svc.db);
-    const closed = svc.db.prepare("SELECT season, pool, block_number AS block, tx_hash AS hash FROM seasons ORDER BY season DESC LIMIT 10").all();
-    return { ...ranking, closed };
+    return { ...ranking, closed: closedSeasons(svc.db) };
+  });
+
+  /**
+   * Full live standings of the running season: every scorer (not only the paid top 10) with rank, score breakdown
+   * and the share they would get if the season closed now, plus the closed seasons and their on-chain payouts.
+   */
+  app.get("/season/standings", async () => ({ ...computeStandings(svc.db), maxWinners: MAX_WINNERS, closed: closedSeasons(svc.db) }));
+
+  /** Payouts of one closed season (404 while it is still running or not indexed yet). */
+  app.get<{ Params: { season: string } }>("/season/:season/payouts", async (req, reply) => {
+    const n = Number(req.params.season);
+    if (!Number.isInteger(n) || n < 1) return reply.code(400).send({ error: "season must be a positive integer" });
+    const [row] = closedSeasons(svc.db, { season: n });
+    if (!row) return reply.code(404).send({ error: `season ${n} is not closed (or not indexed yet)` });
+    return row;
   });
 
   /**

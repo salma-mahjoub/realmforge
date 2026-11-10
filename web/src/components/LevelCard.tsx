@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, Play, Tag, Trophy } from 'lucide-react';
+import { Heart, Play, Tag, Trophy, Coins } from 'lucide-react';
 import type { LevelSummary } from '../api/types';
 import type { Theme } from '../game/level/types';
 import { compact, pct, shortAddr } from './ui/format';
@@ -53,6 +53,7 @@ export function LevelCard({ level, rank }: { level: LevelSummary; rank?: number 
                     </span>
                 )}
                 {rank != null && <span className="level-card-rank">#{rank}</span>}
+                {!!level.activeBounties && <span className="level-card-flag bounty-flag"><Coins size={12} aria-hidden /> Bounty</span>}
             </div>
             <div className="level-card-body">
                 <div className="level-card-row">

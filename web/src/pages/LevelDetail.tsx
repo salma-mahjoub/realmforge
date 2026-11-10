@@ -11,6 +11,8 @@ import { formatForge } from '../contracts/hooks/useForgeBalance';
 import { explorerTxUrl } from '../web3/config';
 import { chainName, useTxFlow, useWeb3Status } from '../web3/tx';
 import { BuyModal, ListModal } from '../components/MarketModals';
+import { Input, Field, Modal } from '../components/ui';
+import { useBounty } from '../contracts/hooks';
 
 /** Single-series area chart: no legend, three faint gridlines, violet on the data. */
 function EarningsChart({ points }: { points: { day: string; forge: number }[] }) {
@@ -70,6 +72,7 @@ export default function LevelDetail() {
     const board = useAsync(() => api.getLeaderboard(id, 5), [id]);
     const txs = useAsync(() => api.getLevelActivity(id), [id]);
     const earnings = useAsync(() => api.getCreatorEarnings(id), [id]);
+    const bounties = useAsync(() => api.getBounties(id), [id]);
     const chain = useLevel(valid ? id : undefined);
     const market = useMarket();
     const tx = useTxFlow();
@@ -78,6 +81,11 @@ export default function LevelDetail() {
     const mockEarnings = useMockData('/levels/:id/earnings');
     const [buying, setBuying] = useState(false);
     const [listing, setListing] = useState(false);
+    const [bountyOpen, setBountyOpen] = useState(false);
+    const [bountyAmount, setBountyAmount] = useState('10');
+    const [bountyTarget, setBountyTarget] = useState('');
+    const [bountyExpiryDays, setBountyExpiryDays] = useState('30');
+    const bounty = useBounty();
 
     if (!valid) return <EmptyState tone="error" title="Invalid level id" action={<Button to="/browse">Browse levels</Button>}>Level ids are positive integers, e.g. /level/42.</EmptyState>;
     if (error && !lvl) {
@@ -106,6 +114,17 @@ export default function LevelDetail() {
     const sample = mockDetail && !onChain;
 
     const like = () => void tx.run('like', { title: `Like level #${id}`, success: 'Liked! Thanks for the support.' }, () => market.like(BigInt(id)));
+    const fundBounty = async () => {
+        const amt = Number(bountyAmount);
+        const target = bountyTarget.trim() ? Number(bountyTarget) : 0;
+        const days = bountyExpiryDays.trim() ? Number(bountyExpiryDays) : 0;
+        if (!Number.isFinite(amt) || amt <= 0 || (target && (!Number.isInteger(target) || target < 1)) || (days && (!Number.isInteger(days) || days < 1 || days > 365))) return;
+        const approval = await tx.run('bounty-approve', { title: 'Approve FORGE', success: 'FORGE approved' }, () => bounty.approve(parseEther(bountyAmount)));
+        if (!approval.ok) return;
+        const expiry = days ? BigInt(Math.floor(Date.now() / 1000) + days * 24 * 60 * 60) : 0n;
+        const created = await tx.run('bounty-create', { title: 'Create level bounty', success: 'Bounty funded' }, () => bounty.create(BigInt(id), bountyAmount, target, expiry));
+        if (created.ok) { setBountyOpen(false); await bounties.reload(); }
+    };
 
     return (
         <div className="page page-detail">
@@ -181,6 +200,7 @@ export default function LevelDetail() {
                                 </dl>
                             </div>
                             <div className="ownership-cta">
+                                <Button block variant="secondary" icon={<Trophy size={15} aria-hidden />} disabled={!bounty.enabled || !!web3.blocker || missingOnChain || tx.isBusy('bounty-approve') || tx.isBusy('bounty-create')} onClick={() => setBountyOpen(true)}>Add bounty</Button>
                                 {isOwner ? (
                                     <Button variant="primary" block icon={<Tag size={16} aria-hidden />} onClick={() => setListing(true)}>
                                         {listedEth ? `Listed ${listedEth} ETH · Edit` : 'List for sale'}
@@ -306,6 +326,21 @@ export default function LevelDetail() {
 
             <BuyModal open={buying} onClose={() => setBuying(false)} levelId={id} levelName={lvl.name} priceWei={listingWei} seller={owner} creator={creator} onDone={() => void chain.refetch()} />
             <ListModal open={listing} onClose={() => setListing(false)} levelId={id} levelName={lvl.name} currentWei={listingWei} onDone={() => void chain.refetch()} />
+            <Modal open={bountyOpen} onClose={() => setBountyOpen(false)} title={`Add a bounty to level #${id}`} icon={<Trophy size={18} />}>
+                <p className="fine">Escrow FORGE for the first eligible player to clear this level. Your own wallet and the level owner/creator cannot claim.</p>
+                <Field label="Bounty amount" htmlFor="bounty-amount" hint="FORGE">
+                    <Input id="bounty-amount" value={bountyAmount} inputMode="decimal" onChange={(e) => setBountyAmount(e.target.value)} />
+                </Field>
+                <Field label="Target time (optional)" htmlFor="bounty-target" hint="milliseconds; clear at or below this time">
+                    <Input id="bounty-target" value={bountyTarget} inputMode="numeric" placeholder="Any clear" onChange={(e) => setBountyTarget(e.target.value.replace(/[^0-9]/g, ''))} />
+                </Field>
+                <Field label="Expiry (optional)" htmlFor="bounty-expiry" hint="days · 1–365">
+                    <Input id="bounty-expiry" value={bountyExpiryDays} inputMode="numeric" placeholder="Never" onChange={(e) => setBountyExpiryDays(e.target.value.replace(/[^0-9]/g, ''))} />
+                </Field>
+                <p className="fine">Sponsors can reclaim their contributions after expiry. Leaving this blank means the bounty never expires and cannot be refunded.</p>
+                <Button variant="primary" block loading={tx.isBusy('bounty-approve') || tx.isBusy('bounty-create')} disabled={!bountyAmount || Number(bountyAmount) <= 0} onClick={() => void fundBounty()}>Approve and fund</Button>
+                <div className="bounty-list">{bounties.data?.bounties.filter((b) => b.status === 'open').map((b) => <p key={b.bountyId}><b>{formatForge(BigInt(b.amount))} FORGE</b>{b.targetTimeMs ? ` · ≤ ${formatMs(b.targetTimeMs)}` : ' · any clear'}</p>)}</div>
+            </Modal>
         </div>
     );
 }

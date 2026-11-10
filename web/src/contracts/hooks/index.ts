@@ -8,4 +8,5 @@ export { useSeason, parseSeasonProof, prizeOf } from './useSeason';
 export type { SignedSeason } from './useSeason';
 export { useMarket } from './useMarket';
 export { useRace, raceIdFor, parseRaceResult, RACE_STATUS, RACE_TIMEOUT_SEC } from './useRace';
+export { useBounty } from './useBounty';
 export type { SignedRaceResult } from './useRace';

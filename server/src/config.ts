@@ -23,6 +23,7 @@ export const envSchema = z.object({
   CHAIN_ID: z.coerce.number().int().positive().default(31337),
   LEVEL_NFT_ADDRESS: optionalAddress,
   FORGE_COIN_ADDRESS: optionalAddress,
+  LEVEL_BOUNTY_ADDRESS: optionalAddress,
   INDEXER_START_BLOCK: z.coerce.bigint().nonnegative().default(0n),
   INDEXER_ENABLED: z
     .preprocess(emptyToUndefined, z.enum(["true", "false"]).optional())

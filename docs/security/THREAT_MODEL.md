@@ -1,7 +1,7 @@
-# Threat model: ForgeCoin and the signing trust boundary
+# Threat model: RealmForge contracts and the signing trust boundary
 
-Scope: `ForgeCoin.sol` (FORGE token, run settlement, races, seasons, faucet) and the server key that feeds it.
-`LevelNFT` is covered only where it touches ForgeCoin. Deployed on Sepolia (`contracts/ignition/deployments/chain-11155111/`). FORGE has no
+Scope: `ForgeCoin.sol` (FORGE token, run settlement, races, seasons, faucet), `LevelBounty.sol` (FORGE bounty escrow),
+and their server signing paths. `LevelNFT` is covered where it touches ForgeCoin or bounty eligibility. FORGE has no
 market value on a testnet, so the "impact" column describes what would matter on a real network.
 
 ## 1. What we protect
@@ -11,6 +11,7 @@ market value on a testnet, so the "impact" column describes what would matter on
 | FORGE supply and its cap (100 M) | `totalSupply`, `ERC20Capped` | inflation destroys the value of every holder's balance |
 | Player balances | ERC-20 balances | funds cannot be taken by anyone else |
 | Race escrow | contract balance | stakes must come back to the players or be paid out exactly |
+| Bounty escrow | `LevelBounty` balance and sponsor contributions | only a qualified player can claim; each sponsor can refund its share after expiry |
 | Season pool and treasury | `seasonPool`, `treasuryBalance` | only released by the documented paths |
 | Fairness of rewards | `settleRun` | rewards must follow real, validated runs |
 
@@ -18,11 +19,12 @@ market value on a testnet, so the "impact" column describes what would matter on
 
 | Actor | Trusted for | Not trusted for |
 |---|---|---|
-| **Game-server signer key** | stating that a run, a race ranking or a season ranking really happened | nothing else: it cannot move balances directly |
+| **Game-server signer key** | stating that a run, race ranking, season ranking or bounty clear really happened | cannot move balances directly, but can authorize claims against open bounty escrow |
 | **Admin (`DEFAULT_ADMIN_ROLE`, the deployer)** | pause/unpause, `setSigner`, `withdrawTreasury`, submitting `closeSeason`, one-time `setLevelNFT` | minting, taking player funds or race escrow |
 | **LevelNFT contract** | `levelInfo` answers and `recordRun`; linked once by the admin and never changed | arbitrary behaviour: it is called after state is updated, under `nonReentrant` |
 | **Players** | nothing | submitting results that were not signed, replaying, farming |
 | **Anyone** | submitting `settleRace` / `refundRace` | they can only submit what is signed or what has timed out |
+| **Bounty sponsor** | creating a bounty, topping it up, reclaiming its own contribution after expiry | cannot reclaim early or change bounty terms after creation |
 
 The contracts are **not upgradeable**: nobody can change the rules after deployment (a strength for users, a
 limit if a bug is found, which is why `pause` and `setSigner` exist).
@@ -38,10 +40,12 @@ single-use room/season has not been consumed. It **cannot** check that the run r
 | sign `RunResult`s with `cleared = true` and any `coins` | per run: reward capped (max 50 + 20 + 10 + 5); per address: 200 FORGE/day; global: 100 M cap | each fresh wallet can mint 200/day, so the daily cap limits *each address*, not the total. Only the supply cap bounds an attack with many wallets. **Highest residual risk.** |
 | sign a `RaceResult` for a room where the attacker is a player | ranking must contain room players; pays 60 % + 25 % of that room's pot at most | steals up to 85 % of the stakes of honest players who joined that room |
 | sign a `SeasonResult` | also needs the admin key to submit | pays the pool to chosen addresses, only with a second compromised key |
+| sign a `BountyClaim` | must name an open bounty, match its level, meet the target time, and use an eligible player | can drain open bounty pots without a second key |
 | sign `ClearProof`s (LevelNFT) | `hashUsed` and `usedProof` | spam of published levels |
 
 **Mitigations in place**
 - `setSigner` lets the admin rotate the key at once; the old signatures stop working (`SignerRotation` test).
+- The bounty admin can revoke the compromised `SIGNER_ROLE` and grant a replacement. Bounties have no pause switch; expiry refunds remain the recovery path for unclaimed pots.
 - `pause` stops faucet, runs, race creation, join and settlement, while `refundRace` keeps working so nobody's
   stake is trapped (`Race_RefundAfterTimeout` test).
 - Every signed message has a `deadline` (default 1 hour) so leaked signatures expire.
@@ -74,6 +78,8 @@ re-simulation of the input log on the server (`docs/SPEC.md` §3.6, stretch goal
 | T15 | Bad ranking in `closeSeason` | needs signature **and** admin tx; shares must total 10 000; anyone can recompute the ranking from public events (`docs/SEASONS.md`) | `CloseSeason_*` tests | medium |
 | T16 | Signature malleability | OpenZeppelin `ECDSA.tryRecover` rejects malleable signatures; replay is blocked by nonces anyway | library | low |
 | T17 | Server unavailable | funds stay safe; plays cannot settle until it is back; races time out into refunds | refund path | availability only |
+| T18 | False bounty clear or stolen bounty signature | `BountyClaim` binds bounty, level, player, time, nonce, deadline and contract domain; owners, creators and sponsors are rejected | LevelBounty claim tests, validated-clear API and EIP-712 type-string tests | **high if signer compromised**: an eligible wallet can drain open pots until admin revokes `SIGNER_ROLE` |
+| T19 | Bounty sponsor loses funds after an unclaimed bounty | pull refund returns each sponsor's recorded contribution after expiry; expiry is optional | LevelBounty sponsor refund tests | medium: no-expiry bounties cannot be refunded; expired funds remain until sponsors call `refund` |
 
 ## 5. Off-chain gaps (from `docs/CHECKLIST.md`, not solved yet)
 

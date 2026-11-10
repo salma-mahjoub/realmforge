@@ -9,7 +9,8 @@ import { EventBus, type RunFinished } from '../game/EventBus';
 import { SCENES } from '../game/constants';
 import { AddressChip, Badge, Button, EmptyState, ForgeCoin, Kbd, Modal, Skeleton, TokenAmount, Tooltip, cx, formatMs } from '../components/ui';
 import { useAsync } from '../components/useAsync';
-import { useSettleRun } from '../contracts/hooks';
+import { useBounty, useSettleRun } from '../contracts/hooks';
+import { formatForge } from '../contracts/hooks/useForgeBalance';
 import { BlockerNotice } from '../components/BlockerNotice';
 import { humanizeError, isUserRejection } from '../web3/errors';
 import { useServiceStatus, useTxFlow, useWeb3Status } from '../web3/tx';
@@ -57,6 +58,28 @@ function StepRow({ state, title, note }: { state: StepState; title: string; note
             <span className="sr-only">{state === 'done' ? 'done' : state === 'active' ? 'in progress' : state === 'error' ? 'failed' : 'to do'}</span>
         </li>
     );
+}
+
+function BountyClaimStep({ levelId, result, owner, creator }: { levelId: number; result: RunFinished; owner?: string; creator?: string }) {
+    const web3 = useWeb3Status();
+    const tx = useTxFlow();
+    const contract = useBounty();
+    const { data, reload } = useAsync(() => api.getBounties(levelId), [levelId]);
+    const [claimed, setClaimed] = useState<number[]>([]);
+    const eligible = (data?.bounties ?? []).filter((b) => b.status === 'open' && (!b.expiry || b.expiry > Date.now() / 1000) && (!b.targetTimeMs || result.timeMs <= b.targetTimeMs) && !b.sponsors?.some((sponsor) => sponsor.toLowerCase() === web3.address?.toLowerCase()) && web3.address?.toLowerCase() !== owner?.toLowerCase() && web3.address?.toLowerCase() !== creator?.toLowerCase());
+    const claim = async (bountyId: number) => {
+        if (!web3.address) return;
+        try {
+            const proof = await api.bountyClaimProof({ player: web3.address, levelId, bountyId, run: result.run });
+            const c = proof.claim;
+            const out = await tx.run(`bounty-claim-${bountyId}`, { title: 'Claim level bounty', success: 'Bounty claimed' }, () => contract.claim({ bountyId: BigInt(c.bountyId), levelId: BigInt(c.levelId), player: c.player, timeMs: c.timeMs, nonce: BigInt(c.nonce), deadline: BigInt(c.deadline) }, proof.signature));
+            if (out.ok) { setClaimed((xs) => [...xs, bountyId]); await reload(); }
+        } catch (error) {
+            toast.error('Could not prepare bounty claim', humanizeError(error));
+        }
+    };
+    if (!result.cleared || !eligible.length) return null;
+    return <section className="bounty-claim" aria-label="Claim level bounty"><h3>Claim bounty</h3><p>Your validated clear qualifies for these open bounties.</p>{eligible.map((b) => <div key={b.bountyId} className="row-sm"><span>{formatForge(BigInt(b.amount))} FORGE{b.targetTimeMs ? ` · ≤ ${formatMs(b.targetTimeMs)}` : ''}</span><Button size="sm" variant="primary" disabled={!contract.enabled || claimed.includes(b.bountyId) || !web3.address || !!web3.blocker} loading={tx.isBusy(`bounty-claim-${b.bountyId}`)} onClick={() => void claim(b.bountyId)}>{claimed.includes(b.bountyId) ? 'Claimed' : 'Claim bounty'}</Button></div>)}</section>;
 }
 
 /** Solo settlement (SPEC §3.6/§5.3): server validates + signs RunResult → permit (or approve) → settleRun. */
@@ -443,6 +466,7 @@ export default function Play() {
                                 </div>
                             </dl>
                             <SettlePanel levelId={id} result={result} fee={fee} onSettled={() => meta.reload()} />
+                            <BountyClaimStep levelId={id} result={result} owner={lvl?.owner} creator={lvl?.creator} />
                         </>
                     )}
                 </Modal>

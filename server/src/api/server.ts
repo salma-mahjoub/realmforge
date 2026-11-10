@@ -4,6 +4,7 @@ import { levelRoutes } from "./routes/levels.js";
 import { runRoutes } from "./routes/runs.js";
 import { seasonRoutes } from "./routes/season.js";
 import { statsRoutes } from "./routes/stats.js";
+import { bountyRoutes } from "./routes/bounties.js";
 
 const startedAt = Date.now();
 
@@ -37,6 +38,7 @@ export async function buildApi(svc: Services, opts: { logger?: boolean } = {}): 
       contracts: {
         levelNFT: svc.config.LEVEL_NFT_ADDRESS ?? null,
         forgeCoin: svc.config.FORGE_COIN_ADDRESS ?? null,
+        levelBounty: svc.config.LEVEL_BOUNTY_ADDRESS ?? null,
       },
       ipfs: svc.pinner.provider,
       indexer: Object.fromEntries(lastBlocks.map((r) => [r.key, r.value])),
@@ -47,5 +49,6 @@ export async function buildApi(svc: Services, opts: { logger?: boolean } = {}): 
   runRoutes(app, svc);
   statsRoutes(app, svc);
   seasonRoutes(app, svc);
+  bountyRoutes(app, svc);
   return app;
 }

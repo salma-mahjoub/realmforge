@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { toEventSelector, type AbiEvent } from "viem";
-import { clearProofTypes, raceResultTypes, runResultTypes, seasonResultTypes } from "../src/eip712.js";
+import { bountyClaimTypes, clearProofTypes, raceResultTypes, runResultTypes, seasonResultTypes } from "../src/eip712.js";
 import { loadAbi } from "../src/indexer/abi.js";
 
 /** EIP-712 encodeType for flat structs (no nested struct members). */
@@ -17,10 +17,11 @@ const EXPECTED = {
   RunResult: "RunResult(address player,uint256 levelId,uint32 timeMs,bool cleared,uint16 coins,uint256 nonce,uint256 deadline)",
   RaceResult: "RaceResult(bytes32 roomId,address[] ranking,uint256 deadline)",
   SeasonResult: "SeasonResult(uint256 season,address[] players,address[] creators,uint256[] shares)",
+  BountyClaim: "BountyClaim(uint256 bountyId,uint256 levelId,address player,uint32 timeMs,uint256 nonce,uint256 deadline)",
 };
 
 const CONTRACTS = resolve(dirname(fileURLToPath(import.meta.url)), "../../contracts/src");
-const hasContracts = existsSync(resolve(CONTRACTS, "ForgeCoin.sol")) && existsSync(resolve(CONTRACTS, "LevelNFT.sol"));
+const hasContracts = existsSync(resolve(CONTRACTS, "ForgeCoin.sol")) && existsSync(resolve(CONTRACTS, "LevelNFT.sol")) && existsSync(resolve(CONTRACTS, "LevelBounty.sol"));
 
 describe("EIP-712 types match contracts/", () => {
   it("encodeType strings", () => {
@@ -28,18 +29,21 @@ describe("EIP-712 types match contracts/", () => {
     expect(encodeType(runResultTypes)).toBe(EXPECTED.RunResult);
     expect(encodeType(raceResultTypes)).toBe(EXPECTED.RaceResult);
     expect(encodeType(seasonResultTypes)).toBe(EXPECTED.SeasonResult);
+    expect(encodeType(bountyClaimTypes)).toBe(EXPECTED.BountyClaim);
   });
 
   it.skipIf(!hasContracts)("typehash strings and domain names appear verbatim in the Solidity sources", () => {
-    const sol = readFileSync(resolve(CONTRACTS, "LevelNFT.sol"), "utf8") + readFileSync(resolve(CONTRACTS, "ForgeCoin.sol"), "utf8");
+    const sol = readFileSync(resolve(CONTRACTS, "LevelNFT.sol"), "utf8") + readFileSync(resolve(CONTRACTS, "ForgeCoin.sol"), "utf8") + readFileSync(resolve(CONTRACTS, "LevelBounty.sol"), "utf8");
     const flat = sol.replace(/"\s*\n\s*"/g, ""); // tolerate split string literals
     for (const s of Object.values(EXPECTED)) expect(flat).toContain(`"${s}"`);
     expect(sol).toContain('"RealmForge LevelNFT"');
     expect(sol).toContain('"RealmForge ForgeCoin"');
+    expect(sol).toContain('"RealmForge LevelBounty"');
+    expect(sol).toContain('"BountyClaim(uint256 bountyId,uint256 levelId,address player,uint32 timeMs,uint256 nonce,uint256 deadline)"');
   });
 
   it.skipIf(!hasContracts)("exported event ABIs match event declarations in the Solidity sources", () => {
-    const srcs = ["LevelNFT.sol", "ForgeCoin.sol", "interfaces/IForgeCoin.sol"]
+    const srcs = ["LevelNFT.sol", "ForgeCoin.sol", "LevelBounty.sol", "interfaces/IForgeCoin.sol"]
       .map((f) => resolve(CONTRACTS, f))
       .filter(existsSync)
       .map((f) => readFileSync(f, "utf8"))
@@ -47,7 +51,7 @@ describe("EIP-712 types match contracts/", () => {
       .replace(/\s+/g, " ")
       .replace(/\(\s+/g, "(")
       .replace(/\s+\)/g, ")");
-    for (const name of ["LevelNFT", "ForgeCoin"]) {
+    for (const name of ["LevelNFT", "ForgeCoin", "LevelBounty"]) {
       for (const ev of loadAbi(name).filter((x): x is AbiEvent => x.type === "event")) {
         // Events not declared in RealmForge sources (Transfer, Approval, RoleGranted, …) are inherited from OpenZeppelin.
         if (!srcs.includes(`event ${ev.name}(`)) continue;

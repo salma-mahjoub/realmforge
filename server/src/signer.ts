@@ -4,6 +4,8 @@ import { bytesToBigInt, type Address, type Hex } from "viem";
 import {
   clearProofTypes,
   forgeCoinDomain,
+  levelBountyDomain,
+  bountyClaimTypes,
   levelNftDomain,
   raceResultTypes,
   runResultTypes,
@@ -14,6 +16,7 @@ import {
   type RaceResult,
   type RunResult,
   type SeasonResult,
+  type BountyClaim,
 } from "./eip712.js";
 
 export interface SignerOptions {
@@ -21,6 +24,7 @@ export interface SignerOptions {
   chainId: number;
   levelNftAddress?: Address;
   forgeCoinAddress?: Address;
+  levelBountyAddress?: Address;
   /** Validity window for deadlines, seconds. */
   ttlSec?: number;
 }
@@ -33,7 +37,7 @@ export interface Signed<T> {
 
 export class ContractNotConfiguredError extends Error {
   constructor(name: string) {
-    super(`${name} address is not configured (set ${name === "LevelNFT" ? "LEVEL_NFT_ADDRESS" : "FORGE_COIN_ADDRESS"})`);
+    super(`${name} address is not configured (set ${name === "LevelNFT" ? "LEVEL_NFT_ADDRESS" : name === "ForgeCoin" ? "FORGE_COIN_ADDRESS" : "LEVEL_BOUNTY_ADDRESS"})`);
     this.name = "ContractNotConfiguredError";
   }
 }
@@ -56,6 +60,7 @@ export class GameSigner {
   readonly chainId: number;
   readonly levelNftAddress?: Address;
   readonly forgeCoinAddress?: Address;
+  readonly levelBountyAddress?: Address;
   readonly ttlSec: number;
 
   constructor(opts: SignerOptions) {
@@ -63,6 +68,7 @@ export class GameSigner {
     this.chainId = opts.chainId;
     this.levelNftAddress = opts.levelNftAddress;
     this.forgeCoinAddress = opts.forgeCoinAddress;
+    this.levelBountyAddress = opts.levelBountyAddress;
     this.ttlSec = opts.ttlSec ?? 3600;
   }
 
@@ -78,6 +84,18 @@ export class GameSigner {
   private coinDomain() {
     if (!this.forgeCoinAddress) throw new ContractNotConfiguredError("ForgeCoin");
     return forgeCoinDomain(this.chainId, this.forgeCoinAddress);
+  }
+
+  private bountyDomain() {
+    if (!this.levelBountyAddress) throw new ContractNotConfiguredError("LevelBounty");
+    return levelBountyDomain(this.chainId, this.levelBountyAddress);
+  }
+
+  async signBountyClaim(input: Omit<BountyClaim, "nonce" | "deadline"> & { nonce?: bigint; deadline?: bigint }): Promise<Signed<BountyClaim>> {
+    if (!Number.isInteger(input.timeMs) || input.timeMs < 0 || input.timeMs > UINT32_MAX) throw new RangeError("timeMs must fit uint32");
+    const message: BountyClaim = { ...input, nonce: input.nonce ?? generateNonce(), deadline: input.deadline ?? deadlineFromNow(this.ttlSec) };
+    const signature = await this.account.signTypedData({ domain: this.bountyDomain(), types: bountyClaimTypes, primaryType: "BountyClaim", message });
+    return { message, signature, signer: this.address };
   }
 
   async signClearProof(input: { creator: Address; layoutHash: Hex; deadline?: bigint }): Promise<Signed<ClearProof>> {

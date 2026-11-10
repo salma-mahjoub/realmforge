@@ -23,6 +23,7 @@ import type { Address, Hex, TypedDataDomain } from "viem";
 
 export const LEVEL_NFT_DOMAIN_NAME = "RealmForge LevelNFT";
 export const FORGE_COIN_DOMAIN_NAME = "RealmForge ForgeCoin";
+export const LEVEL_BOUNTY_DOMAIN_NAME = "RealmForge LevelBounty";
 export const DOMAIN_VERSION = "1";
 
 export function levelNftDomain(chainId: number, verifyingContract: Address) {
@@ -42,6 +43,23 @@ export function forgeCoinDomain(chainId: number, verifyingContract: Address) {
     verifyingContract,
   } as const satisfies TypedDataDomain;
 }
+
+export function levelBountyDomain(chainId: number, verifyingContract: Address) {
+  return { name: LEVEL_BOUNTY_DOMAIN_NAME, version: DOMAIN_VERSION, chainId, verifyingContract } as const satisfies TypedDataDomain;
+}
+
+export const bountyClaimTypes = {
+  BountyClaim: [
+    { name: "bountyId", type: "uint256" },
+    { name: "levelId", type: "uint256" },
+    { name: "player", type: "address" },
+    { name: "timeMs", type: "uint32" },
+    { name: "nonce", type: "uint256" },
+    { name: "deadline", type: "uint256" },
+  ],
+} as const;
+
+export interface BountyClaim { bountyId: bigint; levelId: bigint; player: Address; timeMs: number; nonce: bigint; deadline: bigint }
 
 export const clearProofTypes = {
   ClearProof: [

@@ -20,6 +20,7 @@ async function main() {
   const contracts = [
     ...(config.LEVEL_NFT_ADDRESS ? [{ name: "LevelNFT" as const, address: config.LEVEL_NFT_ADDRESS }] : []),
     ...(config.FORGE_COIN_ADDRESS ? [{ name: "ForgeCoin" as const, address: config.FORGE_COIN_ADDRESS }] : []),
+    ...(config.LEVEL_BOUNTY_ADDRESS ? [{ name: "LevelBounty" as const, address: config.LEVEL_BOUNTY_ADDRESS }] : []),
   ];
   let indexer: Indexer | null = null;
   if (config.INDEXER_ENABLED && contracts.length > 0) {

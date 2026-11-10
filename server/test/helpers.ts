@@ -9,6 +9,7 @@ export const TEST_KEY = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f46
 export const TEST_SIGNER = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" as const;
 export const LEVEL_NFT = "0x5FbDB2315678afecb367f032d93F642f64180aa3" as const;
 export const FORGE_COIN = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512" as const;
+export const LEVEL_BOUNTY = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0" as const;
 export const PLAYER = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC" as const;
 
 export function testConfig(extra: Record<string, string> = {}) {
@@ -18,6 +19,7 @@ export function testConfig(extra: Record<string, string> = {}) {
     CHAIN_ID: "31337",
     LEVEL_NFT_ADDRESS: LEVEL_NFT,
     FORGE_COIN_ADDRESS: FORGE_COIN,
+    LEVEL_BOUNTY_ADDRESS: LEVEL_BOUNTY,
     DATA_DIR: dir,
     PINATA_JWT: "",
     ...extra,

@@ -104,7 +104,7 @@ const page = `<!doctype html>
   <div class="kicker">RealmForge · Blockchain BK-01</div>
   <h1>${title}</h1>
   <div class="bar"></div>
-  <p>Two smart contracts (LevelNFT, ForgeCoin), one trusted signer, and how every level, run, race and season is settled on-chain.</p>
+  <p>Three contracts (two token contracts plus bounty escrow), one trusted signer, and how levels, runs, races, seasons and bounties settle on-chain.</p>
   <ol>${sections.map((s) => `<li>${s.text.replace(/^\d+\.\s*/, '')}</li>`).join('')}</ol>
   <div class="meta">Generated ${today} from docs/BLOCKCHAIN.md · ${diagrams} diagrams</div>
 </section>

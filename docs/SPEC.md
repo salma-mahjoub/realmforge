@@ -12,7 +12,7 @@ Module: Blockchain BK-01 (team of two) · Target: browser DApp · Chain: Ethereu
 | Platform | **Web only** (desktop and mobile browsers). No native build. |
 | Engine | **Phaser 3 + Matter.js physics**, TypeScript, Vite, React UI shell |
 | Blockchain role | Ownership (levels), economy (token), settlement (rewards, fees). **No gameplay on-chain.** |
-| Contracts | 2 Solidity contracts, **one student per contract**: one NFT, one fungible token |
+| Contracts | 2 core token contracts, **one student per contract**: `LevelNFT` and `ForgeCoin`; a supporting `LevelBounty` contract escrows FORGE bounties |
 | Reuse | Use public, permissively licensed assets and code wherever possible (see §8) |
 | IP | **No Nintendo assets or names.** All art is CC0 (Kenney). "Mario Maker" is only the gameplay reference. |
 
@@ -43,11 +43,13 @@ On-chain physics or level data, a real-money mainnet deployment, native desktop 
                                            │
                      ┌─────────────────────▼───────────────────┐
                      │  LevelNFT (ERC-721)  ◄──►  ForgeCoin (ERC-20) │
+                     │                         ▲                     │
+                     │  LevelBounty (FORGE escrow + EIP-712)         │
                      └─────────────────────────────────────────┘
                                   IPFS: level JSON + thumbnail + metadata
 ```
 
-**Trust model:** The game server is the authority that signs run results. Contracts check the signature, a nonce, a deadline, the chain ID, and the contract address, using EIP-712. This is a deliberate trade-off. Explain it at the oral exam (AA4/AA6).
+**Trust model:** The game server is the authority that signs run results and bounty claims. Contracts check the signature, a nonce, a deadline, the chain ID, and the verifying contract, using EIP-712. This is a deliberate trade-off. Explain it at the oral exam (AA4/AA6).
 
 ---
 
@@ -300,6 +302,7 @@ realmforge/
 ├─ contracts/          # Hardhat 3 or Foundry
 │  ├─ src/LevelNFT.sol          (Student A)
 │  ├─ src/ForgeCoin.sol         (Student B)
+│  ├─ src/LevelBounty.sol       (supporting FORGE escrow)
 │  ├─ src/interfaces/ILevelNFT.sol
 │  ├─ test/                     (unit + fuzz + integration)
 │  └─ script/Deploy.s.sol
@@ -321,6 +324,8 @@ realmforge/
 | Server | IPFS pinning + clear validation | Run signer + Colyseus race settlement |
 | Game (shared) | Editor scene, tiles, properties, undo | Play scene, player controller, enemies, multiplayer |
 | Oral exam | NFT standard, royalties, market security | Tokenomics, signatures, escrow, reentrancy |
+
+`LevelBounty.sol` is a supporting escrow: it uses FORGE and LevelNFT's frozen `levelInfo` view, with its own server-signed `BountyClaim` EIP-712 domain. It does not modify either student's token contract.
 
 ---
 

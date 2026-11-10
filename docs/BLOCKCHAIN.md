@@ -8,12 +8,13 @@ The same file is shown in the app at **/how-it-works** and exported to `docs/Rea
 
 ## 1. The big picture
 
-RealmForge uses **two smart contracts, each with its own token**:
+RealmForge uses two token contracts plus a separate bounty escrow:
 
 | Contract | Standard | What it holds | Owner of the design |
 |---|---|---|---|
 | `LevelNFT` | ERC-721 + ERC-2981 (royalties) + EIP-712 | one NFT per published level, level stats, a fixed-price ETH market | Student A |
 | `ForgeCoin` | ERC-20 + ERC-2612 Permit + Capped + Pausable + EIP-712 | the FORGE token, play fees, rewards, race escrow, season pool | Student B |
+| `LevelBounty` | AccessControl + EIP-712 + pull escrow | sponsor-funded FORGE bounties, winner payouts and post-expiry sponsor refunds | Shared feature |
 
 **No gameplay runs on-chain.** Physics, the editor, multiplayer rooms and run validation all happen off-chain,
 in the browser and on the game server. The chain only holds three things:
@@ -40,6 +41,7 @@ flowchart LR
     subgraph Chain["Ethereum (Hardhat 31337 / Sepolia)"]
         NFT["LevelNFT<br/>ERC-721"]
         FORGE["ForgeCoin<br/>ERC-20"]
+        BOUNTY["LevelBounty<br/>FORGE escrow"]
     end
     IPFS[("IPFS<br/>level JSON + metadata")]
 
@@ -49,6 +51,9 @@ flowchart LR
     Game --> Wallet
     Wallet -- "transaction + signature" --> NFT
     Wallet -- "transaction + signature" --> FORGE
+    Wallet -- "approve + bounty transactions" --> BOUNTY
+    BOUNTY -- "transferFrom / transfer" --> FORGE
+    BOUNTY -- "owner / creator checks" --> NFT
     FORGE -- "recordRun / levelInfo" --> NFT
     NFT -- "events" --> Indexer
     FORGE -- "events" --> Indexer
@@ -74,7 +79,7 @@ Each signed message is bound to:
 | `deadline` (default 1 hour) | using an old or leaked signature later |
 | `player` / `creator` + `msg.sender` check | someone else cashing in my signed run |
 
-The two EIP-712 domains are `RealmForge LevelNFT` and `RealmForge ForgeCoin`, both version `"1"`. The signed
+The EIP-712 domains are `RealmForge LevelNFT`, `RealmForge ForgeCoin`, and `RealmForge LevelBounty`, all version `"1"`. The signed
 types are, word for word:
 
 ```text
@@ -82,9 +87,20 @@ ClearProof(address creator,bytes32 layoutHash,uint256 deadline)
 RunResult(address player,uint256 levelId,uint32 timeMs,bool cleared,uint16 coins,uint256 nonce,uint256 deadline)
 RaceResult(bytes32 roomId,address[] ranking,uint256 deadline)
 SeasonResult(uint256 season,address[] players,address[] creators,uint256[] shares)
+BountyClaim(uint256 bountyId,uint256 levelId,address player,uint32 timeMs,uint256 nonce,uint256 deadline)
 ```
 
 A server test compares these strings with the Solidity source, so the two sides cannot drift apart.
+
+### Level bounties
+
+A sponsor approves `LevelBounty` to spend FORGE, then creates a bounty for an existing level. Other wallets can
+top it up without changing its terms. A target time of zero accepts any validated clear; otherwise the run must
+finish at or below the target. Expiry is optional: after a nonzero expiry, each sponsor can pull back its own
+contribution. A never-expiring bounty has no refund path. The server revalidates a clear and signs
+`BountyClaim`; the player submits it, and the first mined qualifying claim receives the whole escrow. The
+contract rejects the current level owner, original creator, and any sponsor, and marks the bounty claimed before
+transferring FORGE. The `LevelBounty` signer key is a separate role on that contract and uses its own domain.
 
 > **The signer is a centralisation point, and we say so.** Whoever holds the signer key can claim that any run
 > happened. The contracts limit the damage (per-run reward caps, 200 FORGE per player per day, a 100 M supply
@@ -331,7 +347,7 @@ scoring rules are in [`docs/SEASONS.md`](SEASONS.md).
 Reading state straight from the contracts for every list would be slow and would need `ERC721Enumerable`, which
 costs extra storage on every mint. Instead:
 
-- The **indexer** in `server/` follows `LevelNFT` and `ForgeCoin` events with viem, and writes them to SQLite.
+- The **indexer** in `server/` follows `LevelNFT`, `ForgeCoin` and `LevelBounty` events with viem, and writes them to SQLite.
   It remembers the last processed block, so it can restart and catch up.
 - The **API** serves level lists, leaderboards, market listings, profiles and season scores from that database.
 - The **web app** reads small, live values directly with wagmi (your FORGE balance, a race room, the season
@@ -378,21 +394,23 @@ transaction.
 | Hardhat local | 31337 | development (`npm run deploy:local`) |
 | Sepolia | 11155111 | class demo |
 
-Sepolia addresses (from `contracts/ignition/deployments/chain-11155111/deployed_addresses.json`):
+Existing Sepolia addresses (from `contracts/ignition/deployments/chain-11155111/deployed_addresses.json`):
 
 | Contract | Address |
 |---|---|
 | `LevelNFT` | `0xC040D6E51e6e59f1764Bc30c1Cf5fB40E4736f09` |
 | `ForgeCoin` | `0x5d40434c1B59F4f2Be0B986373C074571133421e` |
+| `LevelBounty` | Not deployed on Sepolia yet; local deployment is included in `npm run deploy:local` |
 
-The Ignition module (`contracts/ignition/modules/RealmForge.ts`) deploys in four steps, because ForgeCoin calls
-LevelNFT and LevelNFT must allow it:
+The Ignition module (`contracts/ignition/modules/RealmForge.ts`) deploys the three contracts. ForgeCoin calls
+LevelNFT and LevelNFT must allow it; LevelBounty receives both addresses and the server signer:
 
 ```mermaid
 flowchart LR
     D1["1. deploy ForgeCoin(signer)"] --> D2["2. deploy LevelNFT(signer)"]
     D2 --> D3["3. ForgeCoin.setLevelNFT(levelNFT)<br/>(once only)"]
     D3 --> D4["4. LevelNFT grants GAME_ROLE<br/>to ForgeCoin"]
+    D2 --> D5["deploy LevelBounty(forgeCoin, levelNFT, signer)"]
 ```
 
 After any contract change, `contracts/scripts/export-abi.ts` regenerates the ABIs used by `web/` and `server/`.

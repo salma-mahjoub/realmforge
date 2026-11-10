@@ -5,7 +5,8 @@
  */
 export { levelNFTAbi as levelNftAbi } from './LevelNFT.abi';
 export { forgeCoinAbi } from './ForgeCoin.abi';
+export { levelBountyAbi } from './LevelBounty.abi';
 import addresses from './addresses.json';
 
 /** `{ "<chainId>": { LevelNFT, ForgeCoin } }` read from contracts/ignition/deployments at export time. */
-export const deployedAddresses = addresses as Record<string, { LevelNFT?: string; ForgeCoin?: string }>;
+export const deployedAddresses = addresses as Record<string, { LevelNFT?: string; ForgeCoin?: string; LevelBounty?: string }>;

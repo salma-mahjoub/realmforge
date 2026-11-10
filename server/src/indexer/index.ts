@@ -10,7 +10,7 @@ export interface IndexerOptions {
   db: Db;
   rpcUrl: string;
   chainId: number;
-  contracts: { name: "LevelNFT" | "ForgeCoin"; address: Address }[];
+  contracts: { name: "LevelNFT" | "ForgeCoin" | "LevelBounty"; address: Address }[];
   startBlock?: bigint;
   /** Max blocks per getContractEvents call during backfill. */
   chunkSize?: bigint;

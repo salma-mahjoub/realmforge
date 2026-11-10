@@ -19,11 +19,12 @@ export default buildModule("RealmForgeModule", (m) => {
 
   const forgeCoin = m.contract("ForgeCoin", [signer]);
   const levelNFT = m.contract("LevelNFT", [signer]);
+  const levelBounty = m.contract("LevelBounty", [forgeCoin, levelNFT, signer]);
 
   const linked = m.call(forgeCoin, "setLevelNFT", [levelNFT]);
 
   const gameRole = m.staticCall(levelNFT, "GAME_ROLE", []);
   m.call(levelNFT, "grantRole", [gameRole, forgeCoin], { after: [linked] });
 
-  return { forgeCoin, levelNFT };
+  return { forgeCoin, levelNFT, levelBounty };
 });

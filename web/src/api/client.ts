@@ -3,6 +3,7 @@ import { MOCK_EARNINGS, MOCK_LEADERBOARD, MOCK_LEVELS, MOCK_LISTINGS, MOCK_RECEN
 import { SAMPLE_LEVEL } from '../game/level';
 import { markLive, markMock } from './dataSource';
 import type { LevelFileV1, Theme } from '../game/level/types';
+import type { RunSubmission } from '../game/run';
 import { THEMES } from '../game/level/types';
 import { timeAgo } from '../components/ui/format';
 import type {
@@ -22,6 +23,8 @@ import type {
     RunRejected,
     SubmitRunRequest,
     SubmitRunResponse,
+    BountySummary,
+    BountyClaimProof,
 } from './types';
 
 /** server/ Fastify API (default port 8787, see server/.env.example). */
@@ -85,6 +88,7 @@ export function rowToSummary(r: LevelRow): LevelSummary {
         listedPriceEth: r.listing_price && r.listing_price !== '0' ? formatEther(BigInt(r.listing_price)) : null,
         cid: r.level_cid ?? '',
         thumbnailUrl: r.thumbnail_cid ? `${IPFS_GATEWAY}${r.thumbnail_cid}` : undefined,
+        activeBounties: r.bounty_count ?? 0,
     };
 }
 
@@ -191,6 +195,8 @@ export const api = {
 
     // runs (SPEC §3.6 / §5.2)
     submitRun: (body: SubmitRunRequest) => request<SubmitRunResponse>('/runs/validate', { method: 'POST', json: body }),
+    getBounties: (levelId: number) => request<{ levelId: number; bounties: BountySummary[] }>(`/levels/${levelId}/bounties`),
+    bountyClaimProof: (body: { player: Address; levelId: number; bountyId: number; run: RunSubmission }) => request<BountyClaimProof>('/bounties/claim-proof', { method: 'POST', json: body }),
 };
 
 export function ipfsToHttp(uri: string): string {

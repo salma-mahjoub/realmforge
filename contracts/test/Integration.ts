@@ -53,6 +53,17 @@ const SEASON_RESULT_TYPES = {
   ],
 } as const;
 
+const BOUNTY_CLAIM_TYPES = {
+  BountyClaim: [
+    { name: "bountyId", type: "uint256" },
+    { name: "levelId", type: "uint256" },
+    { name: "player", type: "address" },
+    { name: "timeMs", type: "uint32" },
+    { name: "nonce", type: "uint256" },
+    { name: "deadline", type: "uint256" },
+  ],
+} as const;
+
 const PERMIT_TYPES = {
   Permit: [
     { name: "owner", type: "address" },
@@ -66,7 +77,7 @@ const PERMIT_TYPES = {
 async function deploy() {
   const wallets = await viem.getWalletClients();
   const [deployer, server, creator, player, buyer, permitPlayer] = wallets;
-  const { forgeCoin, levelNFT } = await ignition.deploy(RealmForgeModule, {
+  const { forgeCoin, levelNFT, levelBounty } = await ignition.deploy(RealmForgeModule, {
     parameters: { RealmForgeModule: { signer: server.account.address } },
   });
   const publicClient = await viem.getPublicClient();
@@ -85,6 +96,7 @@ async function deploy() {
     chainId,
     verifyingContract: forgeCoin.address,
   } as const;
+  const bountyDomain = { name: "RealmForge LevelBounty", version: "1", chainId, verifyingContract: levelBounty.address } as const;
 
   async function signClearProof(creatorAddr: Address, layoutHash: `0x${string}`, deadline: bigint) {
     return server.signTypedData({
@@ -135,20 +147,39 @@ async function deploy() {
 
   return {
     deployer, server, creator, player, buyer, permitPlayer, wallets,
-    forgeCoin, levelNFT, publicClient, now, coinDomain,
+    forgeCoin, levelNFT, levelBounty, publicClient, now, coinDomain, bountyDomain,
     signClearProof, runResult, signRun, signRace, signSeason, publishLevel,
   };
 }
 
 describe("RealmForge integration", async () => {
   it("Ignition module deploys, links and grants GAME_ROLE (SPEC §6)", async () => {
-    const { forgeCoin, levelNFT, server } = await deploy();
+    const { forgeCoin, levelNFT, levelBounty, server } = await deploy();
     assert.equal((await forgeCoin.read.levelNFT()).toLowerCase(), levelNFT.address.toLowerCase());
     assert.equal((await forgeCoin.read.signer()).toLowerCase(), server.account.address.toLowerCase());
     const gameRole = await levelNFT.read.GAME_ROLE();
     assert.equal(await levelNFT.read.hasRole([gameRole, forgeCoin.address]), true);
     const signerRole = await levelNFT.read.SIGNER_ROLE();
     assert.equal(await levelNFT.read.hasRole([signerRole, server.account.address]), true);
+    assert.equal((await levelBounty.read.forge()).toLowerCase(), forgeCoin.address.toLowerCase());
+    assert.equal((await levelBounty.read.levelNFT()).toLowerCase(), levelNFT.address.toLowerCase());
+    const bountySignerRole = await levelBounty.read.SIGNER_ROLE();
+    assert.equal(await levelBounty.read.hasRole([bountySignerRole, server.account.address]), true);
+  });
+
+  it("first validated clear claim receives the escrowed FORGE bounty once", async () => {
+    const ctx = await deploy();
+    const { forgeCoin, levelBounty, server, deployer, player, bountyDomain, now } = ctx;
+    const levelId = await ctx.publishLevel("bounty-target", 0n);
+    await forgeCoin.write.claimFaucet([], { account: deployer.account });
+    const amount = parseEther("20");
+    await forgeCoin.write.approve([levelBounty.address, amount], { account: deployer.account });
+    await levelBounty.write.createBounty([levelId, amount, 10_000, 0n], { account: deployer.account });
+    const claim = { bountyId: 1n, levelId, player: player.account.address, timeMs: 9_000, nonce: 88n, deadline: now + 3600n };
+    const signature = await server.signTypedData({ domain: bountyDomain, types: BOUNTY_CLAIM_TYPES, primaryType: "BountyClaim", message: claim });
+    await levelBounty.write.claim([claim, signature], { account: player.account });
+    assert.equal(await forgeCoin.read.balanceOf([player.account.address]), amount);
+    await assert.rejects(levelBounty.write.claim([claim, signature], { account: player.account }));
   });
 
   it("publish → settleRun → recordRun → buy NFT → new owner receives the fees", async () => {

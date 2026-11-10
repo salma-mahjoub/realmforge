@@ -166,6 +166,10 @@ export function applyLog(db: Db, log: DecodedLog): boolean {
       case "RaceRefunded":
         db.prepare("UPDATE races SET status = 'refunded', updated_block = ? WHERE room_id = ?").run(block, lc(a.roomId));
         break;
+      case "BadgeClaimed":
+        db.prepare("INSERT OR IGNORE INTO badge_claims (holder, badge_id, ref, tx_hash) VALUES (?, ?, ?, ?)")
+          .run(lc(a.holder), n(a.badgeId), s(a.ref), txHash);
+        break;
       default:
         // FaucetClaimed, Race*, SignerUpdated, ... : recorded as processed only.
         break;

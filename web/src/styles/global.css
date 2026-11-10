@@ -403,6 +403,17 @@ a.level-card:hover .thumb img, .market-card:hover .thumb img { transform: scale(
 .profile-id { display: flex; align-items: center; gap: var(--s-4); min-width: 0; }
 .profile-id .page-title { font-size: var(--fs-2xl); display: flex; }
 .profile-wallet { display: flex; gap: var(--s-6); align-items: center; flex-wrap: wrap; }
+.profile-badges { margin: var(--s-8) 0; }
+.profile-badges .section-heading { display: flex; justify-content: space-between; align-items: end; margin-bottom: var(--s-4); }
+.profile-badges h2 { margin: var(--s-1) 0 0; }
+.badge-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr)); gap: var(--s-3); }
+.achievement-card { display: flex; align-items: center; gap: var(--s-3); min-width: 0; }
+.badge-art { width: 58px; height: 58px; flex: 0 0 auto; color: var(--gold); }
+.badge-art-2 { color: var(--violet-ink); }
+.badge-art-3 { color: var(--green); }
+.badge-art-4 { color: var(--cyan); }
+.achievement-copy { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 4px; }
+.achievement-copy span { color: var(--text-muted); font-size: var(--fs-sm); }
 .profile-balance { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
 .faucet-cta { display: flex; align-items: center; gap: var(--s-4); padding: var(--s-3) var(--s-4); border-radius: var(--r-md); background: var(--gold-soft); border: 1px solid var(--gold-line); }
 .faucet-cta > div > b { display: block; color: var(--gold); }

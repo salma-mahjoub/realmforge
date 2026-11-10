@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { formatEther, isAddress, type Address } from 'viem';
 import { useReadContract, useWriteContract } from 'wagmi';
-import { Droplets, Hammer, History, Layers, RefreshCw, Trophy, UserX, Wallet } from 'lucide-react';
+import { Droplets, Hammer, History, Layers, RefreshCw, Trophy, UserX, Wallet, Medal } from 'lucide-react';
 import { api } from '../api/client';
 import { useMockData } from '../api/dataSource';
 import { AddressChip, Avatar, Badge, Button, Card, EmptyState, LevelGrid, Skeleton, Stat, Tabs, TokenAmount, formatMs, shortAddr } from '../components/ui';
 import { useAsync } from '../components/useAsync';
 import { useFaucet, useForgeBalance } from '../contracts/hooks';
-import { levelNftAbi } from '../contracts/generated';
+import { levelNftAbi, realmBadgesAbi } from '../contracts/generated';
 import { getAddresses } from '../contracts/addresses';
 import { useServiceStatus, useTxFlow, useWeb3Status } from '../web3/tx';
 import { BlockerNotice } from '../components/BlockerNotice';
@@ -22,15 +22,17 @@ export default function Profile() {
     const web3 = useWeb3Status();
     const svc = useServiceStatus();
     const { data: p, error, reload } = useAsync(() => (valid ? api.getProfile(address) : Promise.reject(new Error('invalid'))), [param]);
+    const { data: badges, reload: reloadBadges } = useAsync(() => (valid ? api.getBadges(address) : Promise.reject(new Error('invalid'))), [param]);
     const bal = useForgeBalance(valid ? address : undefined);
     const faucet = useFaucet();
     const tx = useTxFlow();
     const mock = useMockData('/profiles/:address');
     const [tab, setTab] = useState<Tab>('created');
     const isMe = web3.address?.toLowerCase() === param.toLowerCase();
-    const { levelNFT } = getAddresses(web3.chainId);
+    const { levelNFT, realmBadges } = getAddresses(web3.chainId);
     const pending = useReadContract({ address: levelNFT, abi: levelNftAbi, functionName: 'pendingWithdrawals', args: [address], query: { enabled: valid && web3.contractsReady } });
     const withdrawW = useWriteContract();
+    const badgeW = useWriteContract();
 
     if (!valid) {
         return (
@@ -55,6 +57,11 @@ export default function Profile() {
     const claim = () => void tx.run('faucet', { title: 'Claim 100 FORGE', success: '100 FORGE added to your wallet' }, faucet.claim).then((r) => r.ok && void bal.refetch());
     const withdraw = () =>
         void tx.run('withdraw', { title: 'Withdraw sales + royalties', success: 'ETH sent to your wallet' }, () => withdrawW.writeContractAsync({ address: levelNFT, abi: levelNftAbi, functionName: 'withdraw', args: [] })).then((r) => r.ok && void pending.refetch());
+    const claimBadge = (badgeId: number, ref: string, name: string) => void tx.run('badge', { title: `Claim ${name}`, success: `${name} badge minted` }, async () => {
+        const proof = await api.getBadgeClaimProof(address, badgeId, ref);
+        const m = proof.message;
+        return badgeW.writeContractAsync({ address: realmBadges, abi: realmBadgesAbi, functionName: 'claim', args: [{ holder: m.holder, badgeId: BigInt(m.badgeId), ref: BigInt(m.ref), nonce: BigInt(m.nonce), deadline: BigInt(m.deadline) }, proof.signature] });
+    }).then((r) => r.ok && void reloadBadges());
 
     return (
         <div className="page page-profile">
@@ -106,6 +113,20 @@ export default function Profile() {
                 <Stat icon={<Trophy size={20} />} label="Clears" value={p?.clears ?? '—'} loading={!p} />
                 <Stat icon={<History size={20} />} label="Best rank" value={p?.bestRank ? `#${p.bestRank}` : '—'} loading={!p} />
             </div>
+
+            <section className="profile-badges" aria-labelledby="profile-badges-title">
+                <div className="section-heading"><div><span className="eyebrow">ACHIEVEMENTS</span><h2 id="profile-badges-title">Badges</h2></div><span className="fine">Soulbound ERC-1155 · earned in game</span></div>
+                {badges ? <div className="badge-grid">
+                    {[...badges.earned.map((b) => ({ ...b, earned: true, description: `Claimed on-chain · ${b.hash.slice(0, 10)}…` })), ...badges.claimable.map((b) => ({ ...b, earned: false }))].map((b) => (
+                        <Card key={`${b.badgeId}:${b.ref}`} className="achievement-card">
+                            <BadgeArt badgeId={b.badgeId} />
+                            <div className="achievement-copy"><strong>{b.name}</strong><span>{b.description}</span></div>
+                            {b.earned ? <Badge tone="gold">Earned</Badge> : isMe ? realmBadges === '0x0000000000000000000000000000000000000000' ? <Badge tone="neutral">Unavailable on this chain</Badge> : <Button size="sm" variant="gold" loading={tx.isBusy('badge')} onClick={() => claimBadge(b.badgeId, b.ref, b.name)}>Claim</Button> : <Badge tone="violet">Claimable</Badge>}
+                        </Card>
+                    ))}
+                    {!badges.earned.length && !badges.claimable.length && <EmptyState icon={<Medal size={24} />} title="No badges yet">Clear a level, set a record, win a race, or publish a level to earn your first badge.</EmptyState>}
+                </div> : <Skeleton w="100%" h={72} />}
+            </section>
 
             <Tabs
                 label="Profile sections"
@@ -173,4 +194,14 @@ export default function Profile() {
             </div>
         </div>
     );
+}
+
+function BadgeArt({ badgeId }: { badgeId: number }) {
+    const glyph = ({ 1: '1st', 2: 'REC', 3: 'WIN', 4: 'MAKE' } as Record<number, string>)[badgeId] ?? '?';
+    return <svg className={`badge-art badge-art-${badgeId}`} viewBox="0 0 72 72" role="img" aria-label={`${glyph} badge`}>
+        <rect width="72" height="72" rx="18" fill="var(--surface-2)" />
+        <circle cx="36" cy="31" r="23" fill="none" stroke="currentColor" strokeWidth="4" />
+        <text x="36" y="35" textAnchor="middle" fill="currentColor" fontSize="12" fontWeight="800">{glyph}</text>
+        <path d="m26 52-4 15 14-7 14 7-4-15" fill="currentColor" opacity=".8" />
+    </svg>;
 }

@@ -53,6 +53,16 @@ const SEASON_RESULT_TYPES = {
   ],
 } as const;
 
+const BADGE_CLAIM_TYPES = {
+  BadgeClaim: [
+    { name: "holder", type: "address" },
+    { name: "badgeId", type: "uint256" },
+    { name: "ref", type: "uint256" },
+    { name: "nonce", type: "uint256" },
+    { name: "deadline", type: "uint256" },
+  ],
+} as const;
+
 const PERMIT_TYPES = {
   Permit: [
     { name: "owner", type: "address" },
@@ -66,7 +76,7 @@ const PERMIT_TYPES = {
 async function deploy() {
   const wallets = await viem.getWalletClients();
   const [deployer, server, creator, player, buyer, permitPlayer] = wallets;
-  const { forgeCoin, levelNFT } = await ignition.deploy(RealmForgeModule, {
+  const { forgeCoin, levelNFT, realmBadges } = await ignition.deploy(RealmForgeModule, {
     parameters: { RealmForgeModule: { signer: server.account.address } },
   });
   const publicClient = await viem.getPublicClient();
@@ -136,19 +146,44 @@ async function deploy() {
   return {
     deployer, server, creator, player, buyer, permitPlayer, wallets,
     forgeCoin, levelNFT, publicClient, now, coinDomain,
+    realmBadges,
     signClearProof, runResult, signRun, signRace, signSeason, publishLevel,
   };
 }
 
 describe("RealmForge integration", async () => {
   it("Ignition module deploys, links and grants GAME_ROLE (SPEC §6)", async () => {
-    const { forgeCoin, levelNFT, server } = await deploy();
+    const { forgeCoin, levelNFT, realmBadges, server } = await deploy();
     assert.equal((await forgeCoin.read.levelNFT()).toLowerCase(), levelNFT.address.toLowerCase());
     assert.equal((await forgeCoin.read.signer()).toLowerCase(), server.account.address.toLowerCase());
     const gameRole = await levelNFT.read.GAME_ROLE();
     assert.equal(await levelNFT.read.hasRole([gameRole, forgeCoin.address]), true);
     const signerRole = await levelNFT.read.SIGNER_ROLE();
     assert.equal(await levelNFT.read.hasRole([signerRole, server.account.address]), true);
+    assert.equal((await realmBadges.read.signer()).toLowerCase(), server.account.address.toLowerCase());
+    const badgeDomain = await realmBadges.read.eip712Domain();
+    assert.equal(badgeDomain[1], "RealmForge Badges");
+    assert.equal(badgeDomain[2], "1");
+  });
+
+  it("server-signed EIP-712 badge claim mints a non-transferable ERC-1155", async () => {
+    const { realmBadges, server, player, publicClient } = await deploy();
+    const message = {
+      holder: player.account.address,
+      badgeId: 4n,
+      ref: 7n,
+      nonce: 123n,
+      deadline: (await publicClient.getBlock()).timestamp + 3600n,
+    };
+    const signature = await server.signTypedData({
+      domain: { name: "RealmForge Badges", version: "1", chainId: await publicClient.getChainId(), verifyingContract: realmBadges.address },
+      types: BADGE_CLAIM_TYPES,
+      primaryType: "BadgeClaim",
+      message,
+    });
+    await realmBadges.write.claim([message, signature], { account: player.account });
+    assert.equal(await realmBadges.read.balanceOf([player.account.address, 4n]), 1n);
+    assert.equal(await realmBadges.read.claimed([player.account.address, 4n, 7n]), true);
   });
 
   it("publish → settleRun → recordRun → buy NFT → new owner receives the fees", async () => {

@@ -18,7 +18,7 @@ const emit = (eventName: string, args: Record<string, unknown>, tx = `0x${(++log
   applyLog(svc.db, { eventName, args, blockNumber: block++, transactionHash: tx, logIndex: ++logIndex });
 
 beforeAll(async () => {
-  svc = testServices();
+  svc = testServices({ REALM_BADGES_ADDRESS: "0x0000000000000000000000000000000000001234" });
   app = await buildApi(svc);
   emit("LevelPublished", { id: 1n, creator: CREATOR, layoutHash: "0x" + "11".repeat(32), parentId: 0n, playFee: 10n * E18 });
   // one paid, cleared run by PLAYER: LevelNFT.recordRun + ForgeCoin events of the same transaction
@@ -61,6 +61,25 @@ describe("indexed ForgeCoin events", () => {
 });
 
 describe("stats routes", () => {
+  it("shows event-earned badges and signs eligible single-use claim proofs", async () => {
+    emit("RunRecorded", { id: 1n, player: OTHER, timeMs: 7000, cleared: true });
+    const body = (await app.inject({ method: "GET", url: `/profiles/${OTHER}/badges` })).json();
+    expect(body.claimable).toEqual(expect.arrayContaining([expect.objectContaining({ badgeId: 1, ref: "1", name: "First Clear" })]));
+    const creatorBadges = (await app.inject({ method: "GET", url: `/profiles/${PLAYER}/badges` })).json();
+    expect(creatorBadges.claimable).toEqual(expect.arrayContaining([expect.objectContaining({ badgeId: 2, ref: "1", name: "Record Holder" })]));
+    expect(creatorBadges.claimable).not.toEqual(expect.arrayContaining([expect.objectContaining({ badgeId: 1, ref: "1" })]));
+    const proof = await app.inject({ method: "POST", url: "/badges/claim-proof", payload: { holder: OTHER, badgeId: 1, ref: "1" } });
+    expect(proof.statusCode).toBe(200);
+    expect(proof.json().message).toMatchObject({ holder: OTHER, badgeId: "1", ref: "1" });
+    const invalid = await app.inject({ method: "POST", url: "/badges/claim-proof", payload: { holder: PLAYER, badgeId: 1, ref: "1" } });
+    expect(invalid.statusCode).toBe(403);
+    emit("BadgeClaimed", { holder: OTHER, badgeId: 1n, ref: 1n });
+    const after = (await app.inject({ method: "GET", url: `/profiles/${OTHER}/badges` })).json();
+    expect(after.earned).toEqual(expect.arrayContaining([expect.objectContaining({ badgeId: 1, ref: "1", name: "First Clear" })]));
+    expect(after.claimable).not.toEqual(expect.arrayContaining([expect.objectContaining({ badgeId: 1, ref: "1" })]));
+    expect((await app.inject({ method: "POST", url: "/badges/claim-proof", payload: { holder: OTHER, badgeId: 1, ref: "1" } })).statusCode).toBe(409);
+  });
+
   it("GET /levels/:id/activity lists the level's events, newest first", async () => {
     const res = await app.inject({ method: "GET", url: "/levels/1/activity" });
     expect(res.statusCode).toBe(200);
@@ -99,5 +118,19 @@ describe("stats routes", () => {
     const body = (await app.inject({ method: "GET", url: "/market/listings" })).json();
     expect(body.items).toHaveLength(1);
     expect(body.items[0]).toMatchObject({ id: 1, listing_price: (10n ** 17n).toString() });
+  });
+
+  it("derives creator and race badges from their indexed events and excludes a creator's own first clear", async () => {
+    const room = `0x${"ef".repeat(32)}`;
+    emit("RaceCreated", { roomId: room, levelId: 1n, creator: OTHER, stake: E18 });
+    emit("RaceSettled", { roomId: room, first: PLAYER, second: OTHER, pot: 2n * E18 });
+    emit("LevelPublished", { id: 2n, creator: PLAYER, layoutHash: "0x" + "22".repeat(32), parentId: 0n, playFee: 0n });
+    emit("RunRecorded", { id: 2n, player: PLAYER, timeMs: 4000, cleared: true });
+    const body = (await app.inject({ method: "GET", url: `/profiles/${PLAYER}/badges` })).json();
+    expect(body.claimable).toEqual(expect.arrayContaining([
+      expect.objectContaining({ badgeId: 3, ref: BigInt(room).toString(), name: "Race Winner" }),
+      expect.objectContaining({ badgeId: 4, ref: "2", name: "Creator" }),
+    ]));
+    expect(body.claimable).not.toEqual(expect.arrayContaining([expect.objectContaining({ badgeId: 1, ref: "2" })]));
   });
 });

@@ -7,9 +7,9 @@
  *   EXPORT_ABI_OUT=/tmp/abi npm run export-abi
  *
  * Output:
- *   <out>/LevelNFT.abi.ts, ForgeCoin.abi.ts   `export const levelNFTAbi = [...] as const` (viem/wagmi typed)
- *   <out>/LevelNFT.json, ForgeCoin.json       { contractName, abi }
- *   <out>/addresses.json                      { "<chainId>": { "LevelNFT": "0x..", "ForgeCoin": "0x.." } }
+ *   <out>/*.abi.ts   `export const <contract>Abi = [...] as const` (viem/wagmi typed)
+ *   <out>/*.json     { contractName, abi }
+ *   <out>/addresses.json { "<chainId>": { "LevelNFT", "ForgeCoin", "RealmBadges" } }
  *
  * The web/ and server/ directories belong to other owners: this script is only run on purpose by them
  * (or the coordinator); contracts/ never writes there automatically.
@@ -26,6 +26,7 @@ export const EXPORT_CONFIG = {
   contracts: [
     { name: "LevelNFT", source: "src/LevelNFT.sol", constName: "levelNFTAbi" },
     { name: "ForgeCoin", source: "src/ForgeCoin.sol", constName: "forgeCoinAbi" },
+    { name: "RealmBadges", source: "src/RealmBadges.sol", constName: "realmBadgesAbi" },
   ],
   ignitionModuleId: "RealmForgeModule",
 } as const;

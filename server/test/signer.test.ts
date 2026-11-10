@@ -8,10 +8,12 @@ import {
   runResultTypes,
   seasonResultTypes,
 } from "../src/eip712.js";
-import { GameSigner, generateNonce, ContractNotConfiguredError } from "../src/signer.js";
+import { GameSigner, generateNonce, ContractNotConfiguredError, badgeClaimTypes } from "../src/signer.js";
 import { FORGE_COIN, LEVEL_NFT, PLAYER, TEST_KEY, TEST_SIGNER } from "./helpers.js";
 
 const signer = new GameSigner({ privateKey: TEST_KEY, chainId: 31337, levelNftAddress: LEVEL_NFT, forgeCoinAddress: FORGE_COIN });
+const BADGES = "0x0000000000000000000000000000000000001234" as const;
+const badgeSigner = new GameSigner({ privateKey: TEST_KEY, chainId: 31337, realmBadgesAddress: BADGES });
 
 describe("GameSigner (EIP-712)", () => {
   it("derives the expected signer address", () => {
@@ -87,6 +89,15 @@ describe("GameSigner (EIP-712)", () => {
         signature: season.signature,
       }),
     ).toBe(true);
+  });
+
+  it("BadgeClaim binds holder, badge, ref, chain and RealmBadges address", async () => {
+    const { message, signature } = await badgeSigner.signBadgeClaim({ holder: PLAYER, badgeId: 4n, ref: 8n });
+    const domain = { name: "RealmForge Badges", version: "1", chainId: 31337, verifyingContract: BADGES } as const;
+    expect(message).toMatchObject({ holder: PLAYER, badgeId: 4n, ref: 8n });
+    expect(await verifyTypedData({ address: TEST_SIGNER, domain, types: badgeClaimTypes, primaryType: "BadgeClaim", message, signature })).toBe(true);
+    expect(await verifyTypedData({ address: TEST_SIGNER, domain: { ...domain, chainId: 1 }, types: badgeClaimTypes, primaryType: "BadgeClaim", message, signature })).toBe(false);
+    expect(await verifyTypedData({ address: TEST_SIGNER, domain: { ...domain, verifyingContract: FORGE_COIN }, types: badgeClaimTypes, primaryType: "BadgeClaim", message, signature })).toBe(false);
   });
 
   it("rejects out-of-range uint32/uint16 fields and missing contract addresses", async () => {

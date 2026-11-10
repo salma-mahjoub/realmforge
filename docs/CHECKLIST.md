@@ -129,6 +129,13 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] Season ranking + signing: `GET /season/current`, `POST /season/close-proof` (rules of `docs/SEASONS.md`), proven against the real `closeSeason` (`npm run e2e:season`)
 - [ ] Persisting race results, reconnect handling
 
+## 5a. Soulbound achievement badges
+- [x] `RealmBadges` ERC-1155 contract, EIP-712 claims, single-use `(holder, badge, ref)`, and soulbound restrictions
+- [x] Indexer-derived first-clear, record-holder, race-winner, and creator eligibility; claim-proof API and indexed claims
+- [x] Profile badges section with art and wallet claim transactions
+
+Badge feature verification — 10 November 2026: `npx hardhat test` — 103 passing (92 Solidity, 11 node); `server/npm test` — 62 passing; `game-core/npm test` — 87 passing; `web/npx vitest run` — 79 passing; root `npm run build` passes.
+
 ## 6. Integration and operations
 - [x] Private GitHub repo: https://github.com/MedSlimane/realmforge
 - [x] CI workflow written (`.github/workflows/ci.yml`)

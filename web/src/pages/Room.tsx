@@ -438,6 +438,16 @@ function RaceRoom({ code }: { code: string }) {
                     <Radio size={14} aria-hidden /> {online === 'live' ? 'Ping 32ms' : online === 'demo' ? 'Offline: sample players, moves are not synced' : 'Reaching the game server…'}
                 </span>
             </header>
+            {joinError && web3.address && joinNeedsSignIn && (
+                <div className="notice notice-error" role="alert">
+                    <span>
+                        <b>Wallet signature required.</b> {joinError} What you see below is a demo lobby, not your race.
+                    </span>
+                    <Button size="sm" variant="primary" icon={<KeyRound size={14} aria-hidden />} onClick={() => setJoinAttempt((n) => n + 1)}>
+                        Sign in and join
+                    </Button>
+                </div>
+            )}
 
             <div className="race-layout">
                 <Card className="lobby">
@@ -505,16 +515,6 @@ function RaceRoom({ code }: { code: string }) {
                             </div>
                         ))}
                     </dl>
-                    {joinError && web3.address && joinNeedsSignIn && (
-                        <div className="notice notice-error" role="alert">
-                            <span>
-                                <b>Wallet signature required.</b> {joinError} What you see below is a demo lobby, not your race.
-                            </span>
-                            <Button size="sm" variant="primary" icon={<KeyRound size={14} aria-hidden />} onClick={() => setJoinAttempt((n) => n + 1)}>
-                                Sign in and join
-                            </Button>
-                        </div>
-                    )}
                     {joinError && web3.address && !joinNeedsSignIn && (
                         <div className="notice notice-error" role="alert">
                             <span>Could not join the live room ({joinError}). What you see is a demo lobby with sample players and a sample level, not your race.</span>

@@ -28,6 +28,8 @@ export interface JoinOptions {
     /** bytes32 race id from ForgeCoin.createRaceRoom (derived from the room id when omitted). */
     raceId?: string;
     minPlayers?: number;
+    /** Room capacity (1–4); a co-op room sets it to the team size. */
+    maxPlayers?: number;
     /** FORGE stake (decimal string) — escrow happens on-chain (createRaceRoom/joinRace), not in the room. */
     stake?: string;
 }

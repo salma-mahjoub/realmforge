@@ -1,0 +1,16 @@
+/* Co-op page (pages/Coop.tsx): reuses the race lobby/stage layout; only the team result is new. */
+.page-coop .ranking li { justify-content: flex-start; }
+.coop-flag { margin-left: auto; padding-left: var(--s-3); color: var(--gold); font-variant-numeric: tabular-nums; font-weight: 600; }
+.coop-result { margin-top: var(--s-4); display: flex; flex-direction: column; gap: var(--s-3); }
+.coop-result.is-clear { border-color: var(--gold-line); background: linear-gradient(180deg, var(--gold-soft), transparent 60%), var(--surface); }
+.coop-result.is-fail { border-color: var(--line-strong); }
+.coop-stats { background: var(--bg-sunken); border-radius: var(--r-md); }
+.coop-splits { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s-2); }
+.coop-splits li { display: flex; align-items: center; gap: var(--s-3); padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface-2); }
+.coop-splits li.is-you { border-color: var(--violet-line); }
+.coop-splits b { margin-left: auto; font-variant-numeric: tabular-nums; }
+.coop-split-name { display: inline-flex; align-items: center; gap: 6px; }
+.coop-claim { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; padding-top: var(--s-3); border-top: 1px solid var(--line); }
+.coop-claim > .fine { flex: 1; min-width: 220px; }
+.coop-error { color: var(--red); flex-basis: 100%; }
+@media (max-width: 720px) { .coop-stats { grid-template-columns: 1fr; } .coop-stats > .stat + .stat { border-left: 0; border-top: 1px solid var(--line); } }

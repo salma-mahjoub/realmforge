@@ -3,6 +3,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const { walletScript, WEB, RPC } = require('./wallet.cjs');
 const EXE = process.env.CHROME_PATH || undefined; // default: Playwright's bundled Chromium
 const CREATOR = '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC'; // Hardhat #2
+const LEVEL_FILE = process.env.LEVEL_FILE || 'demo-sprint.level.v1.json';
 const shot = (p, n) => p.screenshot({ path: `${__dirname}/shots/${n}.png` }).then(() => console.log('shot', n));
 
 async function connect(page) {
@@ -37,12 +38,12 @@ async function holdRightUntil(page, doneText, ms = 15000) {
   const browser = await chromium.launch({ ...(EXE ? { executablePath: EXE } : {}), args: ['--use-gl=angle', '--enable-unsafe-swiftshader'] });
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   page.on('pageerror', (e) => console.log('PAGEERROR', e.message));
-  await page.addInitScript({ content: walletScript(CREATOR) });
-  await page.goto(WEB + '/editor', { waitUntil: 'networkidle' });
+  await page.addInitScript({ content: walletScript(CREATOR, RPC) });
+  await page.goto(`${WEB}/editor`, { waitUntil: 'networkidle' });
   await connect(page);
   await shot(page, '01-connected');
 
-  const lvl = JSON.parse(require('fs').readFileSync(`${__dirname}/demo-sprint.level.v1.json`, 'utf8'));
+  const lvl = JSON.parse(require('fs').readFileSync(`${__dirname}/${LEVEL_FILE}`, 'utf8'));
   const n = Number(process.env.VARIANT ?? Date.now() % 6);
   lvl.entities[1].x = 9 + n; lvl.meta.name = n ? `Demo Sprint ${n + 1}` : 'Demo Sprint';
   require('fs').writeFileSync(`${__dirname}/variant.level.v1.json`, JSON.stringify(lvl));

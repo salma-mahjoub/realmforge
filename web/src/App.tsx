@@ -14,6 +14,7 @@ const Season = lazy(() => import('./pages/Season'));
 const EditorPage = lazy(() => import('./pages/editor/EditorPage'));
 const Play = lazy(() => import('./pages/Play'));
 const Room = lazy(() => import('./pages/Room'));
+const Coop = lazy(() => import('./pages/Coop'));
 const HowItWorks = lazy(() => import('./pages/HowItWorks'));
 
 function NotFound() {
@@ -56,6 +57,7 @@ export default function App() {
                     <Route path="editor" element={<Suspense fallback={<RouteFallback />}><EditorPage /></Suspense>} />
                     <Route path="play/:id" element={<Suspense fallback={<RouteFallback />}><Play /></Suspense>} />
                     <Route path="room/:code" element={<Suspense fallback={<RouteFallback />}><Room /></Suspense>} />
+                    <Route path="coop/:code" element={<Suspense fallback={<RouteFallback />}><Coop /></Suspense>} />
                     <Route path="profile/:address" element={<Suspense fallback={<RouteFallback />}><Profile /></Suspense>} />
                     <Route path="market" element={<Suspense fallback={<RouteFallback />}><Market /></Suspense>} />
                     <Route path="season" element={<Suspense fallback={<RouteFallback />}><Season /></Suspense>} />

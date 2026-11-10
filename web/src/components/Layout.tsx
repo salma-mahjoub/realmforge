@@ -26,6 +26,7 @@ const NAV = [
     { to: '/browse', label: 'Browse' },
     { to: '/editor', label: 'Editor' },
     { to: '/room/new', label: 'Race', match: '/room' },
+    { to: '/coop/new', label: 'Co-op', match: '/coop' },
     { to: '/market', label: 'Market' },
     { to: '/season', label: 'Season' },
     { to: '/how-it-works', label: 'How it works' },

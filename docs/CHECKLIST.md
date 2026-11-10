@@ -129,6 +129,7 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] Profile / market / activity / earnings endpoints (indexer now handles FeeSplit, FeeBurned, SeasonClosed)
 - [x] `GET /levels/:id/remixes`: remix lineage (ancestors root first, direct children with their remix counts, subtree size) over the indexed `parent_id`
 - [x] Season ranking + signing: `GET /season/current`, `POST /season/close-proof` (rules of `docs/SEASONS.md`), proven against the real `closeSeason` (`npm run e2e:season`)
+- [x] Co-op UI (`/coop/new`, `/coop/:code`, nav “Co-op”): create a room (team of 2–4, no stake) or join by code, ready-up lobby, 3-2-1 towards the server's startAt, `CoopScene` (RaceScene networking + shared checkpoints: a fall respawns at the furthest checkpoint anyone reached, a teammate's checkpoints count for the flag), team result (team time = last arrival, combined time, splits) and per-player claim of the signed RunResult. Browser E2E `scripts/browser-e2e/coop.cjs` (two wallets: shared checkpoint, respawn at it after a real fall, team clear, 0 strikes, reward claimed on-chain)
 - [ ] Persisting race results, reconnect handling
 
 ## 6. Integration and operations

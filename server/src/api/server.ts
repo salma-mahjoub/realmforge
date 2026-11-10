@@ -8,6 +8,7 @@ import { runRoutes } from "./routes/runs.js";
 import { seasonRoutes } from "./routes/season.js";
 import { statsRoutes } from "./routes/stats.js";
 import { badgeRoutes } from "./routes/badges.js";
+import { relayRoutes } from "./routes/relay.js";
 
 const startedAt = Date.now();
 
@@ -56,5 +57,6 @@ export async function buildApi(svc: Services, opts: { logger?: boolean } = {}): 
   statsRoutes(app, svc);
   badgeRoutes(app, svc);
   seasonRoutes(app, svc);
+  relayRoutes(app, svc);
   return app;
 }

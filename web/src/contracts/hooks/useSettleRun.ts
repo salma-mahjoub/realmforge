@@ -25,6 +25,13 @@ export function useSettleRun() {
     const client = usePublicClient();
     const tx = useTx();
     const typed = useSignTypedData();
+    const authorizeRun = (result: RunResult) => typed.signTypedDataAsync({
+        domain: { name: 'RealmForge ForgeCoin', version: '1', chainId, verifyingContract: forgeCoin },
+        types: { RunResult: [
+            { name: 'player', type: 'address' }, { name: 'levelId', type: 'uint256' }, { name: 'timeMs', type: 'uint32' },
+            { name: 'cleared', type: 'bool' }, { name: 'coins', type: 'uint16' }, { name: 'nonce', type: 'uint256' }, { name: 'deadline', type: 'uint256' },
+        ] }, primaryType: 'RunResult', message: result,
+    });
 
     const playFee = async (levelId: bigint) => {
         if (!client) throw new Error('No RPC client');
@@ -42,7 +49,7 @@ export function useSettleRun() {
     };
 
     /** Signs an ERC-2612 permit for the play fee, then settles in a single transaction. */
-    const settleWithPermit = async (result: RunResult, sig: Hex, permitTtlSec = 3600) => {
+    const createPermit = async (result: RunResult, permitTtlSec = 3600) => {
         if (!client) throw new Error('No RPC client');
         const fee = await playFee(result.levelId);
         const nonce = await client.readContract({ address: forgeCoin, abi: forgeCoinAbi, functionName: 'nonces', args: [result.player] });
@@ -64,13 +71,17 @@ export function useSettleRun() {
         });
         const { r, s, yParity, v } = parseSignature(permitSig);
         const v8 = Number(v ?? BigInt(yParity + 27));
+        return { permitDeadline, v: v8, r, s };
+    };
+    const settleWithPermit = async (result: RunResult, sig: Hex, permitTtlSec = 3600) => {
+        const { permitDeadline, v, r, s } = await createPermit(result, permitTtlSec);
         return tx.write.writeContractAsync({
             address: forgeCoin,
             abi: forgeCoinAbi,
             functionName: 'settleRunWithPermit',
-            args: [result, sig, v8, r, s, permitDeadline],
+            args: [result, sig, v, r, s, permitDeadline],
         });
     };
 
-    return { settle, settleWithPermit, approveFee, ...tx };
+    return { settle, settleWithPermit, createPermit, authorizeRun, approveFee, ...tx };
 }

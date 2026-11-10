@@ -881,6 +881,70 @@ contract ForgeCoinTest is Test {
 
     // ------------------------------------------------------------------ settleRunWithPermit (ERC-2612)
 
+    function test_SettleRunFor_RequiresPlayerSignature() public {
+        (address holder, uint256 holderPk) = makeAddrAndKey("relayHolder");
+        vm.prank(holder);
+        coin.claimFaucet();
+        IForgeCoin.RunResult memory run = _run(holder, 901, false, 1000);
+        bytes memory serverSig = _signRun(signerPk, run);
+        (uint8 v, bytes32 r, bytes32 s) = _signPermit(holderPk, holder, FEE, block.timestamp + 1 hours);
+        bytes memory wrong = _signRun(0x1234, run);
+        vm.expectRevert(abi.encodeWithSelector(ForgeCoin.InvalidPlayerSignature.selector, holder));
+        coin.settleRunFor(run, serverSig, wrong, v, r, s, block.timestamp + 1 hours);
+    }
+
+    function test_SettleRunFor_RejectsStaleLargerAllowanceWithoutValidPermit() public {
+        (address holder, uint256 holderPk) = makeAddrAndKey("relayHolder");
+        vm.startPrank(holder);
+        coin.claimFaucet();
+        coin.approve(address(coin), type(uint256).max);
+        vm.stopPrank();
+        IForgeCoin.RunResult memory run = _run(holder, 904, false, 1000);
+        bytes memory serverSig = _signRun(signerPk, run);
+        bytes memory playerSig = _signRun(holderPk, run);
+        vm.expectRevert(abi.encodeWithSelector(ForgeCoin.InvalidPermitAllowance.selector, holder, FEE, type(uint256).max));
+        coin.settleRunFor(run, serverSig, playerSig, 27, bytes32(0), bytes32(0), block.timestamp + 1 hours);
+    }
+
+    function test_SettleRunFor_RelayedSettlementAndReplayProtection() public {
+        (address holder, uint256 holderPk) = makeAddrAndKey("relayHolder");
+        vm.prank(holder);
+        coin.claimFaucet();
+        IForgeCoin.RunResult memory run = _run(holder, 902, false, 1000);
+        bytes memory serverSig = _signRun(signerPk, run);
+        bytes memory playerSig = _signRun(holderPk, run);
+        uint256 permitDeadline = block.timestamp + 1 hours;
+        (uint8 v, bytes32 r, bytes32 s) = _signPermit(holderPk, holder, FEE, permitDeadline);
+        address relay = makeAddr("relayer");
+        vm.prank(relay);
+        coin.settleRunFor(run, serverSig, playerSig, v, r, s, permitDeadline);
+        assertEq(coin.balanceOf(holder), 90e18);
+        assertEq(coin.balanceOf(owner), 7e18);
+        assertTrue(coin.runNonceUsed(holder, run.nonce));
+        vm.prank(relay);
+        vm.expectRevert(abi.encodeWithSelector(ForgeCoin.NonceAlreadyUsed.selector, holder, run.nonce));
+        coin.settleRunFor(run, serverSig, playerSig, v, r, s, permitDeadline);
+    }
+
+    function test_SettleRunFor_FrontRunStillSettlesSamePlayerOnlyOnce() public {
+        (address holder, uint256 holderPk) = makeAddrAndKey("relayHolder");
+        vm.prank(holder);
+        coin.claimFaucet();
+        IForgeCoin.RunResult memory run = _run(holder, 903, false, 1000);
+        bytes memory serverSig = _signRun(signerPk, run);
+        bytes memory playerSig = _signRun(holderPk, run);
+        uint256 permitDeadline = block.timestamp + 1 hours;
+        (uint8 v, bytes32 r, bytes32 s) = _signPermit(holderPk, holder, FEE, permitDeadline);
+        address frontRunner = makeAddr("frontRunner");
+        vm.prank(frontRunner);
+        coin.settleRunFor(run, serverSig, playerSig, v, r, s, permitDeadline);
+        assertEq(coin.balanceOf(frontRunner), 0);
+        assertEq(coin.balanceOf(holder), 90e18);
+        vm.prank(makeAddr("relayer"));
+        vm.expectRevert(abi.encodeWithSelector(ForgeCoin.NonceAlreadyUsed.selector, holder, run.nonce));
+        coin.settleRunFor(run, serverSig, playerSig, v, r, s, permitDeadline);
+    }
+
     bytes32 internal constant PERMIT_TYPEHASH =
         keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
 

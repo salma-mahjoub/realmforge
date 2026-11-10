@@ -8,6 +8,7 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 
 import {ILevelNFT} from "./interfaces/ILevelNFT.sol";
 import {IForgeCoin} from "./interfaces/IForgeCoin.sol";
@@ -161,6 +162,12 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
     error SeasonNotOver(uint256 seasonEnd);
     error InvalidSeasonInput();
     error NothingToWithdraw();
+    error InvalidPlayerSignature(address player);
+    error InvalidPermitAllowance(address player, uint256 expected, uint256 actual);
+
+    /// @notice A run was settled by a third party (gasless relayer) with the player's signed authorisation.
+    /// @dev Emitted after {RunSettled} by {settleRunFor}; `relayer` is `msg.sender` (who paid the gas).
+    event RunRelayed(address indexed player, address indexed relayer, uint256 nonce);
 
     // =====================================================================================================
     //                                           CONSTRUCTOR
@@ -274,10 +281,57 @@ contract ForgeCoin is ERC20, ERC20Permit, ERC20Capped, AccessControl, Reentrancy
         _settleRun(r, sig);
     }
 
-    /// @dev Shared body of {settleRun} / {settleRunWithPermit}.
+    /// @notice Gasless settlement: anyone (in practice the RealmForge relayer, which pays the gas) submits a
+    ///         run on behalf of `r.player`, who authorised it off-chain.
+    /// @dev Two player signatures, zero player transactions:
+    ///      - `playerSig`: the player's EIP-712 signature over the very same `RunResult` the server signed
+    ///        (same typehash and domain, so no new type string). It replaces the `msg.sender == r.player`
+    ///        check of {settleRun}: without it, whoever got hold of a server-signed result (e.g. the relayer)
+    ///        could settle it at a moment the player did not choose. Verified with OpenZeppelin
+    ///        `SignatureChecker`, so smart-contract wallets (ERC-1271) work too.
+    ///      - `v, rr, s, permitDeadline`: the ERC-2612 permit for the play fee, exactly as in
+    ///        {settleRunWithPermit} (try/catch, so a front-run permit does not block the run).
+    ///      Replay: the run nonce is still burned by the shared body, so a relayed result can never be
+    ///      settled twice by any path. Front-running: a copy of the relayer's transaction settles the same
+    ///      run for the same player (nothing to steal: fee and reward only move from/to `r.player`), and the
+    ///      relayer's own transaction then reverts with {NonceAlreadyUsed}. The relayer simulates first.
+    ///      Rewards always go to `r.player`, never to `msg.sender`.
+    function settleRunFor(
+        RunResult calldata r,
+        bytes calldata sig,
+        bytes calldata playerSig,
+        uint8 v,
+        bytes32 rr,
+        bytes32 s,
+        uint256 permitDeadline
+    ) external nonReentrant whenNotPaused {
+        if (!SignatureChecker.isValidSignatureNow(r.player, hashRunResult(r), playerSig)) {
+            revert InvalidPlayerSignature(r.player);
+        }
+        if (block.timestamp > r.deadline) revert SignatureExpired(r.deadline);
+        if (runNonceUsed[r.player][r.nonce]) revert NonceAlreadyUsed(r.player, r.nonce);
+        (,, uint96 playFee,) = _levelNFT().levelInfo(r.levelId);
+        if (playFee > 0) {
+            try this.permit(r.player, address(this), playFee, permitDeadline, v, rr, s) {} catch {}
+            uint256 currentAllowance = allowance(r.player, address(this));
+            // Permit front-running leaves precisely this allowance. Requiring equality prevents a stale
+            // unlimited approval from silently substituting for the player's fee-specific authorisation.
+            if (currentAllowance != playFee) revert InvalidPermitAllowance(r.player, playFee, currentAllowance);
+        }
+        _settle(r, sig);
+        emit RunRelayed(r.player, msg.sender, r.nonce);
+    }
+
+    /// @dev Shared body of {settleRun} / {settleRunWithPermit}: the caller must be the player.
     function _settleRun(RunResult calldata r, bytes calldata sig) internal {
-        // ---------------------------------------------------------------- checks
         if (msg.sender != r.player) revert NotRunPlayer(msg.sender, r.player);
+        _settle(r, sig);
+    }
+
+    /// @dev Settlement body shared by every entry point. The caller has already authenticated the player
+    ///      (`msg.sender` for {_settleRun}, a player signature for {settleRunFor}).
+    function _settle(RunResult calldata r, bytes calldata sig) internal {
+        // ---------------------------------------------------------------- checks
         if (block.timestamp > r.deadline) revert SignatureExpired(r.deadline);
         if (runNonceUsed[r.player][r.nonce]) revert NonceAlreadyUsed(r.player, r.nonce);
         _checkSignature(hashRunResult(r), sig);

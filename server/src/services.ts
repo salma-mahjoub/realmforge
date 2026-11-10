@@ -6,6 +6,8 @@ import { LocalPinner, PinataPinner, type Pinner } from "./ipfs.js";
 import { LevelRepo } from "./levels.js";
 import { GameSigner } from "./signer.js";
 import { RunValidator } from "./validation/index.js";
+import { privateKeyToAccount } from "viem/accounts";
+import type { Hex } from "viem";
 
 export interface Services {
   config: Config;
@@ -18,6 +20,7 @@ export interface Services {
   validator: RunValidator;
   /** SIWE nonces + session tokens (wallet ownership proof for rooms). */
   sessions: SiweAuth;
+  relayer?: ReturnType<typeof privateKeyToAccount>;
 }
 
 export function createServices(config: Config, overrides: Partial<Services> = {}): Services {
@@ -44,5 +47,6 @@ export function createServices(config: Config, overrides: Partial<Services> = {}
     sessions:
       overrides.sessions ??
       new SiweAuth({ chainId: config.CHAIN_ID, secret: config.SESSION_SECRET, ttlSec: config.SESSION_TTL_SEC, domains: config.SIWE_DOMAINS }),
+    relayer: config.RELAYER_PRIVATE_KEY ? privateKeyToAccount(config.RELAYER_PRIVATE_KEY as Hex) : undefined,
   };
 }

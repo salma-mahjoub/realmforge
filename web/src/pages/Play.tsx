@@ -70,6 +70,9 @@ function SettlePanel({ levelId, result, fee, onSettled }: { levelId: number; res
     const [error, setError] = useState<string | null>(null);
     const [running, setRunning] = useState(false);
     const [done, setDone] = useState(false);
+    const [relayConfigured, setRelayConfigured] = useState(false);
+    const [gasless, setGasless] = useState(false);
+    useEffect(() => { let live = true; void api.relayStatus().then(s => { if (live) { setRelayConfigured(s.enabled); setGasless(s.enabled); } }).catch(() => { if (live) { setRelayConfigured(false); setGasless(false); } }); return () => { live = false; }; }, []);
     // The server signs a given recording only once (409 afterwards), so a retry after a failed
     // transaction must reuse the signature it already has until its deadline passes.
     const signedRef = useRef<Awaited<ReturnType<typeof api.submitRun>> | null>(null);
@@ -92,6 +95,22 @@ function SettlePanel({ levelId, result, fee, onSettled }: { levelId: number; res
             const r = signed.result;
             const runResult = { player: r.player, levelId: BigInt(r.levelId), timeMs: r.timeMs, cleared: r.cleared, coins: r.coins, nonce: BigInt(r.nonce), deadline: BigInt(r.deadline) };
             mark(0, 'done', `Signed by ${signed.signer.slice(0, 8)}… · nonce ${String(r.nonce).slice(0, 6)}…`);
+
+            if (gasless) {
+                i = 1;
+                mark(1, 'active', 'Sign run authorisation and fee permit');
+                const playerSignature = await settle.authorizeRun(runResult);
+                const permit = await settle.createPermit(runResult);
+                mark(1, 'done', 'Authorisations signed · no wallet transaction');
+                i = 2;
+                mark(2, 'active', 'Relayer is submitting settlement');
+                await api.relaySettle({ result: r, signature: signed.signature as Hex, playerSignature, permit: { v: permit.v, r: permit.r, s: permit.s, deadline: permit.permitDeadline.toString() } });
+                mark(2, 'done', 'Confirmed on-chain · relayer paid gas');
+                setDone(true);
+                onSettled();
+                toast.success('Run settled on-chain', 'The relayer paid the gas fee.');
+                return;
+            }
 
             i = 1;
             mark(1, 'active', 'Sign the permit in your wallet');
@@ -126,6 +145,7 @@ function SettlePanel({ levelId, result, fee, onSettled }: { levelId: number; res
     const blocked = !!web3.blocker || svc.api === 'offline';
     return (
         <div className="settle">
+            {relayConfigured && <label className="gasless-toggle"><input type="checkbox" checked={gasless} disabled={running || done} onChange={e => setGasless(e.target.checked)} /> Gasless (relayer pays gas)<small>{gasless ? 'You sign two free authorisations; the relayer submits and pays gas.' : 'You pay the network gas for settlement.'}</small></label>}
             <ol className="steps" aria-label="Settle run progress">
                 <StepRow state={steps[0]} title="Validate run" note={notes[0]} />
                 <StepRow state={steps[1]} title="Authorise the play fee" note={notes[1]} />
@@ -154,7 +174,7 @@ function SettlePanel({ levelId, result, fee, onSettled }: { levelId: number; res
             )}
             <div className="settle-actions">
                 <Button variant="gold" size="lg" loading={running} disabled={blocked || done} onClick={() => void submit()}>
-                    {done ? 'Settled' : running ? (tx.stage === 'pending' ? 'Waiting for block…' : 'Working…') : error ? 'Retry settlement' : `Settle run · pay ${fee} FORGE`}
+                    {done ? 'Settled' : running ? (tx.stage === 'pending' ? 'Waiting for block…' : 'Working…') : error ? 'Retry settlement' : gasless ? `Settle run · pay ${fee} FORGE · gasless` : `Settle run · pay ${fee} FORGE`}
                 </Button>
             </div>
         </div>

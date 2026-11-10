@@ -49,7 +49,7 @@ export class TokenBucket {
  * Endpoints that make the server sign something (or start a signing flow). Other features adding a signing
  * endpoint should append its route here.
  */
-export const SIGNING_ROUTES = new Set(["/runs/validate", "/levels/clear-proof", "/season/close-proof", "/auth/nonce", "/auth/verify"]);
+export const SIGNING_ROUTES = new Set(["/runs/validate", "/levels/clear-proof", "/season/close-proof", "/auth/nonce", "/auth/verify", "/badges/claim-proof", "/relay/settle"]);
 
 /** Wallet address a request acts for: `player` / `creator` / `address` in the body, or the address in a SIWE message. */
 export function requestAddress(body: unknown): string | null {

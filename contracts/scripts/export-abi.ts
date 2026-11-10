@@ -9,7 +9,7 @@
  * Output:
  *   <out>/*.abi.ts   `export const <contract>Abi = [...] as const` (viem/wagmi typed)
  *   <out>/*.json     { contractName, abi }
- *   <out>/addresses.json { "<chainId>": { "LevelNFT", "ForgeCoin", "RealmBadges" } }
+ *   <out>/addresses.json { "<chainId>": { "LevelNFT", "ForgeCoin", "RealmBadges", "LevelAuction", ... } }
  *
  * The web/ and server/ directories belong to other owners: this script is only run on purpose by them
  * (or the coordinator); contracts/ never writes there automatically.
@@ -27,6 +27,7 @@ export const EXPORT_CONFIG = {
     { name: "LevelNFT", source: "src/LevelNFT.sol", constName: "levelNFTAbi" },
     { name: "ForgeCoin", source: "src/ForgeCoin.sol", constName: "forgeCoinAbi" },
     { name: "RealmBadges", source: "src/RealmBadges.sol", constName: "realmBadgesAbi" },
+    { name: "LevelAuction", source: "src/LevelAuction.sol", constName: "levelAuctionAbi" },
   ],
   ignitionModuleId: "RealmForgeModule",
 } as const;
@@ -72,6 +73,14 @@ function main() {
   }
 
   const addresses = readAddresses();
+  const existingAddressesPath = join(outDir, "addresses.json");
+  if (existsSync(existingAddressesPath)) {
+    const existing = JSON.parse(readFileSync(existingAddressesPath, "utf8")) as Record<string, Record<string, string>>;
+    for (const [chainId, old] of Object.entries(existing)) {
+      addresses[chainId] ??= {};
+      for (const [name, address] of Object.entries(old)) addresses[chainId][name] ??= address;
+    }
+  }
   writeFileSync(join(outDir, "addresses.json"), JSON.stringify(addresses, null, 2) + "\n");
   console.log(`Exported ${EXPORT_CONFIG.contracts.length} ABIs + addresses for chains [${Object.keys(addresses).join(", ")}] → ${outDir}`);
 }

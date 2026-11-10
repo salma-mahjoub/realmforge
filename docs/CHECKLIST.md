@@ -46,6 +46,13 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [ ] Resolve 3× `TODO(studentA)` design decisions
 - [ ] Owner-side defence for the oral: NFT standard, royalties, market security
 
+### Level auctions (feature branch)
+- [x] `LevelAuction.sol`: timed English auctions, NFT escrow, reserve/increment, anti-sniping, pull refunds, settlement via ERC-2981, cancellation before bids
+- [x] FORGE escrow rule documented and tested: ForgeCoin's 70% owner share lands at the auction contract while it owns a level and remains there (ForgeCoin transfers do not identify a level)
+- [x] Auction API indexer and `GET /auctions` / `GET /auctions?levelId=...`
+- [x] Owner start-auction flow and Auctions market tab with ticking countdown, bid, settle and withdraw
+- [x] Server event-indexing/API integration tests cover auction creation and bids; UI wallet rehearsal remains open
+
 ### Student B — `ForgeCoin.sol` (ERC-20 + Permit + Capped + Pausable)
 - [x] `claimFaucet` (once per address)
 - [x] `settleRun` / `settleRunWithPermit` (`uint8 v`), 70/20/10 split, daily mint cap, supply cap

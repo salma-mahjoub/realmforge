@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { parseEther } from 'viem';
-import { Play, RefreshCw, ShoppingCart, Store, Tag } from 'lucide-react';
+import { formatEther, parseEther } from 'viem';
+import { Gavel, Play, RefreshCw, ShoppingCart, Store, Tag } from 'lucide-react';
 import { api } from '../api/client';
 import type { Listing } from '../api/types';
 import { useMockData } from '../api/dataSource';
@@ -9,6 +9,9 @@ import { AddressChip, Badge, Button, EmptyState, LevelCardSkeleton, LevelThumb, 
 import { useAsync } from '../components/useAsync';
 import { BuyModal, ListModal } from '../components/MarketModals';
 import { useWeb3Status } from '../web3/tx';
+import { useAuction } from '../contracts/hooks';
+import { useTxFlow } from '../web3/tx';
+import { Tabs } from '../components/ui';
 
 type Sort = 'recent' | 'price-asc' | 'price-desc' | 'plays';
 
@@ -17,8 +20,14 @@ export default function Market() {
     const [sort, setSort] = useState<Sort>('recent');
     const [buying, setBuying] = useState<Listing | null>(null);
     const [managing, setManaging] = useState<Listing | null>(null);
+    const [tab, setTab] = useState<'fixed' | 'auctions'>('fixed');
+    const [auctions, setAuctions] = useState<{ levelId: number; seller: `0x${string}`; reservePrice: string; highestBid: string | null; highestBidder: `0x${string}` | null; endTime: number }[]>([]);
     const mock = useMockData('/market/listings');
     const web3 = useWeb3Status();
+    const auction = useAuction();
+    const tx = useTxFlow();
+    const refreshAuctions = () => void api.listAuctions().then((r) => setAuctions(r.items)).catch(() => setAuctions([]));
+    useEffect(() => { refreshAuctions(); const timer = window.setInterval(refreshAuctions, 5_000); return () => window.clearInterval(timer); }, []);
 
     const rows = [...(data ?? [])].sort((a, b) => {
         if (sort === 'price-asc') return Number(a.priceEth) - Number(b.priceEth);
@@ -53,6 +62,9 @@ export default function Market() {
                     </div>
                 </dl>
             </header>
+
+            <Tabs label="Market type" value={tab} onChange={setTab} items={[{ id: 'fixed', label: 'Fixed price' }, { id: 'auctions', label: 'Auctions', icon: <Gavel size={14} /> }]} />
+            {tab === 'auctions' ? <div className="level-grid">{auctions.length === 0 ? <EmptyState icon={<Gavel size={26} />} title="No active auctions">Owners can start an auction from a level page.</EmptyState> : auctions.map((a) => <article className="market-card" key={a.levelId}><div className="level-card-body"><h2 className="level-card-title"><Link to={`/level/${a.levelId}`}>Level #{a.levelId}</Link></h2><p>Reserve {formatEther(BigInt(a.reservePrice))} ETH</p><p>Highest bid {a.highestBid ? `${formatEther(BigInt(a.highestBid))} ETH` : 'No bids'}</p><p>Ends {new Date(a.endTime * 1000).toLocaleString()}</p><AuctionActions item={a} auction={auction} tx={tx} reload={refreshAuctions} /></div></article>)}</div> : <>
 
             <div className="toolbar-row">
                 <span className="results-line">{data ? `${rows.length} listing${rows.length === 1 ? '' : 's'}` : 'Loading listings…'}</span>
@@ -129,6 +141,16 @@ export default function Market() {
                 <BuyModal open onClose={() => setBuying(null)} levelId={buying.level.id} levelName={buying.level.name} priceWei={parseEther(buying.priceEth)} seller={buying.seller} creator={buying.level.creator} onDone={reload} sample={mock} />
             )}
             {managing && <ListModal open onClose={() => setManaging(null)} levelId={managing.level.id} levelName={managing.level.name} currentWei={parseEther(managing.priceEth)} onDone={reload} />}
+            </>}
         </div>
     );
+}
+
+function AuctionActions({ item, auction, tx, reload }: { item: { levelId: number; endTime: number; highestBid?: string | null }; auction: ReturnType<typeof useAuction>; tx: ReturnType<typeof useTxFlow>; reload: () => void }) {
+    const [amount, setAmount] = useState('0.01');
+    const [now, setNow] = useState(Date.now());
+    useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(timer); }, []);
+    const remaining = Math.max(0, Math.ceil(item.endTime - now / 1000));
+    const countdown = `${Math.floor(remaining / 3600)}:${String(Math.floor((remaining % 3600) / 60)).padStart(2, '0')}:${String(remaining % 60).padStart(2, '0')}`;
+    return <div className="row-sm"><span>Time left {countdown}</span><input aria-label="Bid amount ETH" value={amount} onChange={(e) => setAmount(e.target.value)} /><Button size="sm" onClick={() => void tx.run('auction bid', { title: `Bid on level #${item.levelId}`, success: 'Bid placed' }, () => auction.bid(BigInt(item.levelId), amount)).then(reload)}>Bid</Button>{remaining === 0 && <Button size="sm" variant="primary" onClick={() => void tx.run('auction settle', { title: `Settle level #${item.levelId}`, success: 'Auction settled' }, () => auction.settle(BigInt(item.levelId))).then(reload)}>Settle</Button>}<Button size="sm" onClick={() => void tx.run('auction withdraw', { title: 'Withdraw auction proceeds', success: 'Withdrawal complete' }, () => auction.withdraw())}>Withdraw</Button></div>;
 }

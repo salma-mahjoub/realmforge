@@ -133,4 +133,14 @@ describe("stats routes", () => {
     ]));
     expect(body.claimable).not.toEqual(expect.arrayContaining([expect.objectContaining({ badgeId: 1, ref: "2" })]));
   });
+
+  it("indexes auctions and serves the active auction collection and per-level query", async () => {
+    emit("AuctionCreated", { levelId: 1n, seller: CREATOR, reservePrice: E18, minIncrement: E18 / 10n, endTime: 2_000_000_000n });
+    emit("BidPlaced", { levelId: 1n, bidder: PLAYER, amount: 2n * E18, endTime: 2_000_000_600n });
+    const all = (await app.inject({ method: "GET", url: "/auctions" })).json();
+    const one = (await app.inject({ method: "GET", url: "/auctions?levelId=1" })).json();
+    expect(all.items).toHaveLength(1);
+    expect(all.items[0]).toMatchObject({ levelId: 1, seller: CREATOR.toLowerCase(), highestBid: (2n * E18).toString(), highestBidder: PLAYER.toLowerCase(), endTime: 2_000_000_600 });
+    expect(one.items).toHaveLength(1);
+  });
 });

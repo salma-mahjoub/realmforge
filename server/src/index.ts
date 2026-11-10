@@ -21,6 +21,7 @@ async function main() {
     ...(config.LEVEL_NFT_ADDRESS ? [{ name: "LevelNFT" as const, address: config.LEVEL_NFT_ADDRESS }] : []),
     ...(config.FORGE_COIN_ADDRESS ? [{ name: "ForgeCoin" as const, address: config.FORGE_COIN_ADDRESS }] : []),
     ...(config.REALM_BADGES_ADDRESS ? [{ name: "RealmBadges" as const, address: config.REALM_BADGES_ADDRESS }] : []),
+    ...(config.LEVEL_AUCTION_ADDRESS ? [{ name: "LevelAuction" as const, address: config.LEVEL_AUCTION_ADDRESS }] : []),
   ];
   let indexer: Indexer | null = null;
   if (config.INDEXER_ENABLED && contracts.length > 0) {

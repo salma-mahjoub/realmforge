@@ -145,6 +145,22 @@ export function applyLog(db: Db, log: DecodedLog): boolean {
            ON CONFLICT(room_id) DO NOTHING`,
         ).run(lc(a.roomId), n(a.levelId), s(a.stake), JSON.stringify(a.creator ? [lc(a.creator)] : []), block);
         break;
+      case "AuctionCreated":
+        db.prepare("UPDATE levels SET auction_end = ?, auction_seller = ?, auction_price = ? WHERE id = ?").run(n(a.endTime), lc(a.seller), s(a.reservePrice), n(a.levelId));
+        feed(a.levelId, "Auction started", a.seller);
+        break;
+      case "BidPlaced":
+        db.prepare("UPDATE levels SET auction_end = ?, auction_bid = ?, auction_bidder = ? WHERE id = ?").run(n(a.endTime), s(a.amount), lc(a.bidder), n(a.levelId));
+        feed(a.levelId, "Auction bid", a.bidder);
+        break;
+      case "AuctionCancelled":
+        db.prepare("UPDATE levels SET auction_end = NULL, auction_seller = NULL, auction_price = NULL, auction_bid = NULL, auction_bidder = NULL WHERE id = ?").run(n(a.levelId));
+        feed(a.levelId, "Auction cancelled", null);
+        break;
+      case "AuctionSettled":
+        db.prepare("UPDATE levels SET owner = ?, auction_end = NULL, auction_seller = NULL, auction_price = NULL, auction_bid = NULL, auction_bidder = NULL WHERE id = ?").run(lc(a.winner), n(a.levelId));
+        feed(a.levelId, "Auction settled", a.winner);
+        break;
       case "RaceJoined": {
         const row = db.prepare("SELECT players FROM races WHERE room_id = ?").get(lc(a.roomId)) as { players: string } | undefined;
         if (row) {

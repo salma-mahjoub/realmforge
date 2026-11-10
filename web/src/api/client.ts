@@ -189,6 +189,7 @@ export const api = {
                 listedAgo: r.listed_at ? timeAgo(r.listed_at) : '',
             })),
         ),
+    listAuctions: () => request<{ items: { levelId: number; seller: Address; reservePrice: string; highestBid: string | null; highestBidder: Address | null; endTime: number }[] }>('/auctions'),
 
     // seasons (docs/SEASONS.md): live ranking, and the server-signed ranking the admin submits to closeSeason
     getSeason: () => request<SeasonRankingResponse>('/season/current'),

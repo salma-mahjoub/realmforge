@@ -14,8 +14,9 @@ export const SCENES = {
     Play: 'PlayScene',
     Race: 'RaceScene',
     Coop: 'CoopScene',
+    Spectate: 'SpectateScene',
 } as const;
-export type GameSceneKey = (typeof SCENES)['Editor' | 'Play' | 'Race' | 'Coop'];
+export type GameSceneKey = (typeof SCENES)['Editor' | 'Play' | 'Race' | 'Coop' | 'Spectate'];
 
 /** Phaser registry keys shared between scenes. */
 export const REG = {

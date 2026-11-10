@@ -60,6 +60,8 @@ export interface RemotePlayerState {
     vx: number;
     vy: number;
     anim?: string;
+    finished?: boolean;
+    finishTimeMs?: number;
 }
 
 export interface PlayState {
@@ -86,6 +88,11 @@ export interface BusEvents {
     'editor:load-level': [level: LevelFileV1];
     'editor:update-props': [payload: { id: number; props: EntityProps }];
     'editor:delete-selected': [];
+    'editor:copy': [];
+    'editor:cut': [];
+    'editor:paste': [];
+    'editor:rotate': [direction: -1 | 1];
+    'editor:flip': [];
     'editor:request-snapshot': [];
 
     // EditorScene → React
@@ -120,6 +127,7 @@ export interface BusEvents {
     'coop:shared-checkpoint': [index: number];
     /** Co-op: the room ended (true when the whole team reached the goal). */
     'coop:ended': [cleared: boolean];
+    'watch:follow': [sessionId: string];
 }
 
 type Handler<K extends keyof BusEvents> = (...args: BusEvents[K]) => void;

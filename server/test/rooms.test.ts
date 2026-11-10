@@ -61,6 +61,29 @@ describe("RaceRoom (Colyseus)", () => {
     await b.leave();
   });
 
+  it("keeps a spectator outside player state, readiness, and the signed ranking", async () => {
+    const client = new Client(`ws://127.0.0.1:${PORT}`);
+    const a = await client.create("race", { address: PLAYER, timeLimitSec: 30 });
+    const b = await client.joinById(a.roomId, { address: P2 });
+    const started = new Promise<void>((resolve) => a.onMessage("start", () => resolve()));
+    a.send("ready"); b.send("ready");
+    await started;
+    const watcher = await client.joinById(a.roomId, { spectator: true });
+    if (!(watcher.state as any)?.players) await new Promise<void>((resolve) => watcher.onStateChange((state: any) => { if (state?.players) resolve(); }));
+    expect((watcher.state as any).players.size).toBe(2);
+    expect((watcher.state as any).spectatorCount).toBe(1);
+    const result = new Promise<any>((resolve) => watcher.onMessage("result", resolve));
+    watcher.send("ready");
+    watcher.send("finish");
+    b.send("finish");
+    await new Promise((r) => setTimeout(r, 80));
+    a.send("finish");
+    const res = await result;
+    expect(res.result.ranking).toEqual([P2, PLAYER]);
+    expect((watcher.state as any).players.size).toBe(2);
+    await watcher.leave(); await a.leave(); await b.leave();
+  });
+
   it("ends the race when the last racer gives up and ranks the finisher first", async () => {
     const client = new Client(`ws://127.0.0.1:${PORT}`);
     const a = await client.create("race", { ...auth(PLAYER), timeLimitSec: 30 });

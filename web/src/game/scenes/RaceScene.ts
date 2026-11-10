@@ -20,6 +20,7 @@ const isHeld = (...codes: string[]) => codes.some((c) => held.has(c));
 
 export interface RaceSceneData extends PlaySceneData {
     roomCode?: string;
+    spectator?: boolean;
 }
 
 /**
@@ -33,6 +34,8 @@ export class RaceScene extends PlayScene {
     private finishNote?: Phaser.GameObjects.Text;
     private remotes = new Map<string, { sprite: Phaser.GameObjects.Sprite; label: Phaser.GameObjects.Text; target: RemotePlayerState }>();
     roomCode?: string;
+    private spectator = false;
+    private followedId: string | null = null;
 
     constructor(key: string = SCENES.Race) {
         super(key);
@@ -42,7 +45,14 @@ export class RaceScene extends PlayScene {
         this.finishNote = undefined;
         super.init({ ...data, from: 'race' });
         this.roomCode = data?.roomCode;
+        this.spectator = Boolean(data?.spectator);
         this.remotes.clear();
+        this.followedId = null;
+    }
+
+    create() {
+        super.create();
+        if (this.spectator) this.playerSprite.setVisible(false);
     }
 
     /** A restart starts the frame counter again; tell the room first so it keeps accepting our positions. */
@@ -58,6 +68,7 @@ export class RaceScene extends PlayScene {
         // tells the server (race:respawn), which then expects the next position at spawn from frame 0.
         this.unsubs.push(EventBus.subscribe('race:start', () => this.restart(true)));
         this.unsubs.push(EventBus.subscribe('race:ended', (place) => this.showNote(place === 1 ? 'YOU WIN!' : place ? `RACE OVER  ·  YOU PLACED ${ordinal(place)}` : 'RACE OVER')));
+        this.unsubs.push(EventBus.subscribe('watch:follow', (id) => { this.followedId = id; }));
     }
 
     protected onElementEvent(type: string, el: ElementInstance) {
@@ -81,7 +92,7 @@ export class RaceScene extends PlayScene {
 
     protected afterStep() {
         // 60 Hz sim, 20 Hz network
-        if (this.frame % 3 === 0) {
+        if (!this.spectator && this.frame % 3 === 0) {
             const s = this.sample();
             const st = this.player.state;
             const scale = TILE / MOVEMENT.referenceTile;
@@ -99,6 +110,12 @@ export class RaceScene extends PlayScene {
             r.sprite.x = Phaser.Math.Linear(r.sprite.x, tx, 0.35);
             r.sprite.y = Phaser.Math.Linear(r.sprite.y, ty, 0.35);
             r.label.setPosition(r.sprite.x, r.sprite.y - 52);
+        }
+        if (this.spectator) {
+            const racers = [...this.remotes.entries()];
+            const selected = racers.find(([id]) => id === this.followedId)?.[1];
+            const leader = selected ?? racers.sort((a, b) => Number(Boolean(b[1].target.finished)) - Number(Boolean(a[1].target.finished)) || (b[1].target.finished ? (a[1].target.finishTimeMs ?? Infinity) - (b[1].target.finishTimeMs ?? Infinity) : b[1].target.x - a[1].target.x))[0]?.[1];
+            if (leader) this.cameras.main.startFollow(leader.sprite, false, 0.12, 0.16);
         }
     }
 

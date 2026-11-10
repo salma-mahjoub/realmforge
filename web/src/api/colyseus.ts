@@ -36,6 +36,7 @@ export interface JoinOptions {
     maxPlayers?: number;
     /** FORGE stake (decimal string) — escrow happens on-chain (createRaceRoom/joinRace), not in the room. */
     stake?: string;
+    spectator?: boolean;
 }
 
 /** Server code (BaseMatchRoom AUTH_ERROR) for a missing or invalid wallet ownership proof. */
@@ -78,6 +79,7 @@ export interface RaceStateLike {
     raceId?: string;
     startAt?: number;
     elapsedMs?: number;
+    spectatorCount?: number;
     players?: { forEach(cb: (p: Partial<RemotePlayerState>, sessionId: string) => void): void };
 }
 
@@ -117,6 +119,8 @@ export class RaceConnection {
                     vx: p.vx ?? 0,
                     vy: p.vy ?? 0,
                     anim: p.anim,
+                    finished: Boolean((p as { finished?: boolean }).finished),
+                    finishTimeMs: Number((p as { finishTimeMs?: number }).finishTimeMs) || undefined,
                 });
             });
             EventBus.emit('race:remote-states', players);

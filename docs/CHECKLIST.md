@@ -108,8 +108,8 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] Grid, palette (7 categories, 36 elements), place/erase, 100-step undo/redo, T toggles test-play, autosave, JSON import/export
 - [x] Palette + property panel driven by the game-core `ELEMENTS` prop descriptors (verified in browser)
 - [x] Test Play uses the game-core PlayScene
-- [ ] Copy/paste, rotate, link mode (door↔door, switch→blocks)
-- [ ] Theme and music picker
+- [x] Rectangle multi-select with undoable copy/cut/paste, direction transforms where element schemas expose direction, and starter templates (flat, staircase, castle gauntlet)
+- [x] Theme and validated music picker
 - [~] Publish flow (pin → clear-proof → mint) wired; scripted end to end OK, UI path with a wallet not yet clicked
 
 ## 5. Server — `server/` (Fastify, Colyseus 0.16, viem, node:sqlite)
@@ -119,6 +119,7 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] Plausibility checks: speed per tick, checkpoint order, minimum time
 - [x] Event indexer (catch-up, then watch, idempotent writes)
 - [x] RaceRoom + CoopRoom at 20 Hz, signed RaceResult/RunResult; test with two clients
+- [x] Read-only spectator joins for race/co-op rooms, shareable `/watch/:code` view, leader camera, racer switching and live ranking
 - [x] 29 tests passing
 - [x] Movement constants imported from game-core (`file:../game-core`)
 - [x] `GET /levels/:id/file`; schema accepts the web level format; 31 tests
@@ -211,3 +212,10 @@ Coordinator verification: game-core 87, contracts 42 (+9 todo), server 31, web 4
 ## Latest verification — browser demo pass
 
 Root `npm test` and `npm run build` pass: game-core 87, contracts 93 (83 Solidity + 10 integration, 0 todo), server 59, web 79. `npm run e2e:browser` passes on a fresh chain in real Chromium: publish (token id decoded from `LevelPublished`) → second wallet plays, settles and the creator earns → NFT listed, bought and royalties withdrawn → 1v1 staked race with live remote players, signed ranking and on-chain payout. Fixed during the pass: dash power-up runs rejected by the server; race stage going black after the finish; racers frozen at spawn for each other (lobby warm-up desynced the server frame counter); countdown stuck on 3; colliding racer colours; reward estimate (+50) not matching the mint (35); header balance lagging a settle; toasts covering dialog buttons; unreadable faucet button.
+
+## Editor and spectator upgrades — 10 November 2026
+
+- [x] Editor clipboard/template helpers: rectangle selection copy/cut/paste, entity link remapping, undo/redo, schema-backed direction transforms and three starter templates. Music options are constrained to manifest tracks.
+- [x] Race/co-op spectator joins bypass player slots and readiness, remain available after countdown, and are omitted from settlement ranking. `/watch/:code` follows the leader or a selected racer.
+- [x] Root `npm test`: game-core 87, contracts 93 (83 Solidity + 10 integration), server 60, web 85 passing. `npm run build` passes.
+- [x] Local browser race with two wallet contexts plus a third spectator context: spectator joined the running race, displayed both players, switched the followed racer, and showed spectator count; the race settled on-chain.

@@ -40,11 +40,13 @@ export const createOptionsSchema = z.object({
 });
 
 export const joinOptionsSchema = z.object({
-  address: z.string().refine((a) => isAddress(a), "invalid wallet address"),
+  address: z.string().refine((a) => isAddress(a), "invalid wallet address").optional(),
+  /** A read-only connection: never creates a player or participates in race messages. */
+  spectator: z.boolean().optional(),
   name: z.string().max(24).optional(),
   /** Optional personal_sign of joinMessage(roomId, address) proving wallet ownership. */
   signature: z.string().optional(),
-});
+}).superRefine((o, ctx) => { if (!o.spectator && !o.address) ctx.addIssue({ code: "custom", path: ["address"], message: "wallet address is required" }); });
 
 const posSchema = z.object({
   f: z.number().int().nonnegative(),
@@ -60,6 +62,7 @@ export const joinMessage = (roomId: string, address: string) => `RealmForge: joi
 
 interface ClientData {
   address: Address;
+  spectator: boolean;
 }
 
 /**
@@ -67,7 +70,7 @@ interface ClientData {
  * per-tick speed plausibility, checkpoint order, finish order and time limit.
  */
 export abstract class BaseMatchRoom<S extends MatchState> extends Room<S, unknown, ClientData> {
-  maxClients = 4;
+  maxClients = 16;
   protected analysis: LevelAnalysis | null = null;
   protected ended = false;
   /** Players who asked to restart: their frame counter starts again, so their next position must be a respawn point. */
@@ -85,8 +88,9 @@ export abstract class BaseMatchRoom<S extends MatchState> extends Room<S, unknow
     const state = this.createState();
     this.setState(state);
     this.setPatchRate(PATCH_RATE_MS);
-    this.maxClients = options.maxPlayers ?? 4;
-    state.minPlayers = Math.min(options.minPlayers ?? this.defaultMinPlayers, this.maxClients);
+    const maxPlayers = options.maxPlayers ?? 4;
+    this.maxClients = maxPlayers + 12;
+    state.minPlayers = Math.min(options.minPlayers ?? this.defaultMinPlayers, maxPlayers);
 
     const { levels } = roomServices();
     if (options.levelId !== undefined) {
@@ -122,8 +126,11 @@ export abstract class BaseMatchRoom<S extends MatchState> extends Room<S, unknow
     const parsed = joinOptionsSchema.safeParse(rawOptions ?? {});
     if (!parsed.success) throw new ServerError(4001, parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
     const options = parsed.data;
-    const address = getAddress(options.address);
+    // Spectators are admitted independently of player phase/auth and never occupy a player slot.
+    if (options.spectator) return { address: "0x0000000000000000000000000000000000000000" as Address, spectator: true };
+    const address = getAddress(options.address!);
     if (this.state.phase !== "waiting") throw new ServerError(4003, "match already started");
+    if (this.state.players.size >= (this.maxClients - 12)) throw new ServerError(4008, "match is full");
     for (const p of this.state.players.values()) {
       if (p.address === address && p.connected) throw new ServerError(4009, "address already in room");
     }
@@ -132,14 +139,15 @@ export abstract class BaseMatchRoom<S extends MatchState> extends Room<S, unknow
       // TODO(auth): require it (or SIWE) once the web client signs joinMessage().
       return verifyMessage({ address, message: joinMessage(this.roomId, address), signature: options.signature as Hex }).then((ok) => {
         if (!ok) throw new ServerError(4001, "invalid join signature");
-        return { address, name: options.name };
+        return { address, name: options.name, spectator: false };
       });
     }
-    return { address, name: options.name };
+    return { address, name: options.name, spectator: false };
   }
 
-  onJoin(client: Client<ClientData>, _options: unknown, auth: { address: Address; name?: string }) {
-    client.userData = { address: auth.address };
+  onJoin(client: Client<ClientData>, _options: unknown, auth: { address: Address; name?: string; spectator?: boolean }) {
+    client.userData = { address: auth.address, spectator: Boolean(auth.spectator) };
+    if (auth.spectator) { this.state.spectatorCount++; return; }
     const p = new PlayerState();
     p.address = auth.address;
     p.name = auth.name ?? `${auth.address.slice(0, 6)}…${auth.address.slice(-4)}`;
@@ -151,6 +159,7 @@ export abstract class BaseMatchRoom<S extends MatchState> extends Room<S, unknow
   }
 
   async onLeave(client: Client<ClientData>, consented: boolean) {
+    if (client.userData?.spectator) { this.state.spectatorCount = Math.max(0, this.state.spectatorCount - 1); return; }
     const p = this.player(client);
     if (!p) return;
     if (this.state.phase === "waiting" || this.state.phase === "finished") {
@@ -187,7 +196,7 @@ export abstract class BaseMatchRoom<S extends MatchState> extends Room<S, unknow
   protected startCountdown() {
     this.state.phase = "countdown";
     this.state.startAt = this.now() + COUNTDOWN_MS;
-    void this.lock();
+    // Keep the room joinable for read-only spectators. onAuth rejects new players after waiting.
     this.broadcast("countdown", { startAt: this.state.startAt });
     this.clock.setTimeout(() => {
       this.state.phase = "running";

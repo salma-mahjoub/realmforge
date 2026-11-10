@@ -30,6 +30,7 @@ export interface JoinOptions {
     minPlayers?: number;
     /** FORGE stake (decimal string) — escrow happens on-chain (createRaceRoom/joinRace), not in the room. */
     stake?: string;
+    spectator?: boolean;
 }
 
 const PALETTE = [0x22d3ee, 0xf472b6, 0xa3e635, 0xfbbf24];
@@ -46,6 +47,7 @@ export interface RaceStateLike {
     raceId?: string;
     startAt?: number;
     elapsedMs?: number;
+    spectatorCount?: number;
     players?: { forEach(cb: (p: Partial<RemotePlayerState>, sessionId: string) => void): void };
 }
 
@@ -85,6 +87,8 @@ export class RaceConnection {
                     vx: p.vx ?? 0,
                     vy: p.vy ?? 0,
                     anim: p.anim,
+                    finished: Boolean((p as { finished?: boolean }).finished),
+                    finishTimeMs: Number((p as { finishTimeMs?: number }).finishTimeMs) || undefined,
                 });
             });
             EventBus.emit('race:remote-states', players);

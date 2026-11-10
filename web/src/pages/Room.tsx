@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Check, Copy, Flag, Hourglass, KeyRound, LogOut, Plus, Radio, RotateCcw, Swords, Users } from 'lucide-react';
+import { Check, Copy, Eye, Flag, Hourglass, KeyRound, LogOut, Plus, Radio, RotateCcw, Swords, Users } from 'lucide-react';
 import { api } from '../api/client';
 import { RaceConnection, closeRoom, colorFor, openRoom, stashConnection } from '../api/colyseus';
 import type { RoomPlayer } from '../api/types';
@@ -434,12 +434,14 @@ function RaceRoom({ code }: { code: string }) {
                             {code}
                         </div>
                         <div className="invite-actions">
+                            {online === 'live' && <Button size="sm" variant="primary" to={`/watch/${code}`} icon={<Eye size={14} aria-hidden />}>Watch</Button>}
                             <Button size="sm" variant="secondary" icon={copied === 'code' ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />} onClick={() => void copyText(code, 'code')}>
                                 {copied === 'code' ? 'Copied' : 'Copy code'}
                             </Button>
                             <Button size="sm" variant="ghost" icon={copied === 'link' ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />} onClick={() => void copyText(`${location.origin}/room/${code}`, 'link')}>
                                 {copied === 'link' ? 'Copied' : 'Copy invite link'}
                             </Button>
+                            {online === 'live' && <Button size="sm" variant="ghost" onClick={() => void copyText(`${location.origin}/watch/${code}`, 'link')}>Copy watch link</Button>}
                         </div>
                         <span className="fine">They open Race, type the code under “Join with a code”, then pay the same stake ({stake} FORGE).</span>
                     </div>

@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Castle, Check, CheckCircle2, Info, Download, Eraser, Grid3x3, Keyboard, Link2, MousePointer2, Pencil, Play, Plus, Redo2, Rocket, Snowflake, Square, Sun, TreePine, Undo2, Upload, ZoomIn, ZoomOut } from 'lucide-react';
+import { Castle, Check, CheckCircle2, Info, Download, Eraser, FlipHorizontal, Grid3x3, Keyboard, Link2, MousePointer2, Pencil, Play, Plus, Redo2, RotateCcw, Rocket, Snowflake, Square, Sun, TreePine, Undo2, Upload, ZoomIn, ZoomOut } from 'lucide-react';
 import { PhaserGame } from '../../game/PhaserGame';
 import { EventBus, type EditorStatus, type EditorTool } from '../../game/EventBus';
 import { SCENES } from '../../game/constants';
 import { SAMPLE_LEVEL, loadAutosave } from '../../game/level';
 import { layoutHash } from '../../game/level/serialize';
 import { THEMES, type LevelEntity, type LevelFileV1, type Theme } from '../../game/level/types';
+import { ELEMENT_BY_TYPE } from '../../game/level/catalog';
 import { Palette, PropertiesPanel } from './Panels';
 import { PublishModal, type CreatorClear } from './PublishModal';
+import { AVAILABLE_MUSIC, createTemplate, isAvailableMusic, LEVEL_TEMPLATES, type LevelTemplateId, validatedMusic } from '../../game/editor/templates';
 import { Badge, Button, Kbd, Modal, Select, Tooltip, capitalize, cx, formatMs, timeAgo, toast } from '../../components/ui';
 
 const TOOLS: { id: EditorTool; label: string; icon: ReactNode; key: string; hint: string }[] = [
@@ -33,6 +35,9 @@ const SHORTCUTS: [string[], string][] = [
     [['G'], 'Toggle grid'],
     [['⌘/Ctrl', 'Z'], 'Undo'],
     [['⇧', '⌘/Ctrl', 'Z'], 'Redo (also ⌘/Ctrl Y)'],
+    [['⌘/Ctrl', 'C'], 'Copy selection'],
+    [['⌘/Ctrl', 'X'], 'Cut selection'],
+    [['⌘/Ctrl', 'V'], 'Paste at cursor'],
     [['Del'], 'Delete selection'],
     [['Esc'], 'Deselect / leave test play'],
     [['←', '↑', '→', '↓'], 'Scroll the level'],
@@ -49,7 +54,10 @@ export default function EditorPage() {
     const [status, setStatus] = useState<EditorStatus>(INITIAL_STATUS);
     const [mode, setMode] = useState<'edit' | 'test'>('edit');
     const [selection, setSelection] = useState<LevelEntity | null>(null);
-    const [level, setLevel] = useState<LevelFileV1>(() => loadAutosave() ?? SAMPLE_LEVEL);
+    const [level, setLevel] = useState<LevelFileV1>(() => {
+        const stored = loadAutosave() ?? SAMPLE_LEVEL;
+        return { ...stored, meta: { ...stored.meta, music: validatedMusic(stored.meta.theme, stored.meta.music) } };
+    });
     const [savedAt, setSavedAt] = useState<Date | null>(null);
     const [, tick] = useState(0);
     const [clear, setClear] = useState<CreatorClear | null>(null);
@@ -104,8 +112,9 @@ export default function EditorPage() {
     }, []);
 
     const loadLevel = (l: LevelFileV1) => {
-        setLevel(l);
-        EventBus.emit('editor:load-level', l);
+        const validated = { ...l, meta: { ...l.meta, music: validatedMusic(l.meta.theme, l.meta.music) } };
+        setLevel(validated);
+        EventBus.emit('editor:load-level', validated);
     };
     const setMeta = (patch: Partial<LevelFileV1['meta']>) => loadLevel({ ...level, meta: { ...level.meta, ...patch } });
 
@@ -155,7 +164,7 @@ export default function EditorPage() {
                 <Badge tone="neutral">Draft</Badge>
                 <span className="theme-select">
                     <span className="theme-icon">{THEME_ICON[level.meta.theme]}</span>
-                    <Select aria-label="Theme" value={level.meta.theme} onChange={(e) => setMeta({ theme: e.target.value as Theme, music: `${e.target.value}_01` })}>
+                    <Select aria-label="Theme" value={level.meta.theme} onChange={(e) => setMeta({ theme: e.target.value as Theme })}>
                         {THEMES.map((t) => (
                             <option key={t} value={t}>
                                 {capitalize(t)}
@@ -163,6 +172,19 @@ export default function EditorPage() {
                         ))}
                     </Select>
                 </span>
+                <label className="editor-meta-select editor-music-select">
+                    <span className="sr-only">Background music</span>
+                    <Select aria-label="Background music" value={isAvailableMusic(level.meta.music) ? level.meta.music : AVAILABLE_MUSIC[0]} onChange={(e) => setMeta({ music: e.target.value })}>
+                        {AVAILABLE_MUSIC.map((track) => <option key={track} value={track}>{track.replace('_', ' · ').toUpperCase()}</option>)}
+                    </Select>
+                </label>
+                <label className="editor-meta-select editor-template-select">
+                    <span className="sr-only">New from template</span>
+                    <Select aria-label="New from template" value="" onChange={(e) => { if (e.target.value) loadLevel(createTemplate(e.target.value as LevelTemplateId)); }}>
+                        <option value="">New from template…</option>
+                        {LEVEL_TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.label} — {t.description}</option>)}
+                    </Select>
+                </label>
                 <span className="save-state" aria-live="polite">
                     <Check size={15} aria-hidden /> {savedAt ? `Saved ${timeAgo(savedAt)}` : 'Autosave on'}
                 </span>
@@ -222,6 +244,10 @@ export default function EditorPage() {
                             <span>Redo</span>
                         </button>
                     </Tooltip>
+                </div>
+                <div className="tool-group" role="group" aria-label="Selection transforms">
+                    <Tooltip content="Rotate direction"><button type="button" className="tool tool-icon" aria-label="Rotate direction" onClick={() => EventBus.emit('editor:rotate', 1)} disabled={!selection || !ELEMENT_BY_TYPE[selection.type].props.some((p) => p.key === 'direction') || testing}><RotateCcw size={16} /></button></Tooltip>
+                    <Tooltip content="Flip direction"><button type="button" className="tool tool-icon" aria-label="Flip direction" onClick={() => EventBus.emit('editor:flip')} disabled={!selection || !ELEMENT_BY_TYPE[selection.type].props.some((p) => p.key === 'direction') || testing}><FlipHorizontal size={16} /></button></Tooltip>
                 </div>
                 <div className="tool-group tool-group-end" role="group" aria-label="View">
                     <Tooltip content="Toggle grid" shortcut="G">

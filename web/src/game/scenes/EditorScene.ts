@@ -15,7 +15,9 @@ import {
     UpdatePropsCommand,
     type EditorModel,
     type TileChange,
+    type Command,
 } from '../editor/commands';
+import { copySelection, normalizedRect, pasteSelection, type EditorClipboard, type Rect } from '../editor/selection';
 import { createBackground } from '../render/background';
 import { elementTexture, groundTexture } from '../assets/registry';
 import { canonicalType, footprint } from '../elements/bridge';
@@ -48,6 +50,11 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
     private stroke: Map<number, TileChange> | null = null;
     private selectedId: number | null = null;
     private dragFrom: { x: number; y: number } | null = null;
+    private selectionStart: { x: number; y: number } | null = null;
+    private selectionRect: Rect | null = null;
+    private selectionBounds: Rect | null = null;
+    private selectedEntities = new Set<number>();
+    private clipboard: EditorClipboard | null = null;
     private linkFrom: number | null = null;
     private cursor: { x: number; y: number } | null = null;
     private panning: { x: number; y: number; sx: number; sy: number } | null = null;
@@ -71,6 +78,11 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
         this.entityPivots.clear();
         this.selectedId = null;
         this.linkFrom = null;
+        this.selectionStart = null;
+        this.selectionRect = null;
+        this.selectionBounds = null;
+        this.selectedEntities.clear();
+        if (fresh) this.clipboard = null;
     }
 
     create() {
@@ -261,6 +273,16 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
                 g.lineStyle(3, 0x7c5cff, 1).strokeRect(b.x - 4, b.y - 4, b.width + 8, b.height + 8);
             }
         }
+        if (this.selectionRect) {
+            const r = this.selectionRect;
+            g.lineStyle(2, 0x7c5cff, 0.9).fillStyle(0x7c5cff, 0.12)
+                .fillRect(r.left * TILE, r.top * TILE, (r.right - r.left + 1) * TILE, (r.bottom - r.top + 1) * TILE)
+                .strokeRect(r.left * TILE, r.top * TILE, (r.right - r.left + 1) * TILE, (r.bottom - r.top + 1) * TILE);
+        }
+        else if (this.selectionBounds) {
+            const r = this.selectionBounds;
+            g.lineStyle(2, 0x7c5cff, 0.9).strokeRect(r.left * TILE, r.top * TILE, (r.right - r.left + 1) * TILE, (r.bottom - r.top + 1) * TILE);
+        }
         if (this.linkFrom !== null) {
             const src = this.getEntity(this.linkFrom);
             if (src && this.cursor) {
@@ -297,12 +319,20 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
             this.cursorBox.setVisible(Boolean(cell));
             if (cell) this.cursorBox.setPosition(cell.x * TILE, cell.y * TILE);
             if (p.isDown && cell) this.onPrimaryDrag(cell);
+            if (p.isDown && cell && this.tool === 'select' && this.selectionStart && this.selectedId === null) {
+                this.selectionRect = normalizedRect(this.selectionStart, cell);
+                this.drawOverlay();
+            }
             if (this.linkFrom !== null) this.drawOverlay();
         });
 
         this.input.on(Phaser.Input.Events.POINTER_UP, () => {
             this.panning = null;
             this.endStroke();
+            if (this.selectionStart && this.selectionRect) this.applyRectSelection(this.selectionRect);
+            this.selectionStart = null;
+            this.selectionRect = null;
+            this.drawOverlay();
         });
         this.input.on(Phaser.Input.Events.GAME_OUT, () => {
             // leaving the canvas (e.g. toolbar "Test" button) → test-play starts from the level spawn
@@ -331,6 +361,9 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
         kb.on('keydown-Y', (e: KeyboardEvent) => {
             if (!isTypingInForm() && (e.ctrlKey || e.metaKey)) this.redo();
         });
+        kb.on('keydown-C', (e: KeyboardEvent) => { if (!isTypingInForm() && (e.ctrlKey || e.metaKey)) { e.preventDefault(); this.copySelected(false); } });
+        kb.on('keydown-X', (e: KeyboardEvent) => { if (!isTypingInForm() && (e.ctrlKey || e.metaKey)) { e.preventDefault(); this.copySelected(true); } });
+        kb.on('keydown-V', (e: KeyboardEvent) => { if (!isTypingInForm() && (e.ctrlKey || e.metaKey)) { e.preventDefault(); this.pasteAtCursor(); } });
         kb.on('keydown-DELETE', guard(() => this.deleteSelected()));
         kb.on('keydown-BACKSPACE', guard(() => this.deleteSelected()));
         kb.on('keydown-ONE', guard(() => this.setTool('place')));
@@ -379,8 +412,12 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
             }
             case 'select': {
                 const hit = this.entityAt(cell);
+                this.selectionBounds = null;
+                this.selectedEntities.clear();
                 this.select(hit?.id ?? null);
                 this.dragFrom = hit ? { x: hit.x, y: hit.y } : null;
+                this.selectionStart = hit ? null : cell;
+                this.selectionRect = hit ? null : normalizedRect(cell, cell);
                 break;
             }
             case 'link':
@@ -484,8 +521,62 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
     }
 
     private deleteSelected() {
+        if (this.selectionBounds) {
+            this.copySelected(true);
+            this.emitStatus();
+            return;
+        }
+        if (this.selectedEntities.size) {
+            const cmds: Command[] = [...this.selectedEntities].map((id) => this.getEntity(id)).filter((e): e is LevelEntity => Boolean(e)).map((e) => new RemoveEntityCommand(structuredClone(e)));
+            if (cmds.length) this.stack.execute(new CompositeCommand('Delete selection', cmds), this);
+            this.selectedEntities.clear();
+            this.emitStatus();
+            return;
+        }
         const e = this.selectedId !== null ? this.getEntity(this.selectedId) : undefined;
         if (e) this.stack.execute(new RemoveEntityCommand(structuredClone(e)), this);
+        this.emitStatus();
+    }
+
+    private applyRectSelection(rect: Rect) {
+        this.selectionBounds = rect;
+        this.selectedEntities = new Set(this.doc.entities.filter((e) => e.x >= rect.left && e.x <= rect.right && e.y >= rect.top && e.y <= rect.bottom).map((e) => e.id));
+        this.select(null);
+        this.emitStatus();
+    }
+
+    private copySelected(cut: boolean) {
+        const rect = this.selectionBounds ?? (this.selectedId !== null ? (() => { const e = this.getEntity(this.selectedId!); return e ? normalizedRect(e, e) : null; })() : null);
+        if (!rect) return;
+        const entities = this.doc.entities.filter((e) => this.selectedEntities.size ? this.selectedEntities.has(e.id) : this.selectedId === null || e.id === this.selectedId);
+        this.clipboard = copySelection(rect, this.doc.terrain, this.doc.size.w, entities);
+        if (cut) {
+            const cmds: Command[] = this.clipboard.tiles.map((t) => new SetTilesCommand([{ x: rect.left + t.x, y: rect.top + t.y, from: t.value, to: 0 }], 'Cut tile'));
+            for (const e of entities) cmds.push(new RemoveEntityCommand(structuredClone(e)));
+            if (cmds.length) this.stack.execute(new CompositeCommand('Cut selection', cmds), this);
+            this.selectedEntities.clear(); this.select(null);
+        }
+        this.emitStatus();
+    }
+
+    private pasteAtCursor() {
+        if (!this.clipboard || !this.cursor) return;
+        const pasted = pasteSelection(this.clipboard, this.cursor, this.doc.entities.reduce((m, e) => Math.max(m, e.id), 0) + 1);
+        const tileChanges = pasted.tiles.filter((t) => this.inBounds(t.x, t.y)).map((t) => ({ x: t.x, y: t.y, from: this.getTile(t.x, t.y), to: t.value }));
+        const cmds: Command[] = tileChanges.length ? [new SetTilesCommand(tileChanges, 'Paste tiles')] : [];
+        for (const e of pasted.entities) if (this.inBounds(e.x, e.y) && !this.entityAt({ x: e.x, y: e.y })) cmds.push(new AddEntityCommand(e));
+        if (cmds.length) this.stack.execute(new CompositeCommand('Paste selection', cmds), this);
+        this.selectedEntities = new Set(pasted.entities.map((e) => e.id));
+        this.selectionBounds = { left: this.cursor.x, top: this.cursor.y, right: this.cursor.x + this.clipboard.rect.right - this.clipboard.rect.left, bottom: this.cursor.y + this.clipboard.rect.bottom - this.clipboard.rect.top };
+        this.drawOverlay();
+        this.emitStatus();
+    }
+
+    private transformSelected(key: 'direction', value: number) {
+        const e = this.selectedId !== null ? this.getEntity(this.selectedId) : undefined;
+        if (!e || !ELEMENT_BY_TYPE[canonicalType(e.type) ?? e.type]?.props.some((p) => p.key === key)) return;
+        const before = e.props ? structuredClone(e.props) : undefined;
+        this.stack.execute(new UpdatePropsCommand(e.id, before, { ...e.props, [key]: value }), this);
         this.emitStatus();
     }
 
@@ -531,6 +622,11 @@ export class EditorScene extends Phaser.Scene implements EditorModel {
         u.push(EventBus.subscribe('editor:toggle-test', () => this.toggleTestPlay()));
         u.push(EventBus.subscribe('editor:toggle-grid', () => this.toggleGrid()));
         u.push(EventBus.subscribe('editor:delete-selected', () => this.deleteSelected()));
+        u.push(EventBus.subscribe('editor:copy', () => this.copySelected(false)));
+        u.push(EventBus.subscribe('editor:cut', () => this.copySelected(true)));
+        u.push(EventBus.subscribe('editor:paste', () => this.pasteAtCursor()));
+        u.push(EventBus.subscribe('editor:rotate', (_d) => { const e = this.getEntity(this.selectedId ?? -1); if (e && ELEMENT_BY_TYPE[canonicalType(e.type) ?? e.type]?.props.some((p) => p.key === 'direction')) this.transformSelected('direction', Number(e.props?.direction ?? 1) * -1); }));
+        u.push(EventBus.subscribe('editor:flip', () => { const e = this.getEntity(this.selectedId ?? -1); if (e && ELEMENT_BY_TYPE[canonicalType(e.type) ?? e.type]?.props.some((p) => p.key === 'direction')) this.transformSelected('direction', Number(e.props?.direction ?? 1) * -1); }));
         u.push(
             EventBus.subscribe('editor:zoom', (z) => {
                 this.cameras.main.setZoom(Math.round(Phaser.Math.Clamp(z, 0.25, 2) * TILE) / TILE);

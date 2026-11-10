@@ -36,6 +36,7 @@ export class MatchState extends Schema {
   /** bytes32 race id used by ForgeCoin.createRaceRoom / settleRace. */
   @type("string") raceId = "";
   @type("uint8") minPlayers = 2;
+  @type("uint8") spectatorCount = 0;
   @type("uint8") checkpointCount = 0;
   /** Server epoch ms when the countdown ends / race started (0 if not yet). */
   @type("float64") startAt = 0;

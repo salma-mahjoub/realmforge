@@ -2,6 +2,8 @@
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const { walletScript } = require('./wallet.cjs');
 const EXE = process.env.CHROME_PATH || undefined; // default: Playwright's bundled Chromium
+const WEB = process.env.E2E_WEB_URL || 'http://localhost:8080';
+const RPC = process.env.E2E_RPC_URL || 'http://127.0.0.1:8545';
 const CREATOR = '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC'; // Hardhat #2
 const shot = (p, n) => p.screenshot({ path: `${__dirname}/shots/${n}.png` }).then(() => console.log('shot', n));
 
@@ -37,8 +39,8 @@ async function holdRightUntil(page, doneText, ms = 15000) {
   const browser = await chromium.launch({ ...(EXE ? { executablePath: EXE } : {}), args: ['--use-gl=angle', '--enable-unsafe-swiftshader'] });
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   page.on('pageerror', (e) => console.log('PAGEERROR', e.message));
-  await page.addInitScript({ content: walletScript(CREATOR) });
-  await page.goto('http://localhost:8080/editor', { waitUntil: 'networkidle' });
+  await page.addInitScript({ content: walletScript(CREATOR, RPC) });
+  await page.goto(`${WEB}/editor`, { waitUntil: 'networkidle' });
   await connect(page);
   await shot(page, '01-connected');
 

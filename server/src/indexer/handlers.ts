@@ -8,6 +8,8 @@ export interface DecodedLog {
   blockNumber: bigint | null;
   transactionHash: string | null;
   logIndex: number | null;
+  /** Emitting contract (viem sets it on every log); used to recognise FORGE leaving ForgeCoin's own balance. */
+  address?: string | null;
 }
 
 const lc = (v: unknown) => String(v).toLowerCase();
@@ -81,7 +83,15 @@ export function applyLog(db: Db, log: DecodedLog): boolean {
         break;
       case "Transfer":
         // ERC-20 Transfer shares topic0 with ERC-721 Transfer; only the 721 one has `tokenId`.
-        if (a.tokenId === undefined) break;
+        if (a.tokenId === undefined) {
+          // ERC-20: remember FORGE paid out of ForgeCoin's own balance in this tx (closeSeason pays winners this way,
+          // and SeasonClosed is emitted after its transfers). Older txs' rows are dropped so the table stays tiny.
+          if (log.address && lc(a.from) === lc(log.address)) {
+            db.prepare("DELETE FROM forge_outflows WHERE tx_hash != ?").run(txHash);
+            db.prepare("INSERT OR IGNORE INTO forge_outflows (tx_hash, log_index, recipient, amount) VALUES (?, ?, ?, ?)").run(txHash, logIndex, lc(a.to), s(a.value));
+          }
+          break;
+        }
         // ERC-721 transfer keeps `owner` current (also clears listing, mirroring the contract's _update override).
         db.prepare("UPDATE levels SET owner = ?, listing_price = NULL WHERE id = ?").run(lc(a.to), n(a.tokenId));
         break;
@@ -123,6 +133,11 @@ export function applyLog(db: Db, log: DecodedLog): boolean {
         break;
       case "SeasonClosed":
         db.prepare("INSERT OR IGNORE INTO seasons (season, pool, block_number, tx_hash, closed_at) VALUES (?, ?, ?, ?, ?)").run(n(a.season), s(a.pool), block, txHash, now);
+        db.prepare(
+          `INSERT OR IGNORE INTO season_payouts (season, position, recipient, amount)
+           SELECT ?, ROW_NUMBER() OVER (ORDER BY log_index), recipient, amount FROM forge_outflows WHERE tx_hash = ?`,
+        ).run(n(a.season), txHash);
+        db.prepare("DELETE FROM forge_outflows WHERE tx_hash = ?").run(txHash);
         break;
       case "RaceCreated":
         db.prepare(

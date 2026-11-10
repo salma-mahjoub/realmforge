@@ -140,7 +140,45 @@ export interface SeasonRankingResponse {
     creators: { address: Address; score: number }[];
     /** basis points, players first then creators */
     shares: number[];
-    closed: { season: number; pool: string; hash: string }[];
+    closed: ClosedSeason[];
+}
+
+/** A closed season (indexed SeasonClosed) and the FORGE each winner received, in closeSeason order. */
+export interface ClosedSeason {
+    season: number;
+    /** pool before the payouts, wei */
+    pool: string;
+    block: number;
+    hash: string;
+    closedAt: number;
+    payouts: { position: number; address: Address; amount: string }[];
+}
+
+/** One row of GET /season/standings: every scorer of the running season, not only the paid top 10. */
+export interface SeasonStanding {
+    address: Address;
+    rank: number;
+    score: number;
+    reachedBlock: number;
+    /** in the paid top `maxWinners` */
+    winner: boolean;
+    /** basis points of the pool if the season closed now */
+    shareBps: number;
+    /** players: distinct levels cleared · creators: distinct paying players */
+    primary: number;
+    /** players: season records held · creators: levels that were paid for */
+    secondary: number;
+}
+
+/** GET /season/standings */
+export interface SeasonStandingsResponse {
+    season: number;
+    afterBlock: number;
+    maxWinners: number;
+    players: SeasonStanding[];
+    creators: SeasonStanding[];
+    totals: { runs: number; clears: number; activePlayers: number; activeLevels: number };
+    closed: ClosedSeason[];
 }
 
 export interface LevelRow {

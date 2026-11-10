@@ -22,6 +22,7 @@
     "e2e:chain": "cd server && npx tsx scripts/e2e-chain-flow.ts",
     "e2e:race": "cd server && npx tsx scripts/e2e-race-flow.ts",
     "e2e:season": "cd server && npx tsx scripts/e2e-season-flow.ts",
+    "season:ff": "cd server && npx tsx scripts/season-fast-forward.ts",
     "e2e:browser": "node scripts/browser-e2e/run-all.mjs"
   },
   "engines": {

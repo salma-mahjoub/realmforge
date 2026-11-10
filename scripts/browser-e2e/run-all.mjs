@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Full demo in a real browser against a running local stack (dev:chain + deploy:local + dev:server + dev:web):
-// creator publishes → player plays + settles → NFT sold + royalties withdrawn → 1v1 staked race.
+// creator publishes → player plays + settles → NFT sold + royalties withdrawn → 1v1 staked race → season close.
 import { execFileSync } from 'node:child_process';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,4 +11,5 @@ const id = process.env.LEVEL_ID ?? '1';
 step('player.cjs', id);
 step('market.cjs', id);
 step('race.cjs', id);
+step('season.cjs'); // last: closes the season (fast-forwards the local chain clock)
 console.log('\n✔ browser demo done — screenshots in scripts/browser-e2e/shots/');

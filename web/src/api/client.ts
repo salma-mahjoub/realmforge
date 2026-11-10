@@ -19,6 +19,7 @@ import type {
     PinResponse,
     ProfileSummary,
     SeasonRankingResponse,
+    SeasonStandingsResponse,
     RecentTx,
     RunRejected,
     SubmitRunRequest,
@@ -188,6 +189,7 @@ export const api = {
 
     // seasons (docs/SEASONS.md): live ranking, and the server-signed ranking the admin submits to closeSeason
     getSeason: () => request<SeasonRankingResponse>('/season/current'),
+    getSeasonStandings: () => request<SeasonStandingsResponse>('/season/standings'),
     requestSeasonProof: () => request<unknown>('/season/close-proof', { method: 'POST' }),
 
     // publish flow (SPEC §3.3): pin first, then the clear proof references the pinned layoutHash

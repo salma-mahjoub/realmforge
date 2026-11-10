@@ -22,6 +22,27 @@ export interface Scored {
   reachedBlock: number;
 }
 
+/** One row of the full standings (GET /season/standings): every scorer, not only the top 10, with the breakdown. */
+export interface Standing extends Scored {
+  rank: number;
+  /** In the top MAX_WINNERS: paid by closeSeason. */
+  winner: boolean;
+  /** Basis points of the pool this address would receive if the season closed now (0 when not a winner). */
+  shareBps: number;
+  /** players: distinct levels cleared · creators: distinct paying players */
+  primary: number;
+  /** players: levels where they hold the season's best time · creators: distinct levels that were paid for */
+  secondary: number;
+}
+
+export interface SeasonStandings {
+  season: number;
+  afterBlock: number;
+  players: Standing[];
+  creators: Standing[];
+  totals: { runs: number; clears: number; activePlayers: number; activeLevels: number };
+}
+
 export interface SeasonRanking {
   season: number;
   /** Runs counted are strictly after this block (the block where the previous season was closed). */
@@ -42,18 +63,6 @@ interface RunRow {
   owner: string;
 }
 
-const rank = (m: Map<string, { score: number; reachedBlock: number }>): Scored[] =>
-  [...m]
-    .filter(([, v]) => v.score > 0)
-    .map(([address, v]) => ({ address: address as Address, ...v }))
-    .sort((a, b) => b.score - a.score || a.reachedBlock - b.reachedBlock || a.address.localeCompare(b.address))
-    .slice(0, MAX_WINNERS);
-
-function add(m: Map<string, { score: number; reachedBlock: number }>, who: string, points: number, block: number) {
-  const cur = m.get(who) ?? { score: 0, reachedBlock: 0 };
-  m.set(who, { score: cur.score + points, reachedBlock: Math.max(cur.reachedBlock, block) });
-}
-
 /** `half` basis points shared proportionally to the scores; the remainder is added to the first entry. */
 export function allocate(scores: number[], half: number): number[] {
   const total = scores.reduce((a, b) => a + b, 0);
@@ -68,7 +77,24 @@ export function currentSeason(db: Db): { season: number; afterBlock: number } {
   return { season: (row?.season ?? 0) + 1, afterBlock: row?.block ?? 0 };
 }
 
-export function computeSeason(db: Db): SeasonRanking {
+type Acc = Map<string, { score: number; reachedBlock: number; primary: number; secondary: number }>;
+
+function add(m: Acc, who: string, points: number, block: number, field?: "primary" | "secondary") {
+  const cur = m.get(who) ?? { score: 0, reachedBlock: 0, primary: 0, secondary: 0 };
+  cur.score += points;
+  cur.reachedBlock = Math.max(cur.reachedBlock, block);
+  if (field) cur[field] += 1;
+  m.set(who, cur);
+}
+
+const order = (m: Acc) =>
+  [...m]
+    .filter(([, v]) => v.score > 0)
+    .map(([address, v]) => ({ address: address as Address, ...v }))
+    .sort((a, b) => b.score - a.score || a.reachedBlock - b.reachedBlock || a.address.localeCompare(b.address));
+
+/** Every scorer of the running season, ranked, with the share each winner would get if the season closed now. */
+export function computeStandings(db: Db): SeasonStandings {
   const { season, afterBlock } = currentSeason(db);
   const runs = db
     .prepare(
@@ -78,32 +104,88 @@ export function computeSeason(db: Db): SeasonRanking {
     )
     .all(afterBlock) as unknown as RunRow[];
 
-  const players = new Map<string, { score: number; reachedBlock: number }>();
-  const creators = new Map<string, { score: number; reachedBlock: number }>();
+  const players: Acc = new Map();
+  const creators: Acc = new Map();
   const clearedBy = new Set<string>(); // `${level}:${player}`
   const payers = new Set<string>(); // `${creator}:${player}`
+  const paidLevels = new Set<number>();
   const best = new Map<number, RunRow>(); // level -> best cleared run
+  const active = new Set<string>();
+  let counted = 0;
+  let clears = 0;
 
   for (const r of runs) {
     if (r.player === r.creator || r.player === r.owner) continue; // self-play earns nothing
+    counted++;
+    active.add(r.player);
+    if (!paidLevels.has(r.level_id)) {
+      paidLevels.add(r.level_id);
+      const c = creators.get(r.creator);
+      if (c) c.secondary += 1;
+      else creators.set(r.creator, { score: 0, reachedBlock: 0, primary: 0, secondary: 1 });
+    }
     if (!payers.has(`${r.creator}:${r.player}`)) {
       payers.add(`${r.creator}:${r.player}`);
-      add(creators, r.creator, 1, r.block_number);
+      add(creators, r.creator, 1, r.block_number, "primary");
     }
     if (!r.cleared) continue;
+    clears++;
     if (!clearedBy.has(`${r.level_id}:${r.player}`)) {
       clearedBy.add(`${r.level_id}:${r.player}`);
-      add(players, r.player, 1, r.block_number);
+      add(players, r.player, 1, r.block_number, "primary");
     }
     const cur = best.get(r.level_id);
     if (!cur || r.time_ms < cur.time_ms) best.set(r.level_id, r); // strict <: the earlier run keeps a tie
   }
-  for (const r of best.values()) add(players, r.player, 2, r.block_number);
+  for (const r of best.values()) add(players, r.player, 2, r.block_number, "secondary");
 
-  const p = rank(players);
-  const c = rank(creators);
-  const playersHalf = c.length === 0 ? BPS : PLAYERS_SIDE_BPS;
-  const creatorsHalf = p.length === 0 ? BPS : BPS - PLAYERS_SIDE_BPS;
-  const shares = [...(p.length ? allocate(p.map((x) => x.score), playersHalf) : []), ...(c.length ? allocate(c.map((x) => x.score), creatorsHalf) : [])];
-  return { season, afterBlock, players: p, creators: c, shares };
+  const p = order(players);
+  const c = order(creators);
+  const np = Math.min(p.length, MAX_WINNERS);
+  const nc = Math.min(c.length, MAX_WINNERS);
+  const playersHalf = nc === 0 ? BPS : PLAYERS_SIDE_BPS;
+  const creatorsHalf = np === 0 ? BPS : BPS - PLAYERS_SIDE_BPS;
+  const pShares = np ? allocate(p.slice(0, np).map((x) => x.score), playersHalf) : [];
+  const cShares = nc ? allocate(c.slice(0, nc).map((x) => x.score), creatorsHalf) : [];
+  const rows = (list: typeof p, shares: number[]): Standing[] =>
+    list.map((x, i) => ({ ...x, rank: i + 1, winner: i < MAX_WINNERS, shareBps: shares[i] ?? 0 }));
+  return {
+    season,
+    afterBlock,
+    players: rows(p, pShares),
+    creators: rows(c, cShares),
+    totals: { runs: counted, clears, activePlayers: active.size, activeLevels: paidLevels.size },
+  };
+}
+
+export interface ClosedSeason {
+  season: number;
+  /** Pool before the payouts (SeasonClosed.pool), wei as a decimal string. */
+  pool: string;
+  block: number;
+  hash: string;
+  closedAt: number;
+  /** FORGE each winner received, in closeSeason order (players first, then creators). */
+  payouts: { position: number; address: Address; amount: string }[];
+}
+
+/** The latest closed seasons (newest first) with what each winner was actually paid on-chain. */
+export function closedSeasons(db: Db, opts: { limit?: number; season?: number } = {}): ClosedSeason[] {
+  const cols = "SELECT season, pool, block_number AS block, tx_hash AS hash, closed_at AS closedAt FROM seasons";
+  const rows = (
+    opts.season !== undefined
+      ? db.prepare(`${cols} WHERE season = ?`).all(opts.season)
+      : db.prepare(`${cols} ORDER BY season DESC LIMIT ?`).all(opts.limit ?? 10)
+  ) as unknown as Omit<ClosedSeason, "payouts">[];
+  const pay = db.prepare("SELECT position, recipient AS address, amount FROM season_payouts WHERE season = ? ORDER BY position");
+  return rows.map((r) => ({ ...r, payouts: pay.all(r.season) as unknown as ClosedSeason["payouts"] }));
+}
+
+/** What `closeSeason` would pay now: the top MAX_WINNERS of each side and their shares (signed by /season/close-proof). */
+export function computeSeason(db: Db): SeasonRanking {
+  const st = computeStandings(db);
+  const strip = ({ address, score, reachedBlock }: Standing): Scored => ({ address, score, reachedBlock });
+  const p = st.players.filter((x) => x.winner);
+  const c = st.creators.filter((x) => x.winner);
+  return { season: st.season, afterBlock: st.afterBlock, players: p.map(strip), creators: c.map(strip), shares: [...p, ...c].map((x) => x.shareBps) };
 }

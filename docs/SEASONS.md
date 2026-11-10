@@ -47,6 +47,42 @@ playing one level; sybil wallets still count, which is why the faucet has a dail
 On-chain, each payout is `pool * share / 10 000`, rounded down. The few wei of dust stay in `seasonPool` for the
 next season, so the contract never pays more than it holds.
 
+## Live standings, closing and payouts (implementation)
+
+| Piece | Where |
+|---|---|
+| Scoring + shares (these rules) | `server/src/season/scoring.ts` (`computeStandings`, `computeSeason`) |
+| Full live standings (every scorer, rank, breakdown, share if closed now) + closed seasons | `GET /season/standings` |
+| Paid top 10 of each side, as signed | `GET /season/current` |
+| Server-signed `SeasonResult` for the admin | `POST /season/close-proof` |
+| What a closed season actually paid (ERC-20 `Transfer`s of the `closeSeason` tx, indexed) | `GET /season/:n/payouts`, `closed[].payouts` |
+| UI: standings, `seasonPool`, countdown, admin close flow, payouts | `web/src/pages/Season.tsx` |
+
+The admin flow on `/season` (visible only to a wallet with `DEFAULT_ADMIN_ROLE`, i.e. the deployer, Hardhat #0 locally):
+1. **Fetch signed result**: `POST /season/close-proof`; the page shows the season, the shares and the signer, and
+   refuses a proof whose season differs from `ForgeCoin.season()`.
+2. **Close season N**: enabled once the chain clock passes `seasonEnd` (otherwise the contract reverts
+   `SeasonNotOver`); submits `closeSeason(players, creators, shares, sig)`.
+3. **Payouts**: read from the receipt (transfers out of ForgeCoin, players first, then creators) and shown with the
+   rounding dust kept in the pool. The indexer stores the same transfers, so "Past seasons" survives a reload.
+
+The countdown uses the latest **block timestamp**, not the wall clock, because that is what the contract compares.
+
+### Demo: fast-forward the season (local Hardhat only)
+
+```bash
+npm run season:ff                    # next block is at seasonEnd: "Close season" unlocks
+LEAVE_SECONDS=90 npm run season:ff   # stop 90 s before the end to show the countdown hit zero
+```
+
+`server/scripts/season-fast-forward.ts` reads `RPC_URL` / `FORGE_COIN_ADDRESS` (env or `server/.env`), checks the chain
+is 31337 (it refuses anything else), then calls `evm_increaseTime` + `evm_mine`. Sepolia cannot do this: there the
+season really lasts 30 days.
+
+Whole flow in a real browser (admin wallet = Hardhat #0): `node scripts/browser-e2e/season.cjs` with
+`WEB_URL` / `RPC_URL` set: standings → signed result → *Close* disabled before the end → `season:ff` → close →
+payouts checked against on-chain balances and the indexed `GET /season/:n/payouts`.
+
 ## Known limits (to state at the oral exam)
 
 - The signer decides what to publish: a compromised signer plus a compromised admin could pay anyone. Mitigation:

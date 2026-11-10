@@ -5,6 +5,8 @@ import { LocalPinner, PinataPinner, type Pinner } from "./ipfs.js";
 import { LevelRepo } from "./levels.js";
 import { GameSigner } from "./signer.js";
 import { RunValidator } from "./validation/index.js";
+import { privateKeyToAccount } from "viem/accounts";
+import type { Hex } from "viem";
 
 export interface Services {
   config: Config;
@@ -15,6 +17,7 @@ export interface Services {
   localPinner: LocalPinner;
   levels: LevelRepo;
   validator: RunValidator;
+  relayer?: ReturnType<typeof privateKeyToAccount>;
 }
 
 export function createServices(config: Config, overrides: Partial<Services> = {}): Services {
@@ -37,5 +40,6 @@ export function createServices(config: Config, overrides: Partial<Services> = {}
     localPinner,
     levels: overrides.levels ?? new LevelRepo(db),
     validator: overrides.validator ?? new RunValidator(),
+    relayer: config.RELAYER_PRIVATE_KEY ? privateKeyToAccount(config.RELAYER_PRIVATE_KEY as Hex) : undefined,
   };
 }

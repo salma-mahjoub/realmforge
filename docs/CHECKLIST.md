@@ -49,6 +49,7 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 ### Student B — `ForgeCoin.sol` (ERC-20 + Permit + Capped + Pausable)
 - [x] `claimFaucet` (once per address)
 - [x] `settleRun` / `settleRunWithPermit` (`uint8 v`), 70/20/10 split, daily mint cap, supply cap
+- [x] Gasless run settlement: player-authorized `settleRunFor`, replay/front-run/wrong-signer contract coverage
 - [x] Race escrow: `createRaceRoom`, `joinRace`, `settleRace`, `refundRace` (1 h timeout)
 - [x] `closeSeason`, `setSigner`, `pause`/`unpause`, `withdrawTreasury`
 - [x] Fuzz: fee split sums correctly, supply never exceeds the cap
@@ -94,6 +95,7 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] Level types, RLE, canonical JSON + `layoutHash`, sample level
 - [x] Real ABIs from export-abi (interim ABI deleted)
 - [x] Hooks for `claimFaucet`, `publish`, `settleRun` + `settleRunWithPermit` (approve fallback), `useMarket` list/unlist/buy; Buy buttons wired
+- [x] Play settlement offers a gasless toggle when the server relayer is configured; player signs RunResult + permit, relayer pays gas
 - [x] PlayScene uses the game-core player + element runtime + fixed 60 Hz clock; replay bitmask + trace + checkpoints recorded (verified in browser)
 - [x] API and Colyseus client aligned with the server's real routes and rooms
 - [x] vitest added (10 tests)
@@ -116,6 +118,7 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] Zod config, `.env.example`
 - [x] EIP-712 signer; the test confirms the type strings match `contracts/src` exactly
 - [x] Routes: `/levels/pin`, `/levels/clear-proof`, `/runs/validate`, `/levels`, `/levels/:id`, leaderboard, replays, `/ipfs/:cid`, `/health`
+- [x] Gasless relay: optional relayer key, `/relay/status`, server-signed RunResult gate, per-player daily quota and gas limit, `/relay/settle`
 - [x] Plausibility checks: speed per tick, checkpoint order, minimum time
 - [x] Event indexer (catch-up, then watch, idempotent writes)
 - [x] RaceRoom + CoopRoom at 20 Hz, signed RaceResult/RunResult; test with two clients

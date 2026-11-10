@@ -28,6 +28,9 @@ export const envSchema = z.object({
     .preprocess(emptyToUndefined, z.enum(["true", "false"]).optional())
     .transform((v) => v !== "false"),
   SIGNER_PRIVATE_KEY: privateKey,
+  RELAYER_PRIVATE_KEY: z.preprocess(emptyToUndefined, privateKey.optional()),
+  RELAY_DAILY_QUOTA: z.coerce.number().int().positive().max(1000).default(10),
+  RELAY_GAS_LIMIT: z.coerce.number().int().positive().max(1_000_000).default(500_000),
   SIGNATURE_TTL_SEC: z.coerce.number().int().positive().default(3600),
   PINATA_JWT: z.preprocess(emptyToUndefined, z.string().optional()),
   IPFS_GATEWAY: z.url().default("https://gateway.pinata.cloud/ipfs/"),

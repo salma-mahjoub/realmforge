@@ -439,6 +439,9 @@ a.level-card:hover .thumb img, .market-card:hover .thumb img { transform: scale(
 .play-foot > .controls { padding: 12px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); }
 .dot-sep { color: var(--faint); }
 .settle { display: flex; flex-direction: column; gap: var(--s-3); }
+.gasless-toggle { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 0 var(--s-2); color: var(--text); font-weight: 600; }
+.gasless-toggle input { accent-color: var(--violet); }
+.gasless-toggle small { grid-column: 2; color: var(--text-muted); font-weight: 400; }
 .steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s-1); }
 .step { display: grid; grid-template-columns: 28px 1fr; gap: var(--s-3); align-items: start; padding: 8px 0; position: relative; }
 .step b { display: block; font-size: var(--fs-md); }

@@ -22,6 +22,7 @@ import type {
     RunRejected,
     SubmitRunRequest,
     SubmitRunResponse,
+    RelayStatus,
 } from './types';
 
 /** server/ Fastify API (default port 8787, see server/.env.example). */
@@ -191,6 +192,8 @@ export const api = {
 
     // runs (SPEC §3.6 / §5.2)
     submitRun: (body: SubmitRunRequest) => request<SubmitRunResponse>('/runs/validate', { method: 'POST', json: body }),
+    relayStatus: () => request<RelayStatus>('/relay/status'),
+    relaySettle: (body: { result: SubmitRunResponse['result']; signature: Hex; playerSignature: Hex; permit: { v: number; r: Hex; s: Hex; deadline: string } }) => request<{ hash: Hex; relayer: Address }>('/relay/settle', { method: 'POST', json: body }),
 };
 
 export function ipfsToHttp(uri: string): string {

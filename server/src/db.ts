@@ -131,6 +131,9 @@ CREATE TABLE IF NOT EXISTS signed_runs (
   created_at   INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS signed_runs_level ON signed_runs(level_id, cleared, time_ms);
+CREATE TABLE IF NOT EXISTS relay_submissions (
+  player TEXT NOT NULL, day INTEGER NOT NULL, nonce TEXT NOT NULL UNIQUE, created_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS run_fingerprints (
   level_id    TEXT NOT NULL,
   run_hash    TEXT NOT NULL,

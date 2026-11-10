@@ -125,6 +125,7 @@ export interface SubmitRunResponse {
     signature: Hex;
     signer: Address;
 }
+export interface RelayStatus { enabled: boolean; dailyQuota: number; gasLimit: number }
 
 /** 422 body of clear-proof / runs/validate. */
 export interface RunRejected {

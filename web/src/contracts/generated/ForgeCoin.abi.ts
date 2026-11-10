@@ -264,6 +264,38 @@ export const forgeCoinAbi = [
     "type": "error"
   },
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "player",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "expected",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "actual",
+        "type": "uint256"
+      }
+    ],
+    "name": "InvalidPermitAllowance",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "player",
+        "type": "address"
+      }
+    ],
+    "name": "InvalidPlayerSignature",
+    "type": "error"
+  },
+  {
     "inputs": [],
     "name": "InvalidRanking",
     "type": "error"
@@ -755,6 +787,31 @@ export const forgeCoinAbi = [
       }
     ],
     "name": "RoleRevoked",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "player",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "relayer",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "nonce",
+        "type": "uint256"
+      }
+    ],
+    "name": "RunRelayed",
     "type": "event"
   },
   {
@@ -2082,6 +2139,86 @@ export const forgeCoinAbi = [
       }
     ],
     "name": "settleRun",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "player",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "levelId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint32",
+            "name": "timeMs",
+            "type": "uint32"
+          },
+          {
+            "internalType": "bool",
+            "name": "cleared",
+            "type": "bool"
+          },
+          {
+            "internalType": "uint16",
+            "name": "coins",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint256",
+            "name": "nonce",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "deadline",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct IForgeCoin.RunResult",
+        "name": "r",
+        "type": "tuple"
+      },
+      {
+        "internalType": "bytes",
+        "name": "sig",
+        "type": "bytes"
+      },
+      {
+        "internalType": "bytes",
+        "name": "playerSig",
+        "type": "bytes"
+      },
+      {
+        "internalType": "uint8",
+        "name": "v",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "rr",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "s",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint256",
+        "name": "permitDeadline",
+        "type": "uint256"
+      }
+    ],
+    "name": "settleRunFor",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

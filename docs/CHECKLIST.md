@@ -111,6 +111,7 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [ ] Copy/paste, rotate, link mode (door↔door, switch→blocks)
 - [ ] Theme and music picker
 - [~] Publish flow (pin → clear-proof → mint) wired; scripted end to end OK, UI path with a wallet not yet clicked
+- [x] Remix: **Remix** on the level page opens a copy in the editor (`/editor?remix=<id>`, `meta.parentId` set, asks before replacing a draft); a banner and a publish check block an unchanged layout (each layoutHash mints once); publishing mints a child LevelNFT. Lineage card on the level page (ancestors chain + direct remixes). Browser-tested: `scripts/browser-e2e/remix.cjs`
 
 ## 5. Server — `server/` (Fastify, Colyseus 0.16, viem, node:sqlite)
 - [x] Zod config, `.env.example`
@@ -126,6 +127,7 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [ ] Rate limiting on `/runs/validate`
 - [ ] Fetch level JSON from IPFS for levels not pinned through this server
 - [x] Profile / market / activity / earnings endpoints (indexer now handles FeeSplit, FeeBurned, SeasonClosed)
+- [x] `GET /levels/:id/remixes`: remix lineage (ancestors root first, direct children with their remix counts, subtree size) over the indexed `parent_id`
 - [x] Season ranking + signing: `GET /season/current`, `POST /season/close-proof` (rules of `docs/SEASONS.md`), proven against the real `closeSeason` (`npm run e2e:season`)
 - [ ] Persisting race results, reconnect handling
 

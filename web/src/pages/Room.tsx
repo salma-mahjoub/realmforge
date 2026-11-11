@@ -484,7 +484,7 @@ function RaceRoom({ code }: { code: string }) {
                                 <Avatar color={hex(p.color)} size={38} />
                                 <div className="player-text">
                                     <span className="player-addr" title={p.address}>
-                                        {shortAddr(p.address)} {p.isYou && <Badge tone="violet">You</Badge>}
+                                        <span className="player-addr-text">{shortAddr(p.address)}</span> {p.isYou && <Badge tone="violet">You</Badge>}
                                     </span>
                                     <span className={p.stakePaid ? 'player-stake ok' : 'player-stake'}>{p.stakePaid ? `Stake ${stake} FORGE paid` : 'Waiting for stake'}</span>
                                 </div>

@@ -47,6 +47,7 @@ export class CoopScene extends RaceScene {
             creator: this.creator,
             roomCode: this.roomCode,
             skipIntro: true,
+            racing: raceStart || this.racing,
             sharedCheckpoint: this.shared,
         } satisfies CoopSceneData);
     }

@@ -19,6 +19,8 @@ if (typeof window !== 'undefined') {
 const isHeld = (...codes: string[]) => codes.some((c) => held.has(c));
 
 export interface RaceSceneData extends PlaySceneData {
+    /** Set from the server's GO on: positions are only sent while racing (lobby warm-up frames would be refused as 'clock ahead'). */
+    racing?: boolean;
     roomCode?: string;
     spectator?: boolean;
 }
@@ -35,6 +37,7 @@ export class RaceScene extends PlayScene {
     private remotes = new Map<string, { sprite: Phaser.GameObjects.Sprite; label: Phaser.GameObjects.Text; target: RemotePlayerState }>();
     roomCode?: string;
     private spectator = false;
+    protected racing = false;
     private followedId: string | null = null;
 
     constructor(key: string = SCENES.Race) {
@@ -45,6 +48,7 @@ export class RaceScene extends PlayScene {
         this.finishNote = undefined;
         super.init({ ...data, from: 'race' });
         this.roomCode = data?.roomCode;
+        this.racing = Boolean(data?.racing);
         this.spectator = Boolean(data?.spectator);
         this.remotes.clear();
         this.followedId = null;
@@ -58,7 +62,7 @@ export class RaceScene extends PlayScene {
     /** A restart starts the frame counter again; tell the room first so it keeps accepting our positions. */
     protected restart(raceStart = false) {
         EventBus.emit('race:respawn');
-        this.scene.restart({ level: this.file, levelId: this.levelId, from: 'race', spawn: raceStart ? undefined : this.spawnTile, creator: this.creator, roomCode: this.roomCode, skipIntro: raceStart } satisfies RaceSceneData);
+        this.scene.restart({ level: this.file, levelId: this.levelId, from: 'race', spawn: raceStart ? undefined : this.spawnTile, creator: this.creator, roomCode: this.roomCode, skipIntro: raceStart, racing: raceStart || this.racing, spectator: this.spectator } satisfies RaceSceneData);
     }
 
     protected bindBus() {
@@ -96,7 +100,7 @@ export class RaceScene extends PlayScene {
             const s = this.sample();
             const st = this.player.state;
             const scale = TILE / MOVEMENT.referenceTile;
-            EventBus.emit('race:local-state', { f: s.f, x: s.x, y: s.y, vx: fixedToWorld(st.vx, scale) / TILE, vy: fixedToWorld(st.vy, scale) / TILE });
+            if (this.racing) EventBus.emit('race:local-state', { f: s.f, x: s.x, y: s.y, vx: fixedToWorld(st.vx, scale) / TILE, vy: fixedToWorld(st.vy, scale) / TILE });
         }
     }
 

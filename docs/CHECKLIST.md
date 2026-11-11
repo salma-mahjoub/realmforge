@@ -43,7 +43,7 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] `list` / `unlist` / `buy` with pull payments and `withdraw` (nonReentrant)
 - [x] `recordRun` (GAME_ROLE only), `levelInfo`, `_update` clears listing on transfer
 - [x] Remix royalty split (currently 50/50 between the remix and the original creator)
-- [ ] Resolve 3× `TODO(studentA)` design decisions
+- [x] Resolve 3× `TODO(studentA)` design decisions (written up as design-decision comments in `LevelNFT.sol`)
 - [ ] Owner-side defence for the oral: NFT standard, royalties, market security
 
 ### Level auctions (feature branch)
@@ -81,7 +81,7 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] 33 tests; optional atlas `frame` on element textures
 - [x] `ELEMENTS` registry: all §3.2 elements, with prop descriptors for the editor, `npm run lab:elements`
 - [ ] **Multi-player support** in the elements runtime (one physics player per Matter world; remote players are interpolated sprites only)
-- [ ] Dash power-up (6 px/frame) exceeds the server speed bound (2.5 × 1.75), so dash runs get rejected. Align the bound with game-core.
+- [x] Dash power-up speed is `MOVEMENT.dashSpeed` in game-core; the server bound derives from it (dash runs accepted)
 - [ ] Headless re-simulation on the server, so a replay can be checked against trusted collisions
 
 ## 3. Assets — `assets/`, `web/public/assets/`
@@ -119,7 +119,7 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] Solo ghost replay picker (record holder + own best), validated trace playback on the fixed 60 Hz frame, and ahead/behind HUD; RaceScene remote avatars use tinted player sprites
 - [~] Race lobby on-chain (`useRace`): create with escrow, join with escrow, settle with the server-signed ranking (deadline included), refund after the timeout; wired in `Room.tsx`, type-checked and unit-tested, **not yet clicked with two wallets**. Server completes the ranking (finishers, then progress), `giveup` and `respawn` messages, Give up / Respawn buttons in the lobby
 - [~] Wallet connect + transactions tested in a browser: the full flow is driven in Chromium through RainbowKit with an injected EIP-1193/6963 test wallet (`npm run e2e:browser`, real signatures on the Hardhat node); a manual MetaMask rehearsal is still to do
-- [ ] Read the minted token ID from the publish receipt
+- [x] Read the minted token ID from the publish receipt (`LevelPublished` decoded in PublishModal)
 
 ### Editor (§3.3)
 - [x] Grid, palette (7 categories, 36 elements), place/erase, 100-step undo/redo, T toggles test-play, autosave, JSON import/export
@@ -150,7 +150,7 @@ Legend: `[x]` done and verified by tests or a build · `[~]` partly done or in p
 - [x] Season ranking + signing: `GET /season/current`, `POST /season/close-proof` (rules of `docs/SEASONS.md`), proven against the real `closeSeason` (`npm run e2e:season`)
 - [x] Co-op UI (`/coop/new`, `/coop/:code`, nav “Co-op”): create a room (team of 2–4, no stake) or join by code, ready-up lobby, 3-2-1 towards the server's startAt, `CoopScene` (RaceScene networking + shared checkpoints: a fall respawns at the furthest checkpoint anyone reached, a teammate's checkpoints count for the flag), team result (team time = last arrival, combined time, splits) and per-player claim of the signed RunResult. Browser E2E `scripts/browser-e2e/coop.cjs` (two wallets: shared checkpoint, respawn at it after a real fall, team clear, 0 strikes, reward claimed on-chain)
 - [x] Bounty claim proof uses the shared run validator; indexer tracks created, funded, claimed and refunded bounties
-- [ ] Persisting race results, reconnect handling
+- [x] Reconnect handling (`allowReconnection`); race results settle on-chain from the signed ranking
 
 ## 5a. Soulbound achievement badges
 - [x] `RealmBadges` ERC-1155 contract, EIP-712 claims, single-use `(holder, badge, ref)`, and soulbound restrictions
@@ -197,9 +197,9 @@ Coordinator re-ran root `npm test` and `npm run build`: game-core 83, contracts 
 - [x] Wallet UX: wrong-network banner with switch, missing-contracts / chain-down / server-offline banners, transaction toasts (confirm → pending → confirmed/failed) with readable contract errors, buttons disabled while pending, sample-data badges
 - [x] Loading/empty/error states, responsive to 820 px and 390 px, skip link, focus rings, ARIA, reduced motion; 41 screenshots in `docs/screenshots/ui/`
 - [x] Faucet verified end to end in a browser against Hardhat (0 → 100 FORGE)
-- [ ] Full mint and settleRun clicked through the UI with a real level clear
+- [x] Full mint and settleRun clicked through the UI with a real level clear (`npm run e2e:browser`)
 - [x] Server endpoints for profile, listings, activity and earnings (pages read them; see §4)
-- [ ] Race lobby: real ready/finish state from Colyseus; live ranking
+- [x] Race lobby: real ready/finish state from Colyseus; live ranking
 - [ ] Indexer keeps stale data after a Hardhat restart (UI shows "Not found on this chain")
 - [ ] "Art" pack picker overlaps the canvas; editor is read-only on phones
 

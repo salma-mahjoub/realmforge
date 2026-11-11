@@ -51,6 +51,9 @@ const shot = (p, n) => p.screenshot({ path: `${__dirname}/shots/${n}.png` }).the
   await page.getByRole('button', { name: /sign in and join/i }).click();
   await page.waitForFunction(() => !document.body.innerText.includes('Wallet signature required'), null, { timeout: 20000 });
   await page.waitForFunction(() => /0x90F7/.test(document.body.innerText) && /0x9965/.test(document.body.innerText), null, { timeout: 20000 }).catch(() => {});
+  // the server's state patch can trail the page by a tick: poll for up to 5 s
+  for (let i = 0; i < 25 && room.state.players.size < 2; i++) await new Promise((r) => setTimeout(r, 200));
+  await page.waitForTimeout(1500); // let the stage remount after the re-join before the screenshot
   const players = room.state.players.size;
   console.log('players in the server room after signing:', players);
   await shot(page, '42-room-joined');

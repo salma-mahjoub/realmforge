@@ -4,6 +4,7 @@ import { useMockData } from '../api/dataSource';
 import { Hero } from '../components/Hero';
 import { Avatar, Badge, Button, EmptyState, ForgeCoin, LevelGrid, compact } from '../components/ui';
 import { useAsync } from '../components/useAsync';
+import { ShowcaseSection } from '../components/ShowcaseSection';
 
 /** Fee split enforced by ForgeCoin.settleRun (SPEC §5.1). */
 const SPLIT = [
@@ -50,6 +51,8 @@ export default function Home() {
                     <LevelGrid levels={popular.data?.slice(0, 4)} loading={popular.loading} count={4} />
                 )}
             </section>
+
+            <ShowcaseSection />
 
             <section className="section economy" aria-labelledby="economy-title">
                 <div className="economy-copy">

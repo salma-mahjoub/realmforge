@@ -66,6 +66,14 @@ export default function EditorPage() {
         return { ...stored, meta: { ...stored.meta, music: validatedMusic(stored.meta.theme, stored.meta.music) } };
     });
     const [params, setParams] = useSearchParams();
+    const playOnOpen = useRef(params.get('play') === '1');
+    useEffect(() => {
+        if (!params.has('play')) return;
+        const next = new URLSearchParams(params);
+        next.delete('play');
+        setParams(next, { replace: true });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
     const remixParam = parseRemixParam(params.get('remix'));
     // The Phaser scene reads its level once at mount, so the canvas waits until the remix copy is ready.
     const [remixLoad, setRemixLoad] = useState<RemixLoad | null>(() => (remixParam ? { id: remixParam, stage: 'loading' } : null));
@@ -91,7 +99,14 @@ export default function EditorPage() {
                 setLevel(l);
                 setSavedAt(new Date());
             }),
-            EventBus.subscribe('current-scene-ready', (s) => setMode(s.scene.key === SCENES.Editor ? 'edit' : 'test')),
+            EventBus.subscribe('current-scene-ready', (s) => {
+                setMode(s.scene.key === SCENES.Editor ? 'edit' : 'test');
+                // /editor?play=1 (a "Made by us" level): jump straight into test play once, then drop the flag
+                if (s.scene.key === SCENES.Editor && playOnOpen.current) {
+                    playOnOpen.current = false;
+                    setTimeout(() => EventBus.emit('editor:toggle-test'), 150);
+                }
+            }),
             EventBus.subscribe('play:finished', (r) => {
                 // Only a clear from the level spawn counts for the server-signed ClearProof.
                 if (!r.fromSpawn) {

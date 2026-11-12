@@ -21,7 +21,7 @@ class SeesawLab extends Phaser.Scene {
     private readonly tile = 64;
 
     preload() {
-        this.load.json('manifest', '/packs/mario/manifest.json');
+        this.load.json('manifest', '/assets/manifest.json');
         this.load.once('filecomplete-json-manifest', () => {
             const m = this.cache.json.get('manifest') as Manifest;
             for (const id of ['seesaw', 'seesaw_pivot']) {

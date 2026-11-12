@@ -7,7 +7,7 @@ const player = process.env.PLAYER || '0x90f79bf6EB2c4f870365E785982E1f101E93b906
 const base = process.env.WEB_URL || 'http://localhost:8080';
 const rpc = process.env.CHAIN_RPC || 'http://127.0.0.1:8545';
 const exe = process.env.CHROME_PATH;
-const screenshot = path.resolve(__dirname, '../../docs/screenshots/ghost/ghost-race.png');
+const screenshot = path.resolve(__dirname, 'shots/ghost-race.png');
 
 (async () => {
   fs.mkdirSync(path.dirname(screenshot), { recursive: true });

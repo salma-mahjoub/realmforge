@@ -1,6 +1,6 @@
 /*
  * RealmForge design tokens. Every component and page style references these, never raw values.
- * Palette from docs/mockups: navy shell #0f1424, violet action #7c5cff, FORGE gold #ffc83d.
+ * Palette: navy shell #0f1424, violet action #7c5cff, FORGE gold #ffc83d.
  */
 :root {
     /* surfaces (one tone step each, separated by 1px lines in app chrome) */

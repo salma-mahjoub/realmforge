@@ -41,7 +41,7 @@ src/
   api/            client.ts (Fastify API, VITE_API_URL), colyseus.ts (VITE_GAME_SERVER_URL), types.ts
   components/     Layout (nav, FORGE pill, wallet chip), ui (cards, thumbs, formatters), useAsync
   contracts/      addresses.ts (env / generated addresses.json), generated/ (ABIs exported by contracts/), hooks/
-  data/mock.ts    placeholder data shaped like docs/mockups
+  data/mock.ts    placeholder data shaped like the UI design
   game/
     EventBus.ts   typed React ⇄ Phaser bridge (event map = the contract between both sides)
     PhaserGame.tsx React host (one Phaser.Game per mount)

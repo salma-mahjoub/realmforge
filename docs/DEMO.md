@@ -47,7 +47,7 @@ After `deploy:local` on a fresh chain, reset the MetaMask activity (Settings →
 ## 4. 1v1 staked race (Host + Guest) — "escrow + signed results"
 1. As the host: **Race → Create room**, pick the level and a 10 FORGE stake. `createRaceRoom` escrows the stake and returns a room code.
 2. As the guest, in another browser window: claim the faucet, enter the code, then **Join and escrow 10 FORGE**.
-3. Both players click **I'm ready**. The server counts down 3-2-1 and both players restart at spawn on **GO!**. Each sees the other Mario live; the server checks speeds and positions every tick.
+3. Both players click **I'm ready**. The server counts down 3-2-1 and both players restart at spawn on **GO!**. Each sees the other player live; the server checks speeds and positions every tick.
 4. The winner sees **YOU WIN!**. The server signs the ranking, and **anyone** can submit it with **Settle on-chain**. The 20 FORGE pot pays 60% to 1st, 25% to 2nd, 10% to the level owner and 5% to the season pool.
    - Fallback: a race that is never settled can be refunded after 1 hour.
 

@@ -71,7 +71,7 @@ The inspected baseline had **no angular stops**: a center hinge alone allows com
 
 The existing deck renderer stretches the sprite to the actual body dimensions. Hosts can optionally provide `ctx.textures.seesaw_pivot`; that image stays fixed at the axle x, top at axle y + 0.1 tile, with default size 0.75 × 0.75 tile, behind the rotating deck. It dims and cleans up with the element. The web currently supplies its pivot through `drawMechanisms`, and does not supply the optional core pivot, so these changes do not add a second web pivot. Its existing placement matches this convention. The browser fixture supplies the separate pivot to the core factory.
 
-The fixture uses existing `elements.seesaw` and `elements.seesaw_pivot` imagery from the Mario pack. Provenance remains [the pack's SOURCES.md](../../assets/packs/mario/SOURCES.md) and manifest source mappings. Nintendo retains its rights; the team's authorization for a private class demo does **not** grant a licence. Screenshots containing that art must stay private with the repo. The outlined player, collision hull and grid are diagnostic geometry, not generated character art or fabricated animation frames.
+The fixture uses the `elements.seesaw` and `elements.seesaw_pivot` imagery of the bundled CC0 pack (see [assets/CREDITS.md](../../assets/CREDITS.md)).
 
 ## Consequences for existing levels
 
@@ -125,12 +125,3 @@ Screenshots were captured from the live Phaser canvas; the right-tilt screenshot
 Additional big-form tests exposed incorrect **parent broadphase bounds after `createMatterPlayer.setForm('big')`**. A standalone player, independent of any seesaw, created at (480,200) and then grown has center (480,170), main bounds approximately **(456,110)–(504,230)**, but parent bounds **(932,306)–(988,434)**. The parent no longer contains the main hull. The browser checker reproduces this with an isolated second player that is never attached to the element runtime. This is evidence of an adapter resize issue, not an inference from the seesaw sprite.
 
 On the right-tilt fixture that grown player can retain a foot contact while its main hull penetrates **4.468 px**; see [diagnostic screenshot](evidence/seesaw-growth-diagnostic.png). Big-form slope collision/stability is therefore **not fully verified**. Existing feet-anchored resize/state tests still pass. `src/adapters/phaserMatter.ts` and `src/controller.ts` have no diff in this pass. Repairing the broadphase hull belongs to the adapter owner and must be followed by real grown-rider collision tests on both tilt directions. No adapter workaround or altered growth behavior was added here.
-
-## Shared checklist updates requested
-
-The coordinator should update `docs/CHECKLIST.md`; this pass intentionally does not edit that shared file:
-
-- Replace the outstanding 0.25-tile seesaw entry with the verified 0.45-tile deck, preserved mass/inertia, center hinge, new ±30° stops, 14 regressions and the browser evidence above.
-- Update game-core verification to the final **83 passing tests**, passing library build, and the original lab build results below; web has **18 passing tests** and a passing production build.
-- Mark the player form-resize parent-bounds defect repaired using the **16 adapter regressions** and grown-rider browser proof above. Keep the free-hinge re-landing carry, floating-point determinism and one-player-per-world limitations explicit.
-- Asset authenticity and Kenney mushroom status belong to the concurrent asset owners; this pass makes no completion claim for those changes.

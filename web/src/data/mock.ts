@@ -1,5 +1,5 @@
 /**
- * Placeholder data shaped like the UI mockups (docs/mockups/*.png). Used when the API is not
+ * Placeholder data shaped like the UI design. Used when the API is not
  * reachable and VITE_USE_MOCKS=true. Shapes match src/api/types.ts.
  */
 import type { Address } from 'viem';

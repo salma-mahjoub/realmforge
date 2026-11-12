@@ -81,7 +81,7 @@ re-simulation of the input log on the server (`docs/SPEC.md` §3.6, stretch goal
 | T18 | False bounty clear or stolen bounty signature | `BountyClaim` binds bounty, level, player, time, nonce, deadline and contract domain; owners, creators and sponsors are rejected | LevelBounty claim tests, validated-clear API and EIP-712 type-string tests | **high if signer compromised**: an eligible wallet can drain open pots until admin revokes `SIGNER_ROLE` |
 | T19 | Bounty sponsor loses funds after an unclaimed bounty | pull refund returns each sponsor's recorded contribution after expiry; expiry is optional | LevelBounty sponsor refund tests | medium: no-expiry bounties cannot be refunded; expired funds remain until sponsors call `refund` |
 
-## 5. Off-chain gaps (from `docs/CHECKLIST.md`, not solved yet)
+## 5. Off-chain gaps (not solved yet)
 
 - Rooms now require wallet ownership proof (SIWE session token or `joinMessage` signature), and the signing endpoints
   are rate limited per IP and per address (in-memory token bucket: one server process only; several instances would
@@ -105,5 +105,5 @@ server owner.
 
 ## 7. Checks run
 
-Unit, fuzz, invariant and integration tests (`docs/CHECKLIST.md`), Solidity coverage of ForgeCoin 99.5 %, Slither
+Unit, fuzz, invariant and integration tests, Solidity coverage of ForgeCoin 99.5 %, Slither
 without high or medium findings (`docs/security/SLITHER.md`), gas report (`docs/GAS.md`).

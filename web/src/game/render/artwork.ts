@@ -29,7 +29,7 @@ export function prepareArtwork(scene: Phaser.Scene) {
         if (/^(background|parallax|tiles-|ph:)/.test(key)) continue;
         const character = isCharacterTexture(key);
         const walker = elementTexture('walker');
-        // Imported Goomba frames share a feet-normalized canvas across walk/death.
+        // A walker anchored at its feet shares one feet-normalized canvas across walk/death.
         // Trimming each pose here destroys its authored scale, aspect and foot alignment.
         if (key === walker.key && walker.anchor?.x === 0.5 && walker.anchor?.y === 1) continue;
         // Terrain keeps its full tile box for seamless joins.

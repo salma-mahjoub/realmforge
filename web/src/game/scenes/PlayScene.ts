@@ -67,7 +67,7 @@ const ANIM_FOR: Record<MovementState, string> = {
 
 /**
  * Solo play (SPEC §3.5). Builds the level with game-core: terrain bodies + `createElementRuntime`
- * (all SPEC elements via `ELEMENTS[type].create`) + `createMatterPlayer` (Mario-like controller),
+ * (all SPEC elements via `ELEMENTS[type].create`) + `createMatterPlayer` (platformer controller),
  * stepped by game-core's fixed 60 Hz Matter clock. Every physics step records one input mask
  * (game-core replay encoder), a position trace and checkpoint hits for server validation.
  */
@@ -208,7 +208,7 @@ export class PlayScene extends Phaser.Scene {
         drawMechanisms(this, this.runtime.elements);
         this.effects = new PlayEffects(this, this.runtime.elements, this.doc.meta.theme);
 
-        // 3. game-core Mario-like controller on a Matter compound body.
+        // 3. game-core platformer controller on a Matter compound body.
         const sp = this.tileCenter(this.spawnTile);
         const playerOptions: PlayerOptions = {
             tile: TILE,

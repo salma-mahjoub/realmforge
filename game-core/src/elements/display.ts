@@ -113,7 +113,7 @@ export function stompVisuals(scene: Phaser.Scene, visuals: ElementVisual[]) {
         const key = `${visual.texture.key}:stomp`;
         const animation = scene.anims?.get(key);
         if (animation && animation.frames.length > 1 && Number.isFinite(animation.duration) && animation.duration > 0) {
-            // The Goomba cycle is already flat: no second squash or early fade.
+            // The stomp cycle is already flat: no second squash or early fade.
             // Scope completion to this animation and force one play even in looping packs.
             const timeout = scene.time.delayedCall(animation.duration + Math.max(100, animation.duration * 0.1), () => ghost.destroy());
             ghost.once(`animationcomplete-${key}`, () => ghost.destroy());

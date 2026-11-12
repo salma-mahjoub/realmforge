@@ -13,7 +13,7 @@ const LOAD_TIMEOUT_MS = 15000;
 
 /**
  * Two-pass loader:
- *  1. fetch the selected pack, falling back from Mario to Kenney;
+ *  1. fetch the asset pack manifest;
  *  2. if present, queue every file it references; individual file errors are tolerated;
  *  3. generate placeholder textures for anything still missing, then start the requested scene.
  */

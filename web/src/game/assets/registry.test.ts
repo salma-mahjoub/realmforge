@@ -3,15 +3,25 @@ import { effectTexture, elementTexture, getAnimations, completeGroundVariants, g
 import { fetchPackManifest, manifestUrl } from './pack';
 
 describe('asset packs', () => {
-    it('falls back to Kenney when a missing pack returns the Vite HTML page', async () => {
+    it('loads the manifest of the bundled pack', async () => {
         const urls: string[] = [];
         const fetcher = (async (url: string) => {
             urls.push(url);
-            return urls.length === 1 ? new Response('<html>missing</html>') : Response.json({ schema: 1, elements: {} });
+            return Response.json({ schema: 1, elements: {} });
         }) as typeof fetch;
-        const result = await fetchPackManifest('mario', fetcher);
+        const result = await fetchPackManifest('kenney', fetcher);
         expect(result.pack).toBe('kenney');
-        expect(urls).toEqual([manifestUrl('mario'), manifestUrl('kenney')]);
+        expect(urls).toEqual([manifestUrl('kenney')]);
+    });
+
+    it('rejects the Vite HTML page served for a missing pack', async () => {
+        const fetcher = (async () => new Response('<html>missing</html>')) as typeof fetch;
+        await expect(fetchPackManifest('kenney', fetcher)).rejects.toThrow();
+    });
+
+    it('rejects a manifest with another schema', async () => {
+        const fetcher = (async () => Response.json({ schema: 2, elements: {} })) as typeof fetch;
+        await expect(fetchPackManifest('kenney', fetcher)).rejects.toThrow('Invalid asset manifest');
     });
 
     it('loads additive metadata, parallax and animation timing without a Kenney character name', () => {
@@ -19,8 +29,8 @@ describe('asset packs', () => {
             elements: { coin: { path: 'coin.png', displaySize: [0.75, 0.75], anchor: [0.5, 1] } },
             characters: { hero: { image: 'hero.png', atlas: 'hero.json', animations: { idle: { frames: ['stand'], frameRate: 3 } } } },
             themes: { grass: { parallax: [{ file: 'sky.png', scrollFactor: 0.1 }, { file: 'hills.png', scrollFactor: 0.4, y: 16 }] } },
-        }, ['coin', 'player'], '/packs/mario/');
-        expect(files).toContainEqual({ kind: 'image', key: 'coin', url: '/packs/mario/coin.png' });
+        }, ['coin', 'player'], '/packs/demo/');
+        expect(files).toContainEqual({ kind: 'image', key: 'coin', url: '/packs/demo/coin.png' });
         expect(elementTexture('coin')).toMatchObject({ displaySize: { w: 0.75, h: 0.75 }, anchor: { x: 0.5, y: 1 } });
         expect(elementTexture('player')).toMatchObject({ key: 'characters-hero', frame: 'stand' });
         expect(getAnimations()[0].frameRate).toBe(3);
@@ -73,9 +83,9 @@ describe('terrain topology and forms', () => {
     });
 
     it('resolves both form atlases by character id and keeps a legacy-pack fallback', () => {
-        readManifest({ characters: { mario: { path: 'big.png' }, mario_small: { path: 'small.png' } } }, ['player']);
-        expect(playerTexture('big').key).toBe('characters-mario');
-        expect(playerTexture('small').key).toBe('characters-mario_small');
+        readManifest({ characters: { hero: { path: 'big.png' }, hero_small: { path: 'small.png' } } }, ['player']);
+        expect(playerTexture('big').key).toBe('characters-hero');
+        expect(playerTexture('small').key).toBe('characters-hero_small');
         readManifest({ characters: { purple: { path: 'purple.png' } } }, ['player']);
         expect(playerTexture('big')).toEqual(playerTexture('small'));
     });
@@ -102,8 +112,8 @@ it('composes every concave blob from corner quarters without losing exposed card
 
 describe('additive effect manifest', () => {
     it('queues authentic effect atlases with frames, timing, anchors and sizing', () => {
-        const files = readManifest({ schema: 1, fx: { dust: { image: 'dust.png', atlas: 'dust.json', frames: ['puff0', 'puff1'], frameRate: 24, anchor: [0.5, 1], displaySize: [1.5, 0.75] } } }, [], '/packs/mario/');
-        expect(files).toContainEqual({ kind: 'atlas', key: 'fx:dust', textureURL: '/packs/mario/dust.png', atlasURL: '/packs/mario/dust.json' });
+        const files = readManifest({ schema: 1, fx: { dust: { image: 'dust.png', atlas: 'dust.json', frames: ['puff0', 'puff1'], frameRate: 24, anchor: [0.5, 1], displaySize: [1.5, 0.75] } } }, [], '/packs/demo/');
+        expect(files).toContainEqual({ kind: 'atlas', key: 'fx:dust', textureURL: '/packs/demo/dust.png', atlasURL: '/packs/demo/dust.json' });
         expect(effectTexture('dust')).toMatchObject({ key: 'fx:dust', frame: 'puff0', anchor: { x: 0.5, y: 1 }, displaySize: { w: 1.5, h: 0.75 } });
         expect(getAnimations()).toContainEqual({ key: 'fx:dust:idle', texture: 'fx:dust', frames: ['puff0', 'puff1'], frameRate: 24, repeat: 0 });
         expect(effectTexture('land_puff')).toBeUndefined();

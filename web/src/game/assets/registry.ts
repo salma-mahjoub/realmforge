@@ -71,7 +71,7 @@ const ALIASES: Partial<Record<ElementType | 'player', string[]>> = {
 };
 
 /** Character id; form selection happens independently of the pack's preferred colour. */
-const PLAYER_CHARACTERS = ['mario', 'purple', 'green', 'pink', 'beige'];
+const PLAYER_CHARACTERS = ['purple', 'green', 'pink', 'beige'];
 
 let base = '/assets/';
 

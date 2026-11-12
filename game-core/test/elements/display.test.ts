@@ -33,7 +33,7 @@ function harness(animated = true) {
 describe('enemy presentation (no physics changes)', () => {
     it('keeps native 120:100 proportions and bottom-centre feet through walk frames and motion', () => {
         const h = harness();
-        const v = createElementVisual(h.scene, 'walker', { texture: 'mario-walker', frame: 'goomba_walk_00', displaySize: { w: 1.2, h: 1 }, anchor: { x: 0.5, y: 1 } }, 100, 200, 64, 64, 64);
+        const v = createElementVisual(h.scene, 'walker', { texture: 'walker-sheet', frame: 'walk_00', displaySize: { w: 1.2, h: 1 }, anchor: { x: 0.5, y: 1 } }, 100, 200, 64, 64, 64);
         for (let i = 0; i < 16; i++) {
             v.emit('animationupdate'); positionElementVisual(v, 100 + i, 200, 0);
             expect(v.scaleX).toBeCloseTo(0.64); expect(v.scaleY).toBeCloseTo(v.scaleX);
@@ -42,19 +42,19 @@ describe('enemy presentation (no physics changes)', () => {
     });
     it('plays the entire flattened stomp once, with unchanged scale, feet and facing', () => {
         const h = harness();
-        const v = createElementVisual(h.scene, 'walker', { texture: 'mario-walker', displaySize: { w: 1.2, h: 1 }, anchor: { x: 0.5, y: 1 } }, 100, 200, 64, 64, 64);
+        const v = createElementVisual(h.scene, 'walker', { texture: 'walker-sheet', displaySize: { w: 1.2, h: 1 }, anchor: { x: 0.5, y: 1 } }, 100, 200, 64, 64, 64);
         v.setFlipX(true); stompVisuals(h.scene, [v]); const ghost = h.sprites[1]!;
         expect(ghost.scaleX).toBeCloseTo(0.64); expect(ghost.scaleY).toBeCloseTo(0.64);
         expect(ghost.y).toBe(232); expect(ghost.flipX).toBe(true);
-        expect(ghost.play).toHaveBeenCalledWith({ key: 'mario-walker:stomp', repeat: 0 });
+        expect(ghost.play).toHaveBeenCalledWith({ key: 'walker-sheet:stomp', repeat: 0 });
         expect(h.host.tweens.add).not.toHaveBeenCalled();
         expect(h.host.time.delayedCall.mock.calls[0]?.[0]).toBeGreaterThan(h.duration);
         ghost.emit('animationcomplete-other'); expect(ghost.active).toBe(true);
-        ghost.emit('animationcomplete-mario-walker:stomp'); expect(ghost.active).toBe(false);
+        ghost.emit('animationcomplete-walker-sheet:stomp'); expect(ghost.active).toBe(false);
         expect(h.timer.remove).toHaveBeenCalledWith(false);
     });
     it('cleans up if a timed animation never completes', () => {
-        const h = harness(); const v = createElementVisual(h.scene, 'walker', { texture: 'mario-walker' }, 0, 0, 64, 64, 64);
+        const h = harness(); const v = createElementVisual(h.scene, 'walker', { texture: 'walker-sheet' }, 0, 0, 64, 64, 64);
         stompVisuals(h.scene, [v]);
         const callback = h.host.time.delayedCall.mock.calls[0]?.[1] as unknown as () => void;
         callback(); expect(h.sprites[1]!.active).toBe(false);

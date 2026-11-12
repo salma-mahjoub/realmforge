@@ -61,7 +61,7 @@ const still = (png, seconds, out) => ff(['-loop', '1', '-t', String(seconds), '-
 const fit = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2:color=0x0b1020`;
 
 const segments = [];
-await card(join(work, 'intro.png'), 'Live demo · local Hardhat chain', 'RealmForge', 'A Mario-Maker-style platformer where every level is an NFT and every play moves FORGE tokens.<br>Recorded end to end in a real browser with real wallet signatures.');
+await card(join(work, 'intro.png'), 'Live demo · local Hardhat chain', 'RealmForge', 'A level-maker platformer where every level is an NFT and every play moves FORGE tokens.<br>Recorded end to end in a real browser with real wallet signatures.');
 still(join(work, 'intro.png'), 4, join(work, '000-intro.mp4'));
 segments.push(join(work, '000-intro.mp4'));
 

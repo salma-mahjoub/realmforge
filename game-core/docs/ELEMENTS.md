@@ -51,7 +51,7 @@ Player inventory is available through `inventoryFor(player)`: coins, keys, doubl
 
 Matter uses floating-point constraints and collision resolution. Fixed 60 Hz and integer-frame AI make repeated runs stable where possible, but this is not a deterministic authoritative server solver.
 
-Seesaws have a 0.45-tile deck (scaled by `height`), a center hinge and ±30° stops; the previous quarter-height mass/inertia are retained. The deck visual follows its collider. Optional `textures.seesaw_pivot` stays fixed behind it; hosts with their own pivot overlay can omit it. See [SEESAW_VALIDATION.md](SEESAW_VALIDATION.md) for level-clearance changes, real contact tests, browser screenshots and the existing player growth/broadphase limitation.
+Seesaws have a 0.45-tile deck (scaled by `height`), a center hinge and ±30° stops; the previous quarter-height mass/inertia are retained. The deck visual follows its collider. Optional `textures.seesaw_pivot` stays fixed behind it; hosts with their own pivot overlay can omit it.
 
 ## Showcase and checks
 

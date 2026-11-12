@@ -1,5 +1,5 @@
 # RealmForge — Technical Specification
-**A web-based "Mario Maker"-style platformer: players build levels with rich physics, publish them as NFTs, and earn tokens when others play.**
+**A web-based level-maker platformer: players build levels with rich physics, publish them as NFTs, and earn tokens when others play.**
 
 Module: Blockchain BK-01 (team of two) · Target: browser DApp · Chain: Ethereum testnet (Sepolia or Base Sepolia)
 
